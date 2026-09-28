@@ -28,9 +28,9 @@ export function MemorySettings() {
   const memories = useQuery({
     queryKey: qk.memories,
     queryFn: () => window.api.memories.list(),
-    // 记忆由 AI 工具在主进程后台写入（不经渲染层 mutation），全局 staleTime=∞ 会让
-    // 面板停留在「上次打开时」的快照——例如开过设置后再聊天写入记忆，重开设置仍空。
-    // staleTime:0 使每次打开记忆面板都重新拉取最新列表（参照 conversation-queries 同型处理）。
+    // Công cụ AI ghi bộ nhớ trong main process, không đi qua mutation của renderer.
+    // Với staleTime vô hạn, bảng có thể giữ danh sách cũ sau khi chat đã tạo bộ nhớ mới.
+    // staleTime:0 buộc tải lại mỗi lần mở bảng, như truy vấn hội thoại.
     staleTime: 0,
   });
 
@@ -49,7 +49,7 @@ export function MemorySettings() {
       setEditingId(null);
     },
     onError: () => {
-      toast.error(t("settings.memory.updateFailed", "记忆保存失败，请重试"));
+      toast.error(t("settings.memory.updateFailed", "Không thể lưu ghi nhớ. Hãy thử lại."));
     },
   });
 
@@ -60,7 +60,7 @@ export function MemorySettings() {
       setDeleteTarget(null);
     },
     onError: () => {
-      toast.error(t("settings.memory.deleteFailed", "记忆删除失败，请重试"));
+      toast.error(t("settings.memory.deleteFailed", "Không thể xóa ghi nhớ. Hãy thử lại."));
     },
   });
 
@@ -90,18 +90,18 @@ export function MemorySettings() {
   return (
     <>
       <section className="space-y-4">
-        <h2 className="font-serif text-lg">{t("settings.memory", "记忆")}</h2>
+        <h2 className="font-serif text-lg">{t("settings.memory", "Bộ nhớ")}</h2>
 
-        {/* 总开关 */}
+        {/* Công tắc chính. */}
         <div className="flex items-start justify-between gap-3">
           <label htmlFor="memory-enabled" className="min-w-0 cursor-pointer">
             <span className="block text-sm font-medium">
-              {t("settings.memory.enabled", "启用 AI 记忆")}
+              {t("settings.memory.enabled", "Bật bộ nhớ AI")}
             </span>
             <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
               {t(
                 "settings.memory.enabledDesc",
-                "AI 会在对话中自动记录重要信息（偏好、阅读习惯、个人背景等），供后续对话参考。关闭后 AI 将不再写入新记忆，已有记忆仍保留。",
+                "AI tự ghi nhớ thông tin quan trọng như tùy chọn, thói quen đọc và ngữ cảnh cá nhân để dùng trong các cuộc trò chuyện sau. Khi tắt, ứng dụng không ghi thêm nhưng vẫn giữ các mục đã có.",
               )}
             </span>
           </label>
@@ -113,16 +113,16 @@ export function MemorySettings() {
           />
         </div>
 
-        {/* 后台自动整理开关（受总开关约束） */}
+        {/* Công tắc tự sắp xếp ở nền, phụ thuộc công tắc chính. */}
         <div className="flex items-start justify-between gap-3">
           <label htmlFor="memory-auto-consolidate" className="min-w-0 cursor-pointer">
             <span className="block text-sm font-medium">
-              {t("settings.memory.autoConsolidate", "后台自动整理记忆")}
+              {t("settings.memory.autoConsolidate", "Tự động sắp xếp bộ nhớ trong nền")}
             </span>
             <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
               {t(
                 "settings.memory.autoConsolidateDesc",
-                "每隔几轮对话，Lia 会在后台补记漏掉的要点并整理已有记忆。会产生额外的模型调用，默认关闭。",
+                "Sau vài lượt trò chuyện, Lia sẽ bổ sung điều còn thiếu và sắp xếp lại các ghi nhớ trong nền. Tính năng này gọi model thêm và mặc định tắt.",
               )}
             </span>
           </label>
@@ -135,13 +135,13 @@ export function MemorySettings() {
           />
         </div>
 
-        {/* 记忆列表 */}
+        {/* Danh sách bộ nhớ. */}
         <div className="space-y-1">
-          <h3 className="text-sm font-semibold">{t("settings.memory.list", "已记忆的内容")}</h3>
+          <h3 className="text-sm font-semibold">{t("settings.memory.list", "Ghi nhớ đã lưu")}</h3>
 
           {memories.isError && (
             <p className="text-sm text-destructive">
-              {t("settings.memory.loadFailed", "记忆加载失败")}
+              {t("settings.memory.loadFailed", "Không thể tải ghi nhớ")}
             </p>
           )}
 
@@ -149,7 +149,7 @@ export function MemorySettings() {
             <p className="py-4 text-center text-sm text-muted-foreground">
               {t(
                 "settings.memory.empty",
-                "还没有记忆。记忆会在与 AI 的对话中自然积累——只需正常交流，AI 会自动记录有用的信息。",
+                "Chưa có ghi nhớ. AI sẽ tự lưu thông tin hữu ích trong lúc trò chuyện. Bạn chỉ cần sử dụng ứng dụng như bình thường.",
               )}
             </p>
           )}
@@ -157,27 +157,27 @@ export function MemorySettings() {
           {memories.data?.map((mem) => (
             <div key={mem.id} className="rounded-lg border border-border">
               {editingId === mem.id ? (
-                /* 编辑态 */
+                /* Chế độ chỉnh sửa. */
                 <div className="space-y-2 p-3">
                   <Input
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    placeholder={t("settings.memory.titlePlaceholder", "标题")}
+                    placeholder={t("settings.memory.titlePlaceholder", "Tiêu đề")}
                   />
                   <Input
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    placeholder={t("settings.memory.descPlaceholder", "简短描述")}
+                    placeholder={t("settings.memory.descPlaceholder", "Mô tả ngắn")}
                   />
                   <Textarea
                     value={editBody}
                     onChange={(e) => setEditBody(e.target.value)}
-                    placeholder={t("settings.memory.bodyPlaceholder", "记忆正文")}
+                    placeholder={t("settings.memory.bodyPlaceholder", "Nội dung ghi nhớ")}
                     className="min-h-24"
                   />
                   <div className="flex justify-end gap-2">
                     <Button variant="ghost" size="sm" onClick={cancelEdit}>
-                      {t("settings.memory.cancel", "取消")}
+                      {t("settings.memory.cancel", "Hủy")}
                     </Button>
                     <Button
                       size="sm"
@@ -189,12 +189,12 @@ export function MemorySettings() {
                         !editBody.trim()
                       }
                     >
-                      {t("settings.memory.save", "保存")}
+                      {t("settings.memory.save", "Lưu")}
                     </Button>
                   </div>
                 </div>
               ) : (
-                /* 展示态 */
+                /* Chế độ hiển thị. */
                 <div>
                   <div className="flex items-center gap-2 px-3 py-2">
                     <button
@@ -215,7 +215,7 @@ export function MemorySettings() {
                         size="icon"
                         className="size-7"
                         onClick={() => startEdit(mem)}
-                        aria-label={t("settings.memory.edit", "编辑")}
+                        aria-label={t("settings.memory.edit", "Sửa")}
                       >
                         <Pencil className="size-3.5" />
                       </Button>
@@ -224,7 +224,7 @@ export function MemorySettings() {
                         size="icon"
                         className="size-7 text-destructive hover:text-destructive"
                         onClick={() => setDeleteTarget(mem.id)}
-                        aria-label={t("settings.memory.delete", "删除")}
+                        aria-label={t("settings.memory.delete", "Xóa")}
                       >
                         <Trash2 className="size-3.5" />
                       </Button>
@@ -238,7 +238,7 @@ export function MemorySettings() {
                       )}
                       <p className="whitespace-pre-wrap text-sm">{mem.body}</p>
                       <p className="text-[11px] text-muted-foreground">
-                        {t("settings.memory.updatedAt", "更新于 {{when}}", {
+                        {t("settings.memory.updatedAt", "Cập nhật {{when}}", {
                           when: new Date(mem.updatedAt).toLocaleString(),
                         })}
                       </p>
@@ -251,7 +251,7 @@ export function MemorySettings() {
         </div>
       </section>
 
-      {/* 删除确认 */}
+      {/* Xác nhận xóa. */}
       <AlertDialog
         open={deleteTarget !== null}
         onOpenChange={(open) => {
@@ -259,13 +259,13 @@ export function MemorySettings() {
         }}
       >
         <AlertDialogContent>
-          <AlertDialogTitle>{t("settings.memory.deleteTitle", "删除记忆？")}</AlertDialogTitle>
+          <AlertDialogTitle>{t("settings.memory.deleteTitle", "Xóa ghi nhớ?")}</AlertDialogTitle>
           <AlertDialogDescription>
-            {t("settings.memory.deleteDesc", "此操作无法撤销，该条记忆将被永久删除。")}
+            {t("settings.memory.deleteDesc", "Bạn không thể hoàn tác thao tác này. Ghi nhớ sẽ bị xóa vĩnh viễn.")}
           </AlertDialogDescription>
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => setDeleteTarget(null)}>
-              {t("settings.memory.cancel", "取消")}
+              {t("settings.memory.cancel", "Hủy")}
             </Button>
             <Button
               variant="destructive"
@@ -274,7 +274,7 @@ export function MemorySettings() {
                 if (deleteTarget) deleteMutation.mutate(deleteTarget);
               }}
             >
-              {t("settings.memory.delete", "删除")}
+              {t("settings.memory.delete", "Xóa")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

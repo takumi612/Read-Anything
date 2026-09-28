@@ -6,9 +6,16 @@ export type ImportBookInput = z.infer<typeof importBookInput>;
 export const bookIdInput = z.object({ bookId: z.string().min(1) });
 export type BookIdInput = z.infer<typeof bookIdInput>;
 
-/** #70 「已读完」标记切换。finished 必传（非 patch；缺键拒绝），独立于 progress。 */
+export const readerDataCategory = z.enum(["annotations", "vocabulary", "bookmarks", "notes"]);
+export type ReaderDataCategory = z.infer<typeof readerDataCategory>;
 
-/** #29 书籍信息编辑。put 语义：两字段必传；author=null 显式清空（回「未知作者」显示）。空串收敛（""→null）由 renderer 表单完成，此处 min(1) 拒空串防绕过 UI 的脏输入。 */
+export const clearBookCategoryInput = bookIdInput.extend({ category: readerDataCategory });
+export type ClearBookCategoryInput = z.infer<typeof clearBookCategoryInput>;
+
+/** #70 Đổi trạng thái đã đọc xong; phải truyền finished, độc lập với tiến độ đọc. */
+
+/** #29 Sửa thông tin sách theo kiểu put: cần cả hai trường; author=null để xóa tên tác giả.
+ * Biểu mẫu chuyển chuỗi rỗng thành null; schema này chặn chuỗi rỗng nếu gọi IPC trực tiếp. */
 export const updateBookInput = z.object({
   bookId: z.string().min(1),
   title: z.string().trim().min(1).max(500),
@@ -19,10 +26,14 @@ export type UpdateBookInput = z.infer<typeof updateBookInput>;
 export const saveProgressInput = z.object({
   bookId: z.string().min(1),
   locator: z.string().min(1),
-  /** 0–1 阅读进度快照；reader 计算上送（spec 2026-06-07-library-shelf-reorder §4）。 */
-  percent: z.number().min(0).max(1).nullish(),
 });
 export type SaveProgressInput = z.infer<typeof saveProgressInput>;
+
+/** Persisted reader location and confirmed page-based completion. */
+export interface ProgressDto {
+  locator: string | null;
+  percent: number | null;
+}
 
 export const chapterRefInput = z.object({
   bookId: z.string().min(1),
@@ -36,7 +47,7 @@ export const readChapterTextInput = chapterRefInput.extend({
 });
 export type ReadChapterTextInput = z.infer<typeof readChapterTextInput>;
 
-/** 手动（重）生成传 `force: true` 跳过 ready-skip；自动触发（开章）不传，已 ready 即廉价 no-op。 */
+/** Tạo lại thủ công dùng force: true; tác vụ tự động bỏ qua nếu nội dung đã sẵn sàng. */
 export const generateChapterSummaryInput = chapterRefInput.extend({
   force: z.boolean().optional(),
 });
@@ -58,46 +69,46 @@ export const reorderBooksInput = z.object({
 });
 export type ReorderBooksInput = z.infer<typeof reorderBooksInput>;
 
-/** 「继续阅读」shelf 条目（#48）：书摘要 + 进度快照。 */
+/** Mục "Đọc tiếp" trên kệ sách: thông tin sách và tiến độ. */
 export interface RecentlyReadDto extends BookSummaryDto {
-  percent: number | null; // 0–1；老数据 null → 卡片不渲染进度行
+  percent: number | null; // 0–1; dữ liệu cũ null thì thẻ không hiện tiến độ.
   lastReadAt: number; // = progress.updatedAt
 }
 
 /**
- * 章节文本分页切片。单一来源在 `@marginalia/epub-parser`（`extractChapterText` 的产出形状），
- * 这里 re-export 供 renderer/preload 消费——与 `@shared/types` re-export `TocNode` 同一模式，避免重复定义漂移。
+ * Các đoạn văn của chương sau phân trang. Kiểu gốc nằm ở @marginalia/epub-parser.
+ * Re-export tại đây cho renderer/preload dùng chung, tránh định nghĩa trùng và lệch kiểu.
  */
 export type { ChapterTextSlice } from "@marginalia/epub-parser";
 
 /**
- * 章节导航引用：渲染层据此列章 / 取 surrogate id 喂 content.chapterText。
- * 章节以 TOC 为准（有标题的目录条目）；`level` 表达层级（0=章，1+=节，源自 TOC 嵌套）。
- * 仅在 epub 无 TOC 的兜底路径里 title 可能为 null。
+ * Tham chiếu điều hướng chương để renderer liệt kê và lấy ID cho content.chapterText.
+ * Chương dựa trên mục lục; level=0 là chương, từ 1 trở lên là các cấp mục con.
+ * title chỉ có thể null khi EPUB không có mục lục và phải dùng đường dự phòng.
  */
 export interface ChapterRefDto {
   id: string;
   title: string | null;
   href: string;
-  anchor: string | null; // 章内 #fragment（锚点级章节）；无锚点章为 null
+  anchor: string | null; // #fragment trong chương; null nếu không có anchor.
   orderIndex: number;
   level: number;
-  startPage: number | null; // PDF 章节页范围（1-based 闭区间）；epub 为 null
+  startPage: number | null; // Trang bắt đầu chương PDF, đánh số từ 1; EPUB dùng null.
   endPage: number | null;
 }
 
-/** 章节/全书摘要的派生状态机（主进程读取时派生，不入 DB；见 DB lifecycle spec §2 / DD-§2）。 */
+/** Trạng thái tóm tắt chương/sách được suy ra khi main đọc DB, không lưu trực tiếp. */
 export type SummaryStatus = "pending" | "generating" | "ready" | "unavailable";
 
-/** content:chapter-summary 返回：摘要状态 + 正文（ready 时非空）。 */
+/** Kết quả content:chapter-summary: trạng thái và nội dung khi đã sẵn sàng. */
 export interface ChapterSummaryDto {
   status: SummaryStatus;
   summary: string | null;
 }
 
 /**
- * content:book-summary 返回：全书摘要状态 + 正文（ready 时非空）。
- * status 在主进程**读取时派生**（books 只持久化 summary；见 book-summary spec），形状同 chapter 版。
+ * Kết quả content:book-summary: trạng thái và nội dung tóm tắt toàn sách.
+ * Main suy ra status khi đọc; bảng books chỉ lưu summary.
  */
 export interface BookSummaryContentDto {
   status: SummaryStatus;
@@ -105,12 +116,30 @@ export interface BookSummaryContentDto {
 }
 
 /**
- * library:read-book-bytes 的返回契约。仅「文件缺失」走 ok:false（reason 预留为字面量联合，
- * 未来别的预期失败再扩）；其余意外错误仍由 handler throw（走 registry 落盘 + 渲染层 query.isError）。
+ * Hợp đồng trả về của library:read-book-bytes. Chỉ tệp bị thiếu trả ok:false.
+ * Lỗi bất ngờ khác được handler ném ra để registry ghi nhận và renderer thấy query.isError.
  */
 export type ReadBookBytesResult =
   | { ok: true; data: Uint8Array }
   | { ok: false; error: { reason: "missing" } };
 
-/** library:relink 返回：ok=写回成功；canceled=用户取消选择；mismatch=选错文件（内容不一致）。 */
+export const exportAnnotatedPdfInput = z.object({
+  bookId: z.string().min(1),
+  bytes: z
+    .instanceof(Uint8Array)
+    .refine(
+      (bytes) =>
+        bytes.length >= 5 &&
+        bytes[0] === 0x25 &&
+        bytes[1] === 0x50 &&
+        bytes[2] === 0x44 &&
+        bytes[3] === 0x46 &&
+        bytes[4] === 0x2d,
+      "Dữ liệu xuất không phải là tệp PDF hợp lệ.",
+    ),
+});
+export type ExportAnnotatedPdfInput = z.infer<typeof exportAnnotatedPdfInput>;
+export type ExportAnnotatedPdfResult = { status: "saved" | "canceled" };
+
+/** Kết quả nối lại tệp sách: ok thành công, canceled do người dùng hủy, mismatch do chọn sai tệp. */
 export type RelinkResult = { status: "ok" | "canceled" | "mismatch" };

@@ -1,30 +1,30 @@
-/** 与 @marginalia/epub-parser 的 TocNode 同形（结构类型兼容，不引依赖）。 */
+/** Có cùng cấu trúc với TocNode của @marginalia/epub-parser, tương thích kiểu cấu trúc mà không thêm dependency. */
 export interface TocNode {
   label: string;
   href: string;
   children?: TocNode[];
 }
 
-/** 章节页范围（1-based 闭区间），与 toc 同序号对应（toc[i].href === "pdf-ch:i"）。 */
+/** Khoảng trang của chương, đánh số từ 1 và tính cả hai đầu; tương ứng toc[i].href === "pdf-ch:i". */
 export interface ChapterRange {
   startPage: number;
   endPage: number;
 }
 
-/** parsePdf 的产物。 */
+/** Kết quả của parsePdf. */
 export interface ParsedPdf {
   title?: string;
   author?: string;
   pageCount: number;
-  /** outline 压扁后的目录；无 outline 时为 []（消费方退化为单章）。 */
+  /** Mục lục outline đã làm phẳng; [] nếu không có outline (bên dùng xem như một chương). */
   toc: TocNode[];
-  /** 章节页范围；无 outline 时为 [{ startPage: 1, endPage: pageCount }]。 */
+  /** Khoảng trang theo chương; nếu không có outline thì dùng [{ startPage: 1, endPage: pageCount }]. */
   chapterRanges: ChapterRange[];
-  /** 文本层检测：采样前 8 页平均字符数 < 阈值 → false（扫描版）。 */
+  /** Phát hiện lớp chữ: false nếu số ký tự trung bình trên 8 trang đầu thấp hơn ngưỡng (PDF scan). */
   hasTextLayer: boolean;
 }
 
-/** 与 epub-parser 的 ChapterTextSlice 同形（结构类型兼容）。 */
+/** Có cùng cấu trúc với ChapterTextSlice của epub-parser. */
 export interface ChapterTextSlice {
   text: string;
   hasMore: boolean;

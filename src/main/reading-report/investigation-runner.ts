@@ -1,4 +1,4 @@
-// src/main/reading-report/investigation-runner.ts —— 把纯逻辑的会话调查接到真实模型与并发额度上。
+// Nối logic điều tra hội thoại với model thật và giới hạn tác vụ nền.
 import { generateText } from "ai";
 import type { ResolvedModel } from "@main/ai/assistant-model";
 import { acquireSlot, type RunBackground } from "@main/ai/background-limiter";
@@ -27,9 +27,9 @@ export type Investigate = (input: {
 }) => Promise<ConversationInvestigation | null>;
 
 /**
- * 生产实现：整次调查占**全局**后台并发的一个槽位——用户在设置里调的并发上限因此对 subagent
- * 真实有效（报告主 agent 是用户显式触发的前台任务，不占该池，故不存在内外层互等的自锁）。
- * 超时未排到槽位返回 null，由工具层转成 busy 让主 agent 自行翻页。
+ * Mỗi lần điều tra chiếm một suất tác vụ nền toàn cục, nên giới hạn người dùng đặt có hiệu lực.
+ * Báo cáo chính là tác vụ foreground, không chiếm suất này. Chờ quá lâu thì trả null
+ * để công cụ báo busy và tác vụ chính tự đọc trang.
  */
 export function createInvestigator(deps: InvestigatorDeps): Investigate {
   return async ({ conversationId, focus }) => {
@@ -48,8 +48,7 @@ export function createInvestigator(deps: InvestigatorDeps): Investigate {
             prompt,
             providerOptions: providerCallOptions(deps.resolved.providerType),
             abortSignal: deps.abortSignal,
-            // 刻意不设 maxOutputTokens：与 runReadingReportAgent 同理，推理模型的思考 token 与
-            // 正文共享该预算，小额度会让要点一条不出。
+            // Không đặt maxOutputTokens vì model reasoning dùng chung mức đó cho suy luận và nội dung.
             maxRetries: 1,
           });
           return text;

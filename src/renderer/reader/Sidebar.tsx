@@ -1,78 +1,98 @@
 import { useTranslation } from "react-i18next";
-import { List, Highlighter, MessagesSquare, NotebookPen } from "lucide-react";
+import { List, PanelLeftClose, PanelsTopLeft } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@renderer/components/ui/tabs";
-import { BookCard } from "./BookCard";
+import { Button } from "@renderer/components/ui/button";
 import { ChapterList } from "./ChapterList";
-import { AnnotationsList } from "./AnnotationsList";
-import { ConversationsTab } from "@renderer/ai/ConversationsTab";
-import { BookNotesPanel } from "@renderer/book-notes/BookNotesPanel";
+import { PdfThumbnailsPanel, type PdfNavigationState } from "./PdfThumbnailsPanel";
 
-export function Sidebar({ bookId }: { bookId: string }) {
+export type PdfTocView = "contents" | "pages";
+
+export function Sidebar({
+  bookId,
+  format,
+  pdfNavigation,
+  pdfTocView,
+  onPdfTocViewChange,
+  onCollapseSidebar,
+}: {
+  bookId: string;
+  format?: "pdf" | "epub";
+  pdfNavigation: PdfNavigationState | null;
+  pdfTocView: PdfTocView;
+  onPdfTocViewChange: (view: PdfTocView) => void;
+  onCollapseSidebar: () => void;
+}) {
   const { t } = useTranslation();
-  // shadcn 的 tabs 组件用 data-horizontal/data-vertical 控方向/高度，但 Base UI Tabs.Root 发的是
-  // data-orientation（属性名不匹配，那些类是惰性的）——故此处显式 flex-col + TabsList h-8 兜底。
-  // tab label 仅在选中态显示（i18n 宽度适配）：trigger 标 group/tab，文字 span 用 group-data-[active] 显隐；
-  // 未选中只剩图标，故每个 trigger 挂 aria-label 保可读名。
+  const collapseSidebarLabel = t("reader.collapseSidebar", "Collapse sidebar");
+  const collapseButton = (
+    <Button
+      variant="ghost"
+      size="icon"
+      onClick={onCollapseSidebar}
+      aria-label={collapseSidebarLabel}
+      aria-expanded={true}
+      title={collapseSidebarLabel}
+      className="size-8 shrink-0"
+    >
+      <PanelLeftClose />
+    </Button>
+  );
+  // Keep navigation limited to the document outline and PDF pages.
   return (
-    // 背景放组件内部而非经 CollapsiblePane className 传入（镜像 AIPanel）：半透明 bg-muted/30
-    // 若传给 CollapsiblePane 会被 tailwind-merge 顶掉收起态抽屉的不透明 bg-background 底 → 浮层透明。
     <div className="flex h-full flex-col bg-muted/30">
-      <BookCard bookId={bookId} />
-      <Tabs defaultValue="toc" className="min-h-0 flex-1 flex-col gap-0">
-        <div className="shrink-0 border-b border-border p-1.5">
-          <TabsList className="h-8 w-full">
-            <TabsTrigger value="toc" className="group/tab" aria-label={t("reader.toc", "目录")}>
-              <List />
-              <span className="hidden group-data-[active]/tab:inline">
-                {t("reader.toc", "目录")}
-              </span>
-            </TabsTrigger>
-            {/* value="notes" 是历史遗留：此 tab 是「标注」；真正的书籍笔记 tab 是 book-notes。 */}
-            <TabsTrigger
-              value="notes"
-              className="group/tab"
-              aria-label={t("reader.annotations", "标注")}
-            >
-              <Highlighter />
-              <span className="hidden group-data-[active]/tab:inline">
-                {t("reader.annotations", "标注")}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="conversations"
-              className="group/tab"
-              aria-label={t("reader.conversations", "会话")}
-            >
-              <MessagesSquare />
-              <span className="hidden group-data-[active]/tab:inline">
-                {t("reader.conversations", "会话")}
-              </span>
-            </TabsTrigger>
-            <TabsTrigger
-              value="book-notes"
-              className="group/tab"
-              aria-label={t("reader.bookNotes", "笔记")}
-            >
-              <NotebookPen />
-              <span className="hidden group-data-[active]/tab:inline">
-                {t("reader.bookNotes", "笔记")}
-              </span>
-            </TabsTrigger>
-          </TabsList>
-        </div>
-        <TabsContent value="toc" className="min-h-0 overflow-hidden">
+      {format === "pdf" ? (
+        <Tabs
+          value={pdfTocView}
+          onValueChange={(value) => {
+            if (value) onPdfTocViewChange(value as PdfTocView);
+          }}
+          className="min-h-0 flex-1 flex-col gap-0"
+        >
+          <div className="flex shrink-0 items-center gap-1 border-b border-border p-1.5">
+            <TabsList className="h-8 min-w-0 flex-1">
+              <TabsTrigger value="contents" aria-label={t("reader.toc", "Contents")}>
+                <List />
+                {t("reader.toc", "Contents")}
+              </TabsTrigger>
+              <TabsTrigger value="pages" aria-label={t("reader.pdf.pages", "Pages")}>
+                <PanelsTopLeft />
+                {t("reader.pdf.pages", "Pages")}
+              </TabsTrigger>
+            </TabsList>
+            {collapseButton}
+          </div>
+          <TabsContent value="contents" className="min-h-0 overflow-hidden">
+            <ChapterList bookId={bookId} />
+          </TabsContent>
+          <TabsContent value="pages" className="min-h-0 overflow-hidden">
+            {pdfNavigation?.bookId === bookId ? (
+              <PdfThumbnailsPanel
+                book={pdfNavigation.book}
+                currentPage={pdfNavigation.currentPage}
+                rotation={pdfNavigation.rotation}
+                invert={pdfNavigation.invert}
+                brightness={pdfNavigation.brightness}
+                onJump={pdfNavigation.onJump}
+              />
+            ) : (
+              <p className="p-3 text-xs text-muted-foreground">
+                {t("reader.pdf.thumbnails.loading", "Loading PDF pages…")}
+              </p>
+            )}
+          </TabsContent>
+        </Tabs>
+      ) : (
+        <div className="min-h-0 flex-1">
+          <div className="flex h-10 items-center justify-between border-b border-border px-2">
+            <span className="flex items-center gap-2 px-1 text-xs font-medium text-muted-foreground">
+              <List className="size-4" />
+              {t("reader.toc", "Contents")}
+            </span>
+            {collapseButton}
+          </div>
           <ChapterList bookId={bookId} />
-        </TabsContent>
-        <TabsContent value="notes" className="min-h-0 overflow-hidden">
-          <AnnotationsList bookId={bookId} />
-        </TabsContent>
-        <TabsContent value="conversations" className="min-h-0 overflow-hidden">
-          <ConversationsTab context={{ kind: "book", bookId }} />
-        </TabsContent>
-        <TabsContent value="book-notes" className="min-h-0 overflow-hidden">
-          <BookNotesPanel bookId={bookId} />
-        </TabsContent>
-      </Tabs>
+        </div>
+      )}
     </div>
   );
 }

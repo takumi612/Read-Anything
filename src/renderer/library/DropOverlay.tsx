@@ -4,9 +4,9 @@ import { cn } from "@renderer/lib/utils";
 import type { EpubDropHandlers } from "./use-epub-drop";
 
 /**
- * 居中投放卡片 overlay（暗背景 + 虚线卡片）。
- * active=指针在卡片上 → accent 激活样式。zoneHandlers 接在卡片上（drop 落卡片才导入）。
- * 容器铺满视口、是书库根的 DOM 子节点，拖拽事件经冒泡回到 rootHandlers。
+ * Lớp phủ thả tệp với nền tối và thẻ viền nét đứt ở giữa.
+ * active bật khi con trỏ trên thẻ. zoneHandlers gắn vào thẻ để chỉ thả trúng thẻ mới nhập.
+ * Khung phủ toàn viewport và là con DOM của thư viện; sự kiện kéo nổi bọt tới rootHandlers.
  */
 export function DropOverlay({
   active,
@@ -30,11 +30,11 @@ export function DropOverlay({
         <Download className="size-14" />
         <p className="text-xl font-medium">
           {active
-            ? t("library.dropActive", "松手即导入")
-            : t("library.dropHint", "拖放 ePub / PDF 到此导入")}
+            ? t("library.dropActive", "Thả để nhập")
+            : t("library.dropHint", "Thả tệp ePub hoặc PDF vào đây để nhập")}
         </p>
         <p className="text-sm opacity-70">
-          {t("library.dropSubhint", "支持一次拖入多本，不支持的文件会被忽略")}
+          {t("library.dropSubhint", "Có thể thả nhiều tệp cùng lúc; tệp không hỗ trợ sẽ bị bỏ qua")}
         </p>
       </div>
     </div>

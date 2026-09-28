@@ -18,7 +18,7 @@ describe("pdf fixtures", () => {
 
   it("makeTextPdf outline=true writes /Outlines to catalog", async () => {
     const bytes = await makeTextPdf({ outline: true, title: "Fixture Book" });
-    // pdf-lib 能 round-trip 自己的产物：直接验证 outline 确实挂上了 catalog
+    // pdf-lib đọc lại được tệp do chính nó tạo; kiểm tra outline đã được gắn vào catalog.
     const doc = await PDFDocument.load(bytes);
     expect(doc.catalog.get(PDFName.of("Outlines"))).toBeDefined();
   });

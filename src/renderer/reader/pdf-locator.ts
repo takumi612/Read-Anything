@@ -1,11 +1,15 @@
-/** PDF 进度 locator（spec §4）：`pdf:` 前缀 + JSON。存储层黑盒，仅 PDF reader 解释。 */
+/** Locator tiến độ PDF gồm tiền tố `pdf:` và JSON; chỉ trình đọc PDF diễn giải nội dung. */
 export interface PdfProgressLocator {
   page: number; // 1-based
-  scrollRatio: number; // 页内滚动比例 [0,1)
+  scrollRatio: number; // Tỉ lệ vị trí cuộn trong trang [0,1).
+  zoom?: number; // persisted per PDF; old locators without this field remain valid
+  viewMode?: "continuous" | "single";
+  fitMode?: "custom" | "width" | "page";
+  rotation?: 0 | 90 | 180 | 270;
 }
 
 export function makePdfLocator(loc: PdfProgressLocator): string {
-  return `pdf:${JSON.stringify({ page: loc.page, scrollRatio: loc.scrollRatio })}`;
+  return `pdf:${JSON.stringify({ page: loc.page, scrollRatio: loc.scrollRatio, ...(loc.zoom ? { zoom: loc.zoom } : {}), ...(loc.viewMode ? { viewMode: loc.viewMode } : {}), ...(loc.fitMode ? { fitMode: loc.fitMode } : {}), ...(loc.rotation ? { rotation: loc.rotation } : {}) })}`;
 }
 
 export function parsePdfLocator(s: string): PdfProgressLocator | null {
@@ -19,9 +23,19 @@ export function parsePdfLocator(s: string): PdfProgressLocator | null {
       (v as { page: number }).page >= 1
     ) {
       const ratio = (v as { scrollRatio?: unknown }).scrollRatio;
+      const zoom = (v as { zoom?: unknown }).zoom;
+      const viewMode = (v as { viewMode?: unknown }).viewMode;
+      const fitMode = (v as { fitMode?: unknown }).fitMode;
+      const rotation = (v as { rotation?: unknown }).rotation;
       return {
         page: (v as { page: number }).page,
         scrollRatio: typeof ratio === "number" ? ratio : 0,
+        ...(typeof zoom === "number" && Number.isFinite(zoom) && zoom > 0 ? { zoom } : {}),
+        ...(viewMode === "continuous" || viewMode === "single" ? { viewMode } : {}),
+        ...(fitMode === "custom" || fitMode === "width" || fitMode === "page" ? { fitMode } : {}),
+        ...(rotation === 0 || rotation === 90 || rotation === 180 || rotation === 270
+          ? { rotation }
+          : {}),
       };
     }
     return null;
@@ -31,9 +45,9 @@ export function parsePdfLocator(s: string): PdfProgressLocator | null {
 }
 
 /**
- * PDF 标注 locatorRange（spec §4）：页内文本流字符偏移（[start, end) 闭开区间）。
- * 坐标空间 = textLayer DOM 文本流（getTextContent items 顺序，不含 EOL 合成换行），
- * 与渲染层选区/（P3）高亮绘制同一空间；与主进程「章内偏移」互不转换。
+ * locatorRange của chú thích PDF là khoảng vị trí ký tự [start,end) trong luồng văn bản của trang.
+ * Hệ tọa độ là textLayer DOM theo thứ tự getTextContent, không gồm xuống dòng EOL tổng hợp.
+ * Vùng chọn và phần tô sáng dùng cùng hệ; không chuyển đổi với vị trí ký tự trong chương ở main process.
  */
 export interface PdfRangeLocator {
   page: number; // 1-based

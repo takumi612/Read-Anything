@@ -3,6 +3,7 @@ import {
   intraPageRatio,
   PAGE_GAP,
   PAGE_PADDING_Y,
+  positionAtViewportTop,
   scrollTopFor,
   topPageAt,
   zoomScrollLeft,
@@ -10,6 +11,47 @@ import {
 } from "./pdf-scroll";
 
 const pageH = 1000; // 每项总高 1016
+
+describe("positionAtViewportTop", () => {
+  const pages = [
+    { page: 12, top: -884, height: 967 },
+    { page: 13, top: 100, height: 967 },
+    { page: 14, top: 1084, height: 967 },
+  ];
+
+  it("uses the rendered page geometry even when virtual scrollTop estimates differ", () => {
+    expect(positionAtViewportTop(100, pages)).toEqual({ page: 13, scrollRatio: 0 });
+    expect(positionAtViewportTop(200, pages)).toEqual({
+      page: 13,
+      scrollRatio: expect.closeTo(100 / 967, 10),
+    });
+  });
+
+  it("resolves the actual page under a zoom cursor instead of a stale scroll estimate", () => {
+    const laidOutPages = [
+      { page: 90, top: -26_000, height: 1724 },
+      { page: 108, top: 400, height: 1724 },
+      { page: 109, top: 2140, height: 1724 },
+    ];
+    // The old uniform-height estimate can indicate page 90 while the viewport cursor is on page 108.
+    expect(positionAtViewportTop(716, laidOutPages)).toEqual({
+      page: 108,
+      scrollRatio: expect.closeTo(316 / 1724, 10),
+    });
+  });
+
+  it("keeps page gaps attached to the previous page", () => {
+    expect(positionAtViewportTop(1070, pages)).toEqual({ page: 13, scrollRatio: 1 });
+  });
+
+  it("falls back to the next laid out page before the first page reaches the viewport", () => {
+    expect(positionAtViewportTop(50, pages.slice(1))).toEqual({ page: 13, scrollRatio: 0 });
+  });
+
+  it("returns null when no rendered page geometry is available", () => {
+    expect(positionAtViewportTop(0, [])).toBeNull();
+  });
+});
 
 describe("topPageAt", () => {
   it("容器顶与首页中部都算第 1 页", () => {

@@ -9,9 +9,9 @@ export interface StyleBarState {
 export interface NoteModalState {
   target: AnnoTarget;
   /**
-   * create 模式的选区快照（locatorRange/selectedText）；edit 模式不需要（读标注）。
-   * 快照避免 save 时依赖易失的 `selection`——笔记过长时 textarea 内部滚动会被
-   * EpubReader 的捕获阶段 scroll 监听清掉选区，若 save 仍读 selection 会静默丢笔记。
+   * Ảnh chụp vùng chọn khi tạo gồm locatorRange và selectedText; khi sửa thì đọc từ chú thích.
+   * Không dựa vào selection lúc lưu vì cuộn trong textarea ghi chú dài có thể khiến
+   * listener scroll của EpubReader xóa vùng chọn và làm mất ghi chú.
    */
   anchor?: { locatorRange: string; selectedText: string };
 }
@@ -20,8 +20,14 @@ interface AnnotationState {
   selection: SelectionInfo | null;
   styleBar: StyleBarState | null;
   noteModal: NoteModalState | null;
-  /** 命令信号（非状态）：nonce 递增触发 reader 滚动到该 locator（ePub 下为 CFI 串）。 */
-  scrollCommand: { locator: string; nonce: number } | null;
+  /** Lệnh dùng một lần: nonce tăng để trình đọc cuộn tới locator, dạng CFI với ePub. */
+  scrollCommand: {
+    locator: string;
+    nonce: number;
+    citation?: boolean;
+    citationQuote?: string;
+    bookId?: string;
+  } | null;
 }
 interface AnnotationActions {
   setSelection: (selection: SelectionInfo | null) => void;
@@ -29,7 +35,12 @@ interface AnnotationActions {
   closeStyleBar: () => void;
   openNoteModal: (s: NoteModalState) => void;
   closeNoteModal: () => void;
-  requestScroll: (locator: string) => void;
+  requestScroll: (
+    locator: string,
+    citation?: boolean,
+    bookId?: string,
+    citationQuote?: string,
+  ) => void;
 }
 
 export const ANNOTATION_INITIAL: AnnotationState = {
@@ -46,6 +57,14 @@ export const useAnnotationStore = create<AnnotationState & AnnotationActions>((s
   closeStyleBar: () => set({ styleBar: null }),
   openNoteModal: (noteModal) => set({ noteModal }),
   closeNoteModal: () => set({ noteModal: null }),
-  requestScroll: (locator) =>
-    set((s) => ({ scrollCommand: { locator, nonce: (s.scrollCommand?.nonce ?? 0) + 1 } })),
+  requestScroll: (locator, citation = false, bookId, citationQuote) =>
+    set((s) => ({
+      scrollCommand: {
+        locator,
+        citation,
+        citationQuote,
+        bookId,
+        nonce: (s.scrollCommand?.nonce ?? 0) + 1,
+      },
+    })),
 }));

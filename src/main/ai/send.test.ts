@@ -641,6 +641,52 @@ describe("pdf system prompt injection", () => {
     expect(captured.system).toContain('mode "image"');
   });
 
+  it("sends selected PDF evidence with page citations into the AI turn", async () => {
+    const captured: { system?: string; texts: string[] } = { texts: [] };
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    const bytes = await makeTextPdf({
+      outline: false,
+      title: "Context-aware PDF evidence",
+      pages: 3,
+    });
+    const book = await importBook(db, { bytes });
+    const loadBytes = vi.fn<LoadBytes>(async () => bytes);
+    const deps: SendDeps = {
+      db,
+      loadBytes,
+      resolveModel: () => ({
+        ok: true,
+        model: promptCapturingModel(captured),
+        modelId: "mock",
+      }),
+      resolveSummaryModel: () => ({ ok: false, reason: "unset" }),
+      runBackground: passThrough,
+      notify: () => {},
+    };
+    const convo = createConversation(db, { bookId: book.id });
+
+    const result = await runSend(deps, {
+      bookId: book.id,
+      conversationId: convo.id,
+      chips: buildChips({
+        selection: "body text of page 2",
+        paragraphCurrent: "This is the body text of page 2.",
+      }),
+      userText: "What does this passage mean?",
+      readingContext: { format: "pdf", page: 3, pageCount: 3 },
+    });
+    if (!result.ok) throw new Error(result.reason);
+    await result.finished;
+
+    const currentTurn = captured.texts.at(-1) ?? "";
+    expect(currentTurn).toContain("## Relevant excerpts retrieved from the PDF");
+    expect(currentTurn).toContain("[p.2]");
+    expect(currentTurn).toContain("body text of page 2");
+    expect(currentTurn).toContain("[p.3]");
+    expect(loadBytes).toHaveBeenCalledTimes(1);
+  });
+
   it("does not mention PDF for epub books", async () => {
     const captured: { system?: string } = {};
     const { db, book, deps } = await setup({

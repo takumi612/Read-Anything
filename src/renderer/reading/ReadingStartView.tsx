@@ -27,7 +27,7 @@ export function ReadingStartView({ book }: { book: BookSummaryDto }) {
       ]);
     } catch (error) {
       log.warn("start reading failed", error);
-      toast.error(t("readingStart.failed", "无法开始这次阅读，请重试。"), {
+      toast.error(t("readingStart.failed", "Không thể bắt đầu lượt đọc. Hãy thử lại."), {
         closeButton: true,
         duration: Infinity,
       });
@@ -43,22 +43,22 @@ export function ReadingStartView({ book }: { book: BookSummaryDto }) {
         </div>
         <div>
           <p className="text-sm font-medium text-primary">
-            {t("readingStart.title", "开始这次阅读")}
+            {t("readingStart.title", "Bắt đầu lượt đọc này")}
           </p>
           <h1 className="mt-1 text-2xl font-semibold">{book.title ?? book.id}</h1>
           <p className="mt-2 text-muted-foreground">
-            {book.author ?? t("library.unknownAuthor", "未知作者")}
+            {book.author ?? t("library.unknownAuthor", "Không rõ tác giả")}
           </p>
           <p className="mt-4 text-sm text-muted-foreground">
             {t(
               "readingStart.description",
-              "标记开始，让 Marginalia 将这次阅读的时间和痕迹归在一起。",
+              "Đánh dấu thời điểm bắt đầu để Read-Anything ghi lại thời gian và hoạt động của lượt đọc này.",
             )}
           </p>
         </div>
         <Button onClick={() => void start()} disabled={pending}>
           {pending ? <LoaderCircle className="animate-spin" data-icon="inline-start" /> : null}
-          {t("readingStart.action", "开始阅读")}
+          {t("readingStart.action", "Bắt đầu đọc")}
         </Button>
       </div>
     </main>

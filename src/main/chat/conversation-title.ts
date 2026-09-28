@@ -11,39 +11,40 @@ const log = createLogger("chat");
 
 const MAX_TITLE_LEN = 40;
 
-// 用 \u 转义写死，防格式化器再次吞字符：
-//   U+0022 " ASCII 直双引号   U+0027 ' ASCII 直单引号
-//   U+201C " 左弯双引号       U+201D " 右弯双引号
-//   U+2018 ' 左弯单引号       U+2019 ' 右弯单引号
-//   U+300C 「 左单书名号       U+300D 」 右单书名号
-//   U+300E 『 左双书名号       U+300F 』 右双书名号
+// Ghi rõ các mã Unicode để trình định dạng không làm mất ký tự:
+//   U+0022 " dấu ngoặc kép ASCII   U+0027 ' dấu nháy đơn ASCII
+//   U+201C “ ngoặc kép mở         U+201D ” ngoặc kép đóng
+//   U+2018 ‘ nháy đơn mở         U+2019 ’ nháy đơn đóng
+//   U+300C 「 ngoặc mở kiểu Nhật   U+300D 」 ngoặc đóng kiểu Nhật
+//   U+300E 『 ngoặc kép mở kiểu Nhật U+300F 』 ngoặc kép đóng kiểu Nhật
 const QUOTE_EDGES = /^["'“”‘’「」『』]+|["'“”‘’「」『』]+$/g;
 
 const NAMING_SYSTEM =
-  "你是会话命名助手。根据给出的一轮对话，产出一个能概括话题的简短标题。" +
-  "要求：使用与对话内容相同的语言；不超过 15 个字或 8 个单词；只输出标题本身，不要引号、句号或任何解释。";
+  "Bạn là trợ lý đặt tên cuộc trò chuyện. Dựa trên một lượt hội thoại, hãy đặt tiêu đề ngắn gọn thể hiện chủ đề. " +
+  "Dùng cùng ngôn ngữ với cuộc hội thoại; tối đa 15 ký tự hoặc 8 từ; chỉ trả về tiêu đề, không thêm dấu ngoặc, dấu chấm hay lời giải thích.";
 
 export interface NamingDeps {
   db: DB;
   resolveModel: () => ResolvedModel;
-  /** 后台并发限流端口（与摘要/压缩共用全局上限）。 */
+  /** Giới hạn tác vụ nền chạy đồng thời; dùng chung mức tối đa với tóm tắt và nén ngữ cảnh. */
   runBackground: RunBackground;
 }
 
-// 命名中状态：进程内存瞬态（spec §5）——settle 即清除、不落库；重启自然归零，
-// 失败遗留的 null title 不会被误标为命名中。
+// Trạng thái đặt tên chỉ tồn tại trong bộ nhớ tiến trình (spec §5).
+// Xóa khi tác vụ kết thúc, không lưu DB; khởi động lại sẽ xóa trạng thái này.
+// Tiêu đề null do tác vụ lỗi không bị hiểu nhầm là đang được đặt tên.
 const namingInFlight = new Set<string>();
 
 export function isNamingConversation(id: string): boolean {
   return namingInFlight.has(id);
 }
 
-/** 仅供测试：清空命名运行时态。 */
+/** Chỉ dùng trong kiểm thử: xóa trạng thái đặt tên đang chạy. */
 export function __resetNamingRuntime(): void {
   namingInFlight.clear();
 }
 
-/** 清洗模型产出：取首个非空行、剥首尾引号、压缩空白、截断到 MAX_TITLE_LEN（超出加省略号）。 */
+/** Chuẩn hóa tiêu đề: lấy dòng đầu tiên có chữ, bỏ ngoặc hai đầu, gộp khoảng trắng và cắt ở MAX_TITLE_LEN. */
 export function sanitizeTitle(raw: string): string {
   const firstLine =
     raw
@@ -58,8 +59,8 @@ export function sanitizeTitle(raw: string): string {
 }
 
 /**
- * 首轮完成后的会话自动命名（spec §5）：用触发轮的 user+assistant 做一次非流式短调用。
- * fire-and-forget：失败/未配置模型 → title 保持 null（UI 走 i18n 占位）、仅落日志——绝不编造标题。
+ * Tự đặt tên sau lượt hội thoại đầu tiên (spec §5) bằng một yêu cầu AI ngắn, không truyền trực tuyến.
+ * Tác vụ nền: nếu lỗi hoặc chưa cấu hình model, giữ title là null để UI hiển thị chuỗi dự phòng.
  */
 export async function nameConversation(
   deps: NamingDeps,
@@ -78,14 +79,14 @@ export async function nameConversation(
     const { text } = await deps.runBackground(() =>
       generateText({
         model: resolved.model,
-        reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
+        reasoning: resolved.reasoningEffort, // v7 dùng reasoning cấp cao nhất; undefined = mặc định của nhà cung cấp
         instructions: NAMING_SYSTEM,
-        prompt: `用户：${userText}\n\n助手：${assistantText}`,
+        prompt: `Người dùng: ${userText}\n\nTrợ lý: ${assistantText}`,
       }),
     );
     const title = sanitizeTitle(text);
     if (!title) return;
-    // 写回前复查 title 仍为 null——不覆盖期间已被设置的标题
+    // Chỉ ghi khi title vẫn null để không ghi đè tiêu đề vừa được đặt ở nơi khác.
     const row = deps.db
       .select({ title: conversations.title })
       .from(conversations)

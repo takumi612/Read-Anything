@@ -14,7 +14,7 @@ import { createLogger } from "@renderer/logger";
 
 const log = createLogger("avatar");
 
-/** 头像裁剪弹窗：圆形蒙版 1:1 + 缩放；确认时出图回调 onConfirm(bytes)。 */
+/** Hộp cắt ảnh đại diện với mặt nạ tròn tỉ lệ 1:1 và zoom; xác nhận sẽ gọi onConfirm(bytes). */
 export function AvatarCropDialog({
   open,
   imageSrc,
@@ -50,7 +50,7 @@ export function AvatarCropDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>{t("settings.agent.avatarCropTitle", "裁剪头像")}</DialogTitle>
+          <DialogTitle>{t("settings.agent.avatarCropTitle", "Cắt ảnh đại diện")}</DialogTitle>
         </DialogHeader>
         <div className="relative h-64 w-full overflow-hidden rounded-md bg-muted">
           {imageSrc && (
@@ -74,15 +74,15 @@ export function AvatarCropDialog({
           step={0.01}
           value={zoom}
           onChange={(e) => setZoom(Number(e.target.value))}
-          aria-label={t("settings.agent.avatarZoom", "缩放")}
+          aria-label={t("settings.agent.avatarZoom", "Thu phóng")}
           className="w-full accent-primary"
         />
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={busy}>
-            {t("common.cancel", "取消")}
+            {t("common.cancel", "Hủy")}
           </Button>
           <Button onClick={confirm} disabled={busy || !area}>
-            {t("common.save", "保存")}
+            {t("common.save", "Lưu")}
           </Button>
         </DialogFooter>
       </DialogContent>

@@ -5,7 +5,7 @@ import { HIGHLIGHT, HIGHLIGHT_COLORS } from "#/highlight";
 import { useReaderAI } from "#/reader-ai-context";
 import { cn } from "#/lib/utils";
 
-/** 点击已有高亮弹出的编辑卡：换色 / 写笔记 / 删除。点击外部关闭。 */
+/** Thẻ chỉnh sửa mở ra khi nhấp vào phần tô sáng: đổi màu / viết ghi chú / xóa. Nhấp bên ngoài để đóng. */
 export function HighlightPopover() {
   const { t } = useTranslation();
   const {

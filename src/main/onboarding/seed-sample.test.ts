@@ -43,11 +43,11 @@ describe("maybeSeedSampleBook", () => {
     expect(bytes.length).toBeGreaterThan(0);
   });
 
-  it("seeds the Chinese book when language is zh-CN", async () => {
+  it("seeds the Vietnamese book when language is vi", async () => {
     const db = freshDb();
-    await maybeSeedSampleBook(db, "zh-CN", freshBooksDir());
+    await maybeSeedSampleBook(db, "vi", freshBooksDir());
     const rows = db.select().from(books).all();
-    expect(rows[0].title).toMatch(/页边/);
+    expect(rows[0].title).toMatch(/Bên lề/);
   });
 
   it("does not re-import on a second call", async () => {

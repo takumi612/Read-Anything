@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * 临时性能实验脚本：向 dev DB 的某个 conversation 批量灌入合成消息。
+ * Script thử hiệu năng tạm thời: nạp hàng loạt tin nhắn tổng hợp vào một conversation trong cơ sở dữ liệu dev.
  *
- * 运行方式（必须用项目内的 Electron 二进制，因为 better-sqlite3 编的是 Electron ABI 145）：
+ * Cách chạy (phải dùng Electron binary của dự án vì better-sqlite3 được biên dịch theo Electron ABI 145):
  *   ELECTRON_RUN_AS_NODE=1 ./node_modules/.bin/electron scripts/seed-long-conversation.mjs --count 200
- *   （不要用 pnpx electron——它会解析到不同版本，ABI 不匹配。）
+ *   (Không dùng pnpx electron vì lệnh đó có thể tải phiên bản khác, không khớp ABI.)
  *
- * 默认会新建一个 library（bookId IS NULL）会话；如要追加到已有会话：
+ * Mặc định tạo một conversation mới trong thư viện (bookId IS NULL). Để thêm tin nhắn vào conversation có sẵn:
  *   ELECTRON_RUN_AS_NODE=1 pnpx electron scripts/seed-long-conversation.mjs --count 50 --conversation <uuid>
  *
- * 删除测试数据：直接 rm ~/Library/Application\ Support/marginalia-dev/marginalia.db* 即可（dev 库可随意折腾）。
+ * Xóa dữ liệu thử: chạy rm ~/Library/Application\ Support/marginalia-dev/marginalia.db* (cơ sở dữ liệu dev có thể xóa tùy ý).
  */
 import Database from "better-sqlite3";
 import { v7 as uuidv7 } from "uuid";
@@ -43,10 +43,10 @@ function hasFlag(name) {
 const count = Number(flag("--count", "200"));
 const conversationId = flag("--conversation", null);
 const complexity = flag("--complexity", "mixed"); // short | long | code | mixed
-const clear = hasFlag("--clear"); // 清空目标会话已有消息（重新灌）
+const clear = hasFlag("--clear"); // Xóa tin nhắn hiện có trong conversation đích trước khi nạp lại.
 
 if (!Number.isFinite(count) || count <= 0) {
-  console.error("--count 必须是正整数");
+  console.error("--count phải là số nguyên dương");
   process.exit(1);
 }
 
@@ -64,27 +64,27 @@ function nowMs() {
 }
 
 const SHORT_USER = [
-  "这本书讲了什么？",
-  "能再详细说说吗？",
-  "我不太明白这段。",
-  "作者想表达什么？",
-  "这和前面一章有什么联系？",
-  "帮我总结一下核心观点。",
-  "有没有相反的例子？",
+  "Cuốn sách này nói về điều gì?",
+  "Bạn giải thích chi tiết hơn được không?",
+  "Tôi chưa hiểu rõ đoạn này.",
+  "Tác giả muốn truyền đạt điều gì?",
+  "Điều này liên hệ thế nào với chương trước?",
+  "Hãy tóm tắt các ý chính giúp tôi.",
+  "Có ví dụ trái ngược nào không?",
 ];
 
 const SHORT_ASSISTANT = [
-  "好的，我来梳理一下。",
-  "这一段的关键在于……",
-  "我们可以从三个层面理解。",
-  "作者其实是在回应某种批评。",
-  "让我用一个例子说明。",
+  "Được, để tôi hệ thống lại.",
+  "Điểm mấu chốt của đoạn này là…",
+  "Có thể hiểu nội dung này theo ba khía cạnh.",
+  "Thực ra tác giả đang phản hồi một lời phê bình.",
+  "Để tôi giải thích bằng một ví dụ.",
 ];
 
 const LONG_PARAGRAPHS = [
-  `虚拟化列表的性能收益来自「只渲染视口内元素」这一核心思想。当 DOM 节点数量从数百降到十几个时，浏览器在滚动、重排、重绘上的开销会大幅下降。然而，虚拟化并非银弹：对于高度不固定的列表项，需要维护一个测量缓存；对于包含复杂子树（如代码高亮、数学公式）的项，测量和回收的成本可能抵消甚至超过收益。因此，在决定引入虚拟化之前，最好先量化当前实现的瓶颈所在。`,
-  `长对话场景下的卡顿通常表现为三类症状：输入框响应延迟、滚动掉帧、以及新消息插入时的白屏或闪烁。输入延迟往往与 React 的重新渲染范围有关；滚动掉帧可能与大量绝对定位或复杂 CSS 有关；而新消息插入时的抖动则常与自动滚动到底部的行为、以及消息内容的异步加载（如图片、代码块高亮）有关。诊断时需要分别测量，而不是简单地把所有问题都归因于「消息太多」。`,
-  `在 Electron 41 的渲染进程中，Chromium 的合成器线程负责将页面内容分层并送至 GPU。当主线程被长任务阻塞时，合成器仍可能继续显示旧帧，但无法处理新的输入事件。这意味着即使滚动看起来「不卡」，用户的点击或按键也可能被延迟处理。PerformanceObserver 的 longtask 条目是检测这类问题的有效工具，阈值通常为 50ms。`,
+  `Danh sách ảo hóa tăng hiệu năng nhờ chỉ hiển thị các phần tử trong vùng nhìn thấy. Khi số nút DOM giảm từ hàng trăm xuống còn vài chục, chi phí cuộn, bố trí lại và vẽ lại của trình duyệt giảm đáng kể. Tuy vậy, ảo hóa không giải quyết mọi vấn đề: các mục có chiều cao thay đổi cần bộ nhớ đệm kết quả đo; các mục chứa cây nội dung phức tạp như tô màu mã nguồn hoặc công thức toán có thể tốn chi phí đo và tái sử dụng nhiều hơn phần hiệu năng tiết kiệm được. Vì vậy, trước khi áp dụng ảo hóa, nên đo chính xác điểm nghẽn của cách triển khai hiện tại.`,
+  `Tình trạng khựng khi có hội thoại dài thường có ba biểu hiện: ô nhập phản hồi chậm, cuộn bị rớt khung hình và màn hình trắng hoặc nhấp nháy khi thêm tin nhắn mới. Độ trễ nhập thường liên quan phạm vi React phải kết xuất lại; cuộn giật có thể do nhiều phần tử định vị tuyệt đối hoặc CSS phức tạp; còn dao động khi thêm tin nhắn thường liên quan việc tự cuộn xuống cuối và tải nội dung bất đồng bộ như ảnh hoặc tô màu khối mã. Cần đo riêng từng vấn đề thay vì quy mọi thứ cho số lượng tin nhắn.`,
+  `Trong renderer của Electron 41, luồng compositor của Chromium phân lớp nội dung trang rồi gửi tới GPU. Khi tác vụ dài chặn luồng chính, compositor vẫn có thể tiếp tục hiển thị khung hình cũ nhưng không xử lý được sự kiện mới. Vì vậy dù thao tác cuộn trông có vẻ mượt, lần nhấn hoặc bấm phím của người dùng vẫn có thể bị trễ. Mục longtask của PerformanceObserver giúp phát hiện tình trạng này; ngưỡng thường dùng là 50 ms.`,
 ];
 
 const CODE_BLOCKS = [
@@ -104,13 +104,13 @@ function buildAssistantText() {
     case "long":
       return pick(LONG_PARAGRAPHS) + "\n\n" + pick(LONG_PARAGRAPHS);
     case "code":
-      return "这里是一个示例：\n\n" + pick(CODE_BLOCKS) + "\n\n" + pick(SHORT_ASSISTANT);
+      return "Đây là ví dụ:\n\n" + pick(CODE_BLOCKS) + "\n\n" + pick(SHORT_ASSISTANT);
     case "mixed":
     default: {
       const roll = Math.random();
       if (roll < 0.4) return pick(SHORT_ASSISTANT);
       if (roll < 0.7) return pick(LONG_PARAGRAPHS);
-      return "参考实现：\n\n" + pick(CODE_BLOCKS) + "\n\n" + pick(SHORT_ASSISTANT);
+      return "Cách triển khai tham khảo:\n\n" + pick(CODE_BLOCKS) + "\n\n" + pick(SHORT_ASSISTANT);
     }
   }
 }
@@ -167,7 +167,7 @@ for (let i = 0; i < count; i++) {
   const role = isUser ? "user" : "assistant";
   const text = isUser ? pick(SHORT_USER) : buildAssistantText();
   const id = uuidv7();
-  // 时间戳递增 1s，保持顺序自然
+  // Tăng dấu thời gian mỗi giây để thứ tự tin nhắn trông tự nhiên.
   const createdAt = baseTime + i * 1000;
   batch.push([id, targetConversationId, role, JSON.stringify(buildParts(text)), seq, createdAt]);
 }

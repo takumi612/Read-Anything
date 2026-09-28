@@ -1,11 +1,13 @@
 import { z } from "zod";
 
-/** 单个搜索后端配置（判别联合）。exa-mcp = Exa 预设；mcp = 任意 streamable-HTTP MCP 搜索 server。 */
+/** Cấu hình backend tìm kiếm: exa-mcp là mẫu Exa, mcp là server Streamable HTTP tùy chọn. */
 export const webSearchBackend = z.discriminatedUnion("kind", [
   z.object({
     kind: z.literal("exa-mcp"),
     label: z.string().optional(),
     apiKey: z.string().optional(),
+    /** Renderer-only indicator; the saved secret is never returned to the UI. */
+    hasApiKey: z.boolean().optional(),
     enabled: z.boolean().optional(),
   }),
   z.object({
@@ -15,18 +17,29 @@ export const webSearchBackend = z.discriminatedUnion("kind", [
     toolName: z.string().min(1),
     apiKeyHeader: z.string().optional(),
     apiKey: z.string().optional(),
+    hasApiKey: z.boolean().optional(),
     enabled: z.boolean().optional(),
   }),
 ]);
 export type WebSearchBackendConfig = z.infer<typeof webSearchBackend>;
 
-/** 联网搜索偏好：backends 顺序 = 回退优先级（工具注册由 backends.length 决定，per-message 开关走 webSearchEnabled 偏好）。 */
+/** Thứ tự backends là thứ tự thử khi lỗi; công cụ chỉ đăng ký khi có backend. */
 export const webSearchConfig = z.object({
   backends: z.array(webSearchBackend),
 });
 export type WebSearchConfig = z.infer<typeof webSearchConfig>;
 
-/** 出厂默认：Exa 免费层（无 key 即可用）。 */
+/** Mặc định dùng Exa miễn phí, có thể dùng không cần khóa. */
 export const DEFAULT_WEB_SEARCH: WebSearchConfig = {
   backends: [{ kind: "exa-mcp" }],
 };
+
+/** Remove secrets before passing search settings to the renderer. */
+export function redactWebSearchKeys(config: WebSearchConfig): WebSearchConfig {
+  return {
+    backends: config.backends.map(({ apiKey, hasApiKey, ...backend }) => ({
+      ...backend,
+      hasApiKey: Boolean(apiKey) || Boolean(hasApiKey),
+    })),
+  };
+}

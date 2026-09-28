@@ -5,7 +5,7 @@ import { createLogger } from "@renderer/logger";
 
 const log = createLogger("update");
 
-/** 启动时静默查一次更新；有新版弹可跳转 toast，已最新/失败均静默（仅 log.warn）。useRef 守卫防 StrictMode 双跑。 */
+/** Kiểm tra cập nhật một lần khi khởi động; bản mới hiện toast có liên kết, kết quả khác chỉ ghi log khi lỗi. useRef tránh StrictMode chạy hai lần. */
 export function useStartupUpdateCheck(): void {
   const { t } = useTranslation();
   const ranRef = useRef(false);
@@ -16,12 +16,12 @@ export function useStartupUpdateCheck(): void {
       try {
         const res = await window.api.app.checkUpdate();
         if (res.status === "update-available") {
-          toast(t("update.available", "发现新版本 {{version}}", { version: res.latestVersion }), {
+          toast(t("update.available", "Có phiên bản mới {{version}}", { version: res.latestVersion }), {
             action: {
-              label: t("update.view", "查看"),
+              label: t("update.view", "Xem"),
               onClick: () => void window.api.app.openExternal({ url: res.releaseUrl }),
             },
-            duration: Infinity,
+            duration: 8000,
             closeButton: true,
           });
         } else if (res.status === "error") {

@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "#/lib/utils";
 
-/** 自绘 macOS 式细滚动条：隐藏原生条，叠一个绝对定位 thumb，按 scroll 算高度/位置；
- *  滚动 / 悬停时淡入，停手 900ms 后淡出。零依赖、跟随主题。
- *  滚动区限高经 `viewportClassName`（Tailwind，如 `max-h-40`）。
- *  thumb 的 height/top/opacity 为运行时计算值，按规范属"必要"内联。 */
+/** Thanh cuộn mảnh kiểu macOS tự vẽ: ẩn thanh gốc, phủ một thumb định vị tuyệt đối, tính chiều cao/vị trí theo scroll;
+ *  hiện dần khi cuộn / rê chuột, ẩn dần sau 900 ms không thao tác. Không phụ thuộc thư viện, tự theo giao diện.
+ *  Giới hạn chiều cao vùng cuộn qua `viewportClassName` (Tailwind, chẳng hạn `max-h-40`).
+ *  height/top/opacity của thumb được tính khi chạy; theo quy ước, đây là các giá trị nội tuyến "cần thiết". */
 export function ScrollArea({
   children,
   className,

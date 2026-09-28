@@ -65,11 +65,6 @@ describe("openConversation", () => {
     useChatStore.getState().openConversation(BOOK_CTX, "conv-1");
     expect(useChatStore.getState().openCommand?.nonce).toBe(2); // 同会话重开也递增 → 触发重载
   });
-  it("resets summaryChips to off when opening existing conversation", () => {
-    useChatStore.getState().setSummaryChipsPreset();
-    useChatStore.getState().openConversation(BOOK_CTX, "conv-1");
-    expect(useChatStore.getState().summaryChips).toEqual({ chapter: false, book: false });
-  });
   it("tags openCommand with the library context so it can't leak into a book panel", () => {
     useChatStore.getState().openConversation(LIB_CTX, "lib-conv");
     expect(useChatStore.getState().openCommand?.context).toEqual(LIB_CTX);
@@ -105,21 +100,6 @@ describe("resetForBookSwitch", () => {
     expect(s.openCommand).toBeNull();
     expect(s.activeByBook[BOOK]).toBe("conv-a"); // 记忆保留
     expect(s.draftText).toBe("draft kept"); // 草稿不清（跨卸载存活）
-  });
-});
-
-describe("summaryChips state machine", () => {
-  it("defaults to off, presets both on, resets to off", () => {
-    expect(useChatStore.getState().summaryChips).toEqual({ chapter: false, book: false });
-    useChatStore.getState().setSummaryChipsPreset();
-    expect(useChatStore.getState().summaryChips).toEqual({ chapter: true, book: true });
-    useChatStore.getState().resetSummaryChips();
-    expect(useChatStore.getState().summaryChips).toEqual({ chapter: false, book: false });
-  });
-  it("toggles a single kind", () => {
-    useChatStore.getState().setSummaryChip("chapter", true);
-    expect(useChatStore.getState().summaryChips.chapter).toBe(true);
-    expect(useChatStore.getState().summaryChips.book).toBe(false);
   });
 });
 

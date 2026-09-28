@@ -1,115 +1,193 @@
 import { z } from "zod";
-import { annotationStyle } from "@shared/annotations";
+import { annotationFillStyle, annotationStyle } from "@shared/annotations";
 import { uiLanguage } from "@shared/i18n/language";
 import { webSearchConfig } from "@shared/web-search";
 
-/** 正文字体档位:default=原书默认(零干预);其余映射到打包字体栈(见 renderer 的 font-stacks)。 */
+/** Kiểu chữ nội dung: default giữ nguyên sách; các lựa chọn khác dùng font đã đóng gói. */
 export const readerFontFamily = z.enum(["default", "wenkai", "serif", "sans"]);
 export type ReaderFontFamily = z.infer<typeof readerFontFamily>;
 
-/** 阅读排版偏好(字号倍率 / 行距 / 栏宽 px / 字体档)。@renderer/types 的 ReaderPrefs 由此推导，单一源。 */
+/** Tùy chọn dàn trang: cỡ chữ, giãn dòng, chiều rộng cột và font; ReaderPrefs suy ra từ đây. */
 export const readerPrefsSchema = z.object({
   fontScale: z.number(),
   lineHeight: z.number(),
   maxWidth: z.number().int(),
-  // .default 保旧落盘 JSON(无此字段)parse 通过,不连带重置字号/行距/栏宽
+  // .default giúp đọc dữ liệu cũ thiếu trường này mà không đặt lại các tùy chọn khác.
   fontFamily: readerFontFamily.default("default"),
 });
 export type ReaderPrefs = z.infer<typeof readerPrefsSchema>;
 
-/** 颜色模式三档。renderer 的 ColorMode 由此推导，单一源。 */
+/** Ba chế độ màu; ColorMode của renderer suy ra từ đây. */
 export const colorMode = z.enum(["light", "dark", "system"]);
 export type ColorMode = z.infer<typeof colorMode>;
 
-/** 阅读器三向布局开关（左栏 / AI 面板 / 顶栏），整对象落盘、重启恢复。 */
+/** Màu trang đọc độc lập với giao diện ứng dụng; Original giữ nguyên màu của sách. */
+export const readerColorMode = z.enum(["light", "dark", "system", "paper", "sepia", "sage"]);
+export type ReaderColorMode = z.infer<typeof readerColorMode>;
+
+export const appBackgroundMode = z.enum(["default", "color", "image"]);
+export type AppBackgroundMode = z.infer<typeof appBackgroundMode>;
+export const appBackgroundColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+
+/** Bố cục reader lưu trạng thái thanh điều hướng bên trái và bảng AI. */
 export const readerLayoutSchema = z.object({
   sidebarOpen: z.boolean(),
   panelOpen: z.boolean(),
-  headerOpen: z.boolean(),
 });
 export type ReaderLayout = z.infer<typeof readerLayoutSchema>;
 
-/** PDF 缩放倍率（相对适宽）。存倍率而非档位索引：档位表增删时旧倍率仍可收敛到最近档，索引则会错位。 */
+/** Mức zoom PDF so với chế độ vừa chiều rộng; lưu hệ số để không lệch khi danh sách mức zoom thay đổi. */
 export const pdfZoomSchema = z.number().positive();
 
+/** Screen-only brightness applied to PDF page canvases; kept out of EPUB and app appearance. */
+export const pdfBrightnessSchema = z.number().int().min(50).max(150);
+/** Brightness applied only to the area around PDF pages, independent from page brightness. */
+export const pdfSurroundingBrightnessSchema = z.number().int().min(50).max(150);
+
+export const pdfSurroundingColorSchema = z.object({
+  id: z.string().min(1).max(64),
+  name: z.string().trim().min(1).max(40),
+  color: appBackgroundColor,
+  showInThemeMenu: z.boolean(),
+});
+
+const uniquePdfSurroundingColors = (
+  colors: Array<z.infer<typeof pdfSurroundingColorSchema>>,
+) => {
+  const ids = colors.map((color) => color.id);
+  const hexValues = colors.map((color) => color.color.toLowerCase());
+  return new Set(ids).size === ids.length && new Set(hexValues).size === hexValues.length;
+};
+
+/** User-defined colors apply only to the canvas around PDF pages. */
+export const pdfSurroundingBackgroundSchema = z
+  .object({
+    colors: z.array(pdfSurroundingColorSchema).max(12).refine(uniquePdfSurroundingColors),
+    selectedId: z.string().nullable(),
+  })
+  .refine(
+    ({ colors, selectedId }) => selectedId === null || colors.some((color) => color.id === selectedId),
+  );
+export type PdfSurroundingColor = z.infer<typeof pdfSurroundingColorSchema>;
+export type PdfSurroundingBackground = z.infer<typeof pdfSurroundingBackgroundSchema>;
+
+const uniqueAnnotationColors = (colors: string[]) =>
+  new Set(colors.map((color) => color.toLowerCase())).size === colors.length;
+
+export const annotationColorsSchema = z
+  .array(annotationFillStyle)
+  .min(1)
+  .refine(uniqueAnnotationColors);
+export type AnnotationColors = z.infer<typeof annotationColorsSchema>;
+
+export const annotationPaletteSchema = z
+  .array(annotationFillStyle)
+  .min(1)
+  .refine(uniqueAnnotationColors);
+export type AnnotationPalette = z.infer<typeof annotationPaletteSchema>;
+/** Five established tones plus one warm orange; all start saved and enabled. */
+export const DEFAULT_ANNOTATION_COLORS: AnnotationColors = [
+  "yellow",
+  "green",
+  "blue",
+  "pink",
+  "purple",
+  "#f97316",
+];
+export const DEFAULT_ANNOTATION_PALETTE: AnnotationPalette = [...DEFAULT_ANNOTATION_COLORS];
+
 /**
- * 推理强度档位抽象。取值映射到 AI SDK v7 顶层 `reasoning` 参数的同名值（其全集含
- * provider-default/none/minimal/low/medium/high/xhigh），SDK 负责翻译成各 provider 原生配置。
- * 挂在模型偏好上（chat/summary 各自独立）；未设置 = 不下发 reasoning = provider 默认（保持现状）。
- * `none` = 关闭推理（provider 支持才生效；always-on 推理模型会报错，openai-compatible 退化为不下发）。
+ * Mức reasoning ánh xạ vào tham số `reasoning` của AI SDK v7;
+ * SDK chuyển sang cấu hình riêng của từng provider.
+ * Chat và summary có tùy chọn độc lập. Nếu chưa đặt, không gửi tham số và dùng mặc định provider.
+ * `none` tắt reasoning khi provider hỗ trợ; model luôn bật reasoning có thể trả lỗi.
  */
 export const reasoningEffort = z.enum(["none", "low", "medium", "high"]);
 export type ReasoningEffort = z.infer<typeof reasoningEffort>;
 
-/** 摘要模型（章节/全书摘要 + 会话自动命名）：显式 (provider, model) 对；未存 = 未配置（报错态，无回退）。 */
+/** Model tóm tắt và đặt tên hội thoại: cặp provider/model tường minh; thiếu nghĩa là chưa cấu hình. */
 export const summaryModelSchema = z.object({
   providerId: z.string().min(1),
   model: z.string().min(1),
-  reasoningEffort: reasoningEffort.optional(), // 缺省 = 未设置（不下发）；旧落盘 { providerId, model } 向后兼容
+  reasoningEffort: reasoningEffort.optional(), // Thiếu trường thì không gửi tham số; dữ liệu cũ vẫn hợp lệ.
 });
 export type SummaryModel = z.infer<typeof summaryModelSchema>;
 
-/** AI 对话 agent 循环的多步上限。0 = 不限制（永不主动刹车，仅靠模型自然停止 + 用户 abort）；≥1 = 具体步数上限。 */
+/** Giới hạn số bước AI: 0 là không giới hạn; từ 1 trở lên là số bước tối đa. */
 export const stepLimitSchema = z.number().int().min(0);
 
-/** stepLimit 缺省值：主进程兜底（makeSendDeps / runSend）与渲染层初值共用单一源。 */
+/** stepLimit mặc định, dùng chung cho main process và renderer. */
 export const DEFAULT_STEP_LIMIT = 10;
 
-/** 后台模型调用（章节/全书摘要 + 会话命名 + 上下文压缩）的全局并发上限。正整数；无「不限制」档（0=摘要永不跑＝坑）。 */
+/** Số tác vụ AI nền tối đa chạy đồng thời; phải dương để không vô tình tắt toàn bộ tác vụ. */
 export const backgroundConcurrencySchema = z.number().int().positive();
 
-/** backgroundConcurrency 缺省值：主进程兜底与渲染层初值共用单一源。 */
+/** backgroundConcurrency mặc định, dùng chung cho main process và renderer. */
 export const DEFAULT_BACKGROUND_CONCURRENCY = 3;
 
-/** 聊天模型（接替 assistants 表配置；spec 2026-06-10 §2.2）：语义同 summaryModel——显式对，未存 = 未配置。 */
+/** Model trò chuyện (spec 2026-06-10 §2.2): cặp provider/model tường minh, thiếu là chưa cấu hình. */
 export const chatModelSchema = z.object({
   providerId: z.string().min(1),
   model: z.string().min(1),
-  reasoningEffort: reasoningEffort.optional(), // 缺省 = 未设置（不下发）；旧落盘 { providerId, model } 向后兼容
+  reasoningEffort: reasoningEffort.optional(), // Thiếu trường thì không gửi tham số; dữ liệu cũ vẫn hợp lệ.
 });
 export type ChatModel = z.infer<typeof chatModelSchema>;
 
-/** agent 自我设定（SOUL）：name 独立字段（UI 显示用），persona 自由 markdown。用户与 AI 都可写。 */
+/** Cấu hình nhân cách AI (SOUL): tên hiển thị riêng và mô tả persona bằng Markdown. */
 export const soulSchema = z.object({
   name: z.string().min(1),
   persona: z.string(),
 });
 export type Soul = z.infer<typeof soulSchema>;
 
-/** SOUL 出厂值：默认名 Lia（margina-lia 词尾）；persona 简短留白，供用户与 Lia 共同演化。 */
+/** Giá trị SOUL ban đầu: tên Lia; persona ngắn để người dùng tiếp tục tùy chỉnh. */
 export const DEFAULT_SOUL: Soul = {
   name: "Lia",
   persona:
     "You are a warm, curious, and thoughtful reading companion. You genuinely care about how your reader thinks and grows. Keep your voice gentle and concise; let personality come through naturally rather than performing it.",
 };
 
-/** 朗读（TTS）偏好：语速 + 语种→voice.name 映射（失配走 pick-voice 降级链，不报错不重置）。 */
+/** Tùy chọn đọc to: tốc độ và voice.name theo ngôn ngữ; thiếu giọng thì dùng chuỗi dự phòng. */
 export const ttsPrefsSchema = z.object({
   rate: z.number().min(0.5).max(2),
   voiceByLang: z.record(z.string(), z.string()),
 });
 export type TtsPrefs = z.infer<typeof ttsPrefsSchema>;
 
-/** ttsPrefs 出厂值：渲染层初值与重置共用单一源。 */
+/** Tùy chọn đọc to mặc định, dùng chung khi khởi tạo và đặt lại. */
 export const DEFAULT_TTS_PREFS: TtsPrefs = { rate: 1, voiceByLang: {} };
 
 /**
- * 可持久化用户偏好的单一源：key → 值 Zod schema。
- * 新增偏好＝在此注册一个 key + schema；DB / 服务 / IPC / 类型全部据此推导。
+ * Nguồn duy nhất của tùy chọn người dùng có lưu trữ: key → Zod schema.
+ * Thêm tùy chọn bằng cách đăng ký key và schema; DB, service, IPC và kiểu dữ liệu suy ra từ đây.
  */
 export const PREFERENCE_SCHEMAS = {
   readerPrefs: readerPrefsSchema,
   lastHighlightStyle: annotationStyle,
+  annotationColors: annotationColorsSchema,
+  annotationPalette: annotationPaletteSchema,
   autoSummarize: z.boolean(),
   onboardingDismissed: z.boolean(),
   colorMode,
+  /** EPUB page styling is independent from the application chrome and PDF pages. */
+  epubColorMode: readerColorMode,
+  /** PDF page rendering is independent from the application chrome; light preserves source colors. */
+  pdfColorMode: readerColorMode,
+  pdfSurroundingBackground: pdfSurroundingBackgroundSchema,
+  appBackgroundMode,
+  appBackgroundColor,
+  appBackgroundBlobId: z.string().nullable(),
   language: uiLanguage,
   readerLayout: readerLayoutSchema,
   summaryModel: summaryModelSchema,
   pdfZoom: pdfZoomSchema,
+  pdfBrightness: pdfBrightnessSchema,
+  pdfSurroundingBrightness: pdfSurroundingBrightnessSchema,
+  restorePdfTabs: z.boolean(),
   stepLimit: stepLimitSchema,
   backgroundConcurrency: backgroundConcurrencySchema,
   chatModel: chatModelSchema,
+  aiDataConsent: z.boolean(),
   memoryEnabled: z.boolean(),
   memoryAutoConsolidate: z.boolean(),
   soul: soulSchema,
@@ -124,31 +202,43 @@ export const PREFERENCE_SCHEMAS = {
 export type PreferenceKey = keyof typeof PREFERENCE_SCHEMAS;
 export type PreferenceValue<K extends PreferenceKey> = z.infer<(typeof PREFERENCE_SCHEMAS)[K]>;
 
-/** 合法 key 校验（IPC 边界用）。 */
+/** Kiểm tra key hợp lệ tại ranh giới IPC. */
 export const preferenceKey = z.enum(
   Object.keys(PREFERENCE_SCHEMAS) as [PreferenceKey, ...PreferenceKey[]],
 );
 
-/** 全偏好快照（渲染层启动 hydrate 用）：仅含已存且校验通过的 key。 */
+/** Snapshot tùy chọn để renderer khởi tạo, chỉ gồm key đã lưu và hợp lệ. */
 export type PreferencesSnapshot = Partial<{ [K in PreferenceKey]: PreferenceValue<K> }>;
 
 /**
- * `preferences:set` IPC 入参：按 key 判别校验 value（边界处即拒非法形状）。
- * 每注册一个新 key，须在此补一条对应 arm（`preferences.test.ts` 校验与 PREFERENCE_SCHEMAS 同步）。
+ * Đầu vào IPC `preferences:set`: kiểm tra value theo key ngay tại ranh giới.
+ * Khi thêm key mới, thêm nhánh tương ứng tại đây; preferences.test.ts kiểm tra sự đồng bộ.
  */
 export const setPreferenceInput = z.discriminatedUnion("key", [
   z.object({ key: z.literal("readerPrefs"), value: readerPrefsSchema }),
   z.object({ key: z.literal("lastHighlightStyle"), value: annotationStyle }),
+  z.object({ key: z.literal("annotationColors"), value: annotationColorsSchema }),
+  z.object({ key: z.literal("annotationPalette"), value: annotationPaletteSchema }),
   z.object({ key: z.literal("autoSummarize"), value: z.boolean() }),
   z.object({ key: z.literal("onboardingDismissed"), value: z.boolean() }),
   z.object({ key: z.literal("colorMode"), value: colorMode }),
+  z.object({ key: z.literal("epubColorMode"), value: readerColorMode }),
+  z.object({ key: z.literal("pdfColorMode"), value: readerColorMode }),
+  z.object({ key: z.literal("pdfSurroundingBackground"), value: pdfSurroundingBackgroundSchema }),
+  z.object({ key: z.literal("appBackgroundMode"), value: appBackgroundMode }),
+  z.object({ key: z.literal("appBackgroundColor"), value: appBackgroundColor }),
+  z.object({ key: z.literal("appBackgroundBlobId"), value: z.string().nullable() }),
   z.object({ key: z.literal("language"), value: uiLanguage }),
   z.object({ key: z.literal("readerLayout"), value: readerLayoutSchema }),
   z.object({ key: z.literal("summaryModel"), value: summaryModelSchema }),
   z.object({ key: z.literal("pdfZoom"), value: pdfZoomSchema }),
+  z.object({ key: z.literal("pdfBrightness"), value: pdfBrightnessSchema }),
+  z.object({ key: z.literal("pdfSurroundingBrightness"), value: pdfSurroundingBrightnessSchema }),
+  z.object({ key: z.literal("restorePdfTabs"), value: z.boolean() }),
   z.object({ key: z.literal("stepLimit"), value: stepLimitSchema }),
   z.object({ key: z.literal("backgroundConcurrency"), value: backgroundConcurrencySchema }),
   z.object({ key: z.literal("chatModel"), value: chatModelSchema }),
+  z.object({ key: z.literal("aiDataConsent"), value: z.boolean() }),
   z.object({ key: z.literal("memoryEnabled"), value: z.boolean() }),
   z.object({ key: z.literal("memoryAutoConsolidate"), value: z.boolean() }),
   z.object({ key: z.literal("soul"), value: soulSchema }),

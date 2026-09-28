@@ -28,7 +28,7 @@ export const Route = createRootRoute({
 
 function RootDocument({ children }: { children: React.ReactNode }) {
   return (
-    // suppressHydrationWarning：兜住浏览器扩展/主题脚本往 <html>/<body> 注入属性导致的水合告警
+    // suppressHydrationWarning: xử lý cảnh báo hydration do tiện ích trình duyệt hoặc script giao diện chèn thuộc tính vào <html>/<body>
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />

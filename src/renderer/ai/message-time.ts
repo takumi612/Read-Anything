@@ -1,8 +1,8 @@
 import type { ChatUIMessage } from "@renderer/ai/types";
 
 /**
- * 消息时刻（epoch ms）。历史消息由 MessageDto.createdAt 水合而来；
- * live 消息（本轮发送/流式产出）尚未回读落库时间，回退到调用方给的当前时刻。
+ * Thời điểm tin nhắn theo epoch ms. Tin cũ lấy từ MessageDto.createdAt;
+ * tin đang gửi hoặc stream chưa có timestamp từ DB nên dùng thời điểm bên gọi cung cấp.
  */
 export function messageCreatedAt(m: ChatUIMessage, fallbackMs: number): number {
   return m.metadata?.createdAt ?? fallbackMs;
@@ -12,13 +12,13 @@ function localDate(ms: number, timeZone: string): Temporal.PlainDate {
   return Temporal.Instant.fromEpochMilliseconds(ms).toZonedDateTimeISO(timeZone).toPlainDate();
 }
 
-/** 本条与上一条跨自然日（prevMs 为 null ⇒ 列表首条）⇒ 该插一行日期分隔。 */
+/** Có cần dòng ngăn cách ngày giữa tin này và tin trước hay không; prevMs=null là tin đầu danh sách. */
 export function startsNewDay(prevMs: number | null, ms: number, timeZone: string): boolean {
   if (prevMs === null) return true;
   return !localDate(prevMs, timeZone).equals(localDate(ms, timeZone));
 }
 
-/** 日期分隔行的措辞类别：今天 / 昨天 / 更早（更早用绝对日期）。 */
+/** Loại nhãn ngày: hôm nay, hôm qua hoặc ngày cũ dùng ngày tuyệt đối. */
 export type DayKind = "today" | "yesterday" | "older";
 
 export function dayKind(ms: number, nowMs: number, timeZone: string): DayKind {
@@ -29,7 +29,7 @@ export function dayKind(ms: number, nowMs: number, timeZone: string): DayKind {
   return "older";
 }
 
-/** `<time dateTime>` 用的机器可读时刻（本地时区的 ISO 串）。 */
+/** Chuỗi ISO theo múi giờ địa phương để dùng trong thuộc tính dateTime của time. */
 export function isoAt(ms: number, timeZone: string): string {
   return Temporal.Instant.fromEpochMilliseconds(ms).toZonedDateTimeISO(timeZone).toString({
     timeZoneName: "never",

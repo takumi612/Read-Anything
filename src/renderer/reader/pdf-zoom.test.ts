@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { clampPdfZoom, nextZoom, PDF_ZOOM_MAX, PDF_ZOOM_MIN, PDF_ZOOM_STEP } from "./pdf-zoom";
+import {
+  clampPdfZoom,
+  clampPdfZoomScale,
+  nextZoom,
+  PDF_ZOOM_MAX,
+  PDF_ZOOM_MIN,
+  PDF_ZOOM_STEP,
+} from "./pdf-zoom";
 
 describe("clampPdfZoom", () => {
   it("区间内整百分比倍率原样保留", () => {
@@ -46,5 +53,16 @@ describe("nextZoom", () => {
   it("端点 clamp 到 MIN/MAX", () => {
     expect(nextZoom(4.9, -10000)).toBe(PDF_ZOOM_MAX);
     expect(nextZoom(0.3, 10000)).toBe(PDF_ZOOM_MIN);
+  });
+});
+
+describe("clampPdfZoomScale", () => {
+  it("preserves fractional zoom values during a touchpad gesture", () => {
+    expect(clampPdfZoomScale(nextZoom(1, -3))).toBeCloseTo(1.007528, 5);
+  });
+
+  it("still clamps live zoom to the supported range", () => {
+    expect(clampPdfZoomScale(0.1)).toBe(PDF_ZOOM_MIN);
+    expect(clampPdfZoomScale(10)).toBe(PDF_ZOOM_MAX);
   });
 });

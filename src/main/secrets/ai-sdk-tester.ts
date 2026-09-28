@@ -7,20 +7,19 @@ import { createLogger } from "@main/logger";
 
 const log = createLogger("providers");
 
-/** 对给定模型发一次最小生成；成功即返回，失败即抛出。可注入用于测试。 */
+/** Gửi một yêu cầu tạo văn bản tối thiểu tới model; có thể thay bằng mock khi kiểm thử. */
 export type GenerateProbe = (model: ChatModel) => Promise<void>;
 
 const realProbe: GenerateProbe = async (model) => {
-  // maxOutputTokens 须容纳 reasoning 模型的推理预算：设为 1 时，强制思考的模型（如 Kimi K2.6、
-  // gpt-5.x reasoning）连推理都开不了头，provider 回 HTTP 200 但响应 incomplete/无有效输出，
-  // AI SDK 解析失败抛 statusCode=200 的 APICallError。64 留出最小推理余量；测试低频，成本可忽略。
+  // maxOutputTokens phải đủ cho model reasoning. Nếu đặt 1, model có thể trả HTTP 200
+  // nhưng kết quả incomplete và AI SDK báo lỗi phân tích. 64 token cho mức suy luận tối thiểu.
   await generateText({ model, prompt: "ping", maxOutputTokens: 64, maxRetries: 0 });
 };
 
 /**
- * 尽力从 provider 的错误响应体里提取**真实** error message。
- * 覆盖常见形状（anthropic/openai/google 等的 `{error:{message}}`、`{error:"str"}`、`{message}`）；
- * 结构未知、非 JSON、或无可读 message 字段时返回 `null`——交由调用方退到 HTTP 语义，**绝不编造原因**。
+ * Cố lấy thông điệp lỗi thật từ body provider ở các dạng phổ biến.
+ * Body không phải JSON hoặc không có message thì trả null; bên gọi dùng mã HTTP
+ * để nêu khả năng lỗi thay vì tự đoán nguyên nhân cụ thể.
  */
 export function getErrorMessage(err: unknown): string | null {
   if (!APICallError.isInstance(err) || typeof err.responseBody !== "string") return null;
@@ -42,7 +41,7 @@ export function getErrorMessage(err: unknown): string | null {
   return null;
 }
 
-/** 提取不到 provider 原文时的兜底：用 HTTP 状态码的**标准语义**，明确是「可能方向」而非断言。 */
+/** Nếu thiếu lời lỗi của provider, diễn giải mã HTTP như hướng kiểm tra có thể đúng. */
 const HTTP_HINT: Record<number, string> = {
   400: "Bad Request — the request or model name may be rejected",
   401: "Unauthorized — the API key may be invalid or missing",
@@ -53,14 +52,14 @@ const HTTP_HINT: Record<number, string> = {
 
 function describeFallback(status: number | undefined, err: unknown): string {
   if (status === undefined) {
-    // 非 HTTP 响应（网络层/解析失败等）——透传真实异常文案，不编。
+    // Lỗi mạng hoặc phân tích không có HTTP response: chuyển nguyên thông điệp lỗi.
     return `Request failed: ${err instanceof Error ? err.message : String(err)}`;
   }
   if (HTTP_HINT[status]) return `HTTP ${status}: ${HTTP_HINT[status]}`;
   if (status >= 500) return `HTTP ${status}: the provider had a server-side error`;
   if (status >= 200 && status < 300) {
-    // 成功状态码却抛错：provider 回了 2xx，但 AI SDK 无法解析响应——常见于 reasoning 模型在
-    // maxOutputTokens 过小时返回 incomplete/无有效输出。透传 SDK 的诊断文案，绝不报误导性的裸 "HTTP 200"。
+    // HTTP 2xx vẫn có thể lỗi nếu AI SDK không phân tích được phản hồi, thường do
+    // model reasoning thiếu token đầu ra. Dùng thông điệp SDK thay vì "HTTP 200" mơ hồ.
     const detail = err instanceof Error && err.message ? ` (${err.message})` : "";
     return `HTTP ${status}: the provider returned a success status but the response could not be parsed${detail}`;
   }
@@ -68,18 +67,18 @@ function describeFallback(status: number | undefined, err: unknown): string {
 }
 
 /**
- * 把异常映射为 TestResult。原则：**优先透传 provider 的真实 error message**；
- * 提取不到才退到 HTTP 状态码的标准语义（明确「可能方向」），**绝不虚构具体原因**。
+ * Chuyển ngoại lệ thành TestResult: ưu tiên lời lỗi thật của provider;
+ * nếu thiếu thì dùng ý nghĩa mã HTTP như một hướng kiểm tra, không tự bịa nguyên nhân.
  */
 export function mapTestError(err: unknown): TestResult {
   if (LoadAPIKeyError.isInstance(err)) {
-    return { ok: false, message: t("errors.noApiKeyConfigured", "未配置密钥") };
+    return { ok: false, message: t("errors.noApiKeyConfigured", "Chưa cấu hình API key") };
   }
   const status = APICallError.isInstance(err) ? err.statusCode : undefined;
   return { ok: false, status, message: getErrorMessage(err) ?? describeFallback(status, err) };
 }
 
-/** 基于 AI SDK generateText 的真实 ProviderTester。probe 可注入用于测试。 */
+/** ProviderTester dùng AI SDK generateText; có thể truyền probe khác trong kiểm thử. */
 export function createAiSdkTester(probe: GenerateProbe = realProbe): ProviderTester {
   return {
     async test(params: ProviderTestParams): Promise<TestResult> {
@@ -94,8 +93,7 @@ export function createAiSdkTester(probe: GenerateProbe = realProbe): ProviderTes
         await probe(model);
         return { ok: true };
       } catch (err) {
-        // 优雅吞错（转成 TestResult 返回、不抛）必须留 warn——否则测试失败全程无日志：
-        // 既未抛异常（registry catch-all 碰不到），自身又不记录，排障时一片空白。
+        // Khi chuyển lỗi thành TestResult, vẫn ghi cảnh báo để có dấu vết chẩn đoán.
         log.warn("provider connectivity test failed", err);
         return mapTestError(err);
       }
@@ -103,5 +101,5 @@ export function createAiSdkTester(probe: GenerateProbe = realProbe): ProviderTes
   };
 }
 
-/** 进程级单例（main 胶水层注入仓库）。 */
+/** Singleton của main process, được truyền vào repository. */
 export const aiSdkTester: ProviderTester = createAiSdkTester();

@@ -7,7 +7,7 @@ export interface SelectionContext {
   tokenTotal: number;
 }
 
-/** draft 中选区上下文（selection/paragraph chips）的聚合视图（spec §4 合并 pill）；两者皆无 → null。 */
+/** Nhìn chung ngữ cảnh vùng chọn trong bản nháp từ chip selection và paragraph; thiếu cả hai thì null. */
 export function selectionContextOf(chips: Chip[]): SelectionContext | null {
   const selection = chips.find((c) => c.id === "selection") ?? null;
   const paragraph = chips.find((c) => c.id === "paragraph") ?? null;
@@ -19,7 +19,7 @@ export function selectionContextOf(chips: Chip[]): SelectionContext | null {
   };
 }
 
-/** 整体移除选区上下文（spec §4：一次反悔动作，发送前可撤）。 */
+/** Xóa toàn bộ ngữ cảnh vùng chọn khỏi bản nháp trước khi gửi. */
 export function withoutSelectionContext(chips: Chip[]): Chip[] {
   return chips.filter((c) => c.id !== "selection" && c.id !== "paragraph");
 }

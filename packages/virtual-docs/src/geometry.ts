@@ -1,4 +1,4 @@
-/** 选区 viewport 坐标矩形（形状对齐渲染层 SelectionInfo.rect）。 */
+/** Hình chữ nhật vùng chọn trong tọa độ viewport, cùng cấu trúc với SelectionInfo.rect ở renderer. */
 export interface ViewportRect {
   x: number;
   y: number;
@@ -6,7 +6,7 @@ export interface ViewportRect {
   height: number;
 }
 
-/** 把 iframe 内坐标的 rect 平移为主视口坐标（加 iframe 在视口的左上偏移）。 */
+/** Chuyển rect từ tọa độ iframe sang viewport chính bằng cách cộng độ lệch góc trên trái của iframe. */
 export function toViewportRect(
   rangeRect: { left: number; top: number; width: number; height: number },
   iframeRect: { left: number; top: number },

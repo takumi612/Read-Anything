@@ -1,10 +1,11 @@
 const ALLOWED = new Set(["http:", "https:", "mailto:"]);
 
-/** 外链协议白名单：仅放行 http/https/mailto，拒 file/javascript/data 等（防 shell.openExternal 被滥用）。 */
+/** Chỉ mở liên kết http/https/mailto; chặn các scheme khác trước khi gọi shell.openExternal. */
 export function isAllowedExternalUrl(url: string): boolean {
+  if (url === "ms-settings:defaultapps") return true;
   try {
     return ALLOWED.has(new URL(url).protocol);
   } catch {
-    return false; // 非法 URL
+    return false; // URL không hợp lệ.
   }
 }

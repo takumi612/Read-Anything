@@ -1,4 +1,4 @@
-// 假流式对话引擎（原型一次性件）：逐段揭示助手正文，可选先冒一张折叠工具步骤卡，可中断。
+// Bộ máy hội thoại giả lập dạng luồng (dùng riêng cho bản mẫu): lần lượt hiện nội dung trợ lý theo từng đoạn, có thể hiện trước thẻ bước công cụ thu gọn và có thể ngắt.
 
 import { useCallback, useRef, useState } from "react";
 import type { ChatMessage, Chip, ToolStep } from "#/mock/types";
@@ -27,7 +27,7 @@ function readStep(): ToolStep {
   };
 }
 
-/** 据用户文本/chips 生成一段“可信”的假回复（确定性，便于演示各形态）。 */
+/** Tạo câu trả lời giả lập có vẻ đáng tin dựa trên văn bản/chips của người dùng (kết quả xác định để dễ minh họa các trạng thái). */
 function mockReply(userText: string, chips: Chip[]): Reply {
   const selection = chips.find((c) => c.id === "selection")?.content ?? "";
   if (userText.includes("/error") || userText.includes("报错")) {
@@ -54,7 +54,7 @@ function mockReply(userText: string, chips: Chip[]): Reply {
   };
 }
 
-/** 把文本切成 ~2 码位的小块，模拟逐字吐出（CJK 无空格）。 */
+/** Chia văn bản thành các khối khoảng 2 mã điểm để mô phỏng việc xuất từng chữ (chữ Hán/Nhật/Hàn không dùng khoảng trắng). */
 function chunkText(text: string): string[] {
   const arr = Array.from(text);
   const out: string[] = [];

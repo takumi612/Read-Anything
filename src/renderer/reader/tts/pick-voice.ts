@@ -2,7 +2,7 @@ import type { TtsLang } from "./detect-lang";
 
 export type TtsPlatform = "macos" | "windows" | "linux";
 
-/** macOS novelty voices（音效声，朴素 lang 匹配会踩中；spike 实测）。 */
+/** Giọng hiệu ứng của macOS; ghép đơn giản theo lang có thể chọn nhầm các giọng này. */
 export const NOVELTY_BLOCKLIST: readonly string[] = [
   "Albert",
   "Bad News",
@@ -22,15 +22,14 @@ export const NOVELTY_BLOCKLIST: readonly string[] = [
 ];
 
 /**
- * 平台分层推荐表（spec §5）：有序候选名单，顺位降级。macOS 实测精选；
- * Windows/Linux 留空走通用兜底（lang 匹配 + localService/default 优先）——
- * 结构上为未来实测补名单留位。
+ * Danh sách giọng đề xuất theo nền tảng, thử lần lượt theo thứ tự.
+ * macOS dùng các giọng đã kiểm tra; Windows/Linux dùng cách chọn chung theo ngôn ngữ,
+ * ưu tiên localService và giọng mặc định cho tới khi có danh sách được kiểm tra riêng.
  */
 export const RECOMMENDED_VOICES: Record<TtsPlatform, Partial<Record<TtsLang, string[]>>> = {
   macos: {
     en: ["Samantha", "Alex", "Karen", "Daniel"],
-    // macOS 按系统语言本地化中日 voice 名（中文系统显示「婷婷」、英文系统显示 Tingting），
-    // 推荐表两种名都列（实测 2026-06-13 冒烟校准）
+    // macOS bản địa hóa tên giọng theo ngôn ngữ hệ thống; liệt kê cả tên gốc lẫn tên Latin.
     zh: ["Tingting", "婷婷", "Meijia", "美佳", "Sinji", "善怡"],
     ja: ["Kyoko", "京子"],
   },
@@ -38,26 +37,36 @@ export const RECOMMENDED_VOICES: Record<TtsPlatform, Partial<Record<TtsLang, str
   linux: {},
 };
 
-const LANG_PREFIX: Record<TtsLang, string> = { zh: "zh", ja: "ja", en: "en" };
+const LANG_PREFIX: Record<TtsLang, string> = { zh: "zh", ja: "ja", en: "en", vi: "vi" };
 
 export interface VoicePrefsLike {
   voiceByLang: Record<string, string>;
 }
 
+export interface PickVoiceOptions {
+  /** Excludes system-backed online voices for actions that must stay on-device. */
+  localOnly?: boolean;
+}
+
 /**
- * 选声降级链（spec §4.2）：用户偏好 → 平台推荐表顺位 → 通用兜底
- * （novelty 过滤 + localService 优先 + default 优先）→ null（引擎默认行为）。
+ * Chọn giọng theo thứ tự: tùy chọn người dùng, danh sách đề xuất theo nền tảng,
+ * cách chọn chung có lọc giọng hiệu ứng và ưu tiên localService/giọng mặc định,
+ * cuối cùng trả null để engine tự chọn.
  */
 export function pickVoice(
   lang: TtsLang,
   voices: SpeechSynthesisVoice[],
   prefs: VoicePrefsLike,
   platform: TtsPlatform,
+  options: PickVoiceOptions = {},
 ): SpeechSynthesisVoice | null {
-  const matches = voices.filter((v) => v.lang.toLowerCase().startsWith(LANG_PREFIX[lang]));
+  const candidates = options.localOnly ? voices.filter((voice) => voice.localService) : voices;
+  const matches = candidates.filter((v) => v.lang.toLowerCase().startsWith(LANG_PREFIX[lang]));
   const wanted = prefs.voiceByLang[lang];
   if (wanted) {
-    const hit = matches.find((v) => v.name === wanted) ?? voices.find((v) => v.name === wanted);
+    const hit =
+      matches.find((v) => v.name === wanted) ??
+      (options.localOnly ? undefined : candidates.find((v) => v.name === wanted));
     if (hit) return hit;
   }
   for (const name of RECOMMENDED_VOICES[platform][lang] ?? []) {

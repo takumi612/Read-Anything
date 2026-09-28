@@ -148,7 +148,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
   };
 
   if (sessions.isPending || detail.isPending) {
-    return <ReportMessage>{t("reading.routeLoading", "载入阅读档案中…")}</ReportMessage>;
+    return <ReportMessage>{t("reading.routeLoading", "Đang tải sách…")}</ReportMessage>;
   }
   if (sessions.isError || detail.isError || !selectedSession || !detail.data) {
     return <ReportMessage>{t("readingReport.loadFailed")}</ReportMessage>;
@@ -177,7 +177,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
       <div className="mx-auto flex max-w-6xl flex-col gap-6">
         <Button variant="ghost" className="w-fit" onClick={backToLibrary}>
           <ArrowLeft data-icon="inline-start" />
-          {t("reader.backToLibrary", "返回书库")}
+          {t("reader.backToLibrary", "Thư viện")}
         </Button>
 
         <div className="grid items-start gap-6 lg:grid-cols-[17rem_minmax(0,1fr)]">
@@ -187,13 +187,13 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
             </div>
             <div className="flex flex-col gap-1">
               <p className="text-sm font-medium text-primary">
-                {t("reader.completeReading.completed", "阅读完成")}
+                {t("reader.completeReading.completed", "Đã hoàn tất lượt đọc")}
               </p>
               <h1 className="min-w-0 line-clamp-2 font-serif text-3xl leading-tight">
                 {book.title ?? book.id}
               </h1>
               <p className="text-sm text-muted-foreground">
-                {book.author ?? t("library.unknownAuthor", "未知作者")}
+                {book.author ?? t("library.unknownAuthor", "Không rõ tác giả")}
               </p>
             </div>
 
@@ -270,7 +270,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
             <CardContent className="flex flex-1 flex-col gap-4">
               {model.error ? (
                 <p className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
-                  {t("readingReport.generateFailed", "暂时无法生成这份报告，请重试。")}
+                  {t("readingReport.generateFailed", "Không thể tạo báo cáo. Hãy thử lại.")}
                 </p>
               ) : null}
               {editing ? (
@@ -334,7 +334,7 @@ export function ReadingReportView({ book }: { book: BookSummaryDto }) {
           </AlertDialogDescription>
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => setRereadOpen(false)}>
-              {t("common.cancel", "取消")}
+              {t("common.cancel", "Hủy")}
             </Button>
             <Button onClick={() => void reread()}>{t("readingReport.reread")}</Button>
           </AlertDialogFooter>

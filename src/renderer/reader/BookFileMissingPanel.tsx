@@ -14,7 +14,7 @@ import {
 } from "@renderer/components/ui/alert-dialog";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 
-/** 书文件缺失时替换 reader 内容区：重连（内容一致才写回）/ 删除 / 返回书库。epub 与 pdf 共享。 */
+/** Bảng thay vùng đọc khi thiếu tệp sách: liên kết lại sau khi kiểm tra nội dung, xóa hoặc về thư viện. */
 export function BookFileMissingPanel({ bookId }: { bookId: string }) {
   const { t } = useTranslation();
   const qc = useQueryClient();
@@ -27,15 +27,15 @@ export function BookFileMissingPanel({ bookId }: { bookId: string }) {
       const r = await window.api.library.relink({ bookId });
       if (r.status === "ok") {
         setMismatch(false);
-        toast.success(t("reader.missingFile.relinked", "已重新连接文件"));
+        toast.success(t("reader.missingFile.relinked", "Đã kết nối lại tệp"));
         void qc.invalidateQueries({ queryKey: qk.bookBytes(bookId) });
       } else if (r.status === "mismatch") {
         setMismatch(true);
       }
-      // canceled：无动作
+      // Người dùng hủy thì không làm gì.
     } catch (e) {
       toast.error(
-        t("reader.missingFile.relinkFailed", "重新连接失败：{{error}}", {
+        t("reader.missingFile.relinkFailed", "Không thể kết nối lại: {{error}}", {
           error: (e as Error).message,
         }),
         { closeButton: true, duration: Infinity },
@@ -47,11 +47,11 @@ export function BookFileMissingPanel({ bookId }: { bookId: string }) {
     setConfirmOpen(false);
     try {
       await window.api.library.delete({ bookId });
-      toast.success(t("reader.missingFile.deleted", "已从书库删除"));
+      toast.success(t("reader.missingFile.deleted", "Đã gỡ khỏi thư viện"));
       backToLibrary();
     } catch (e) {
       toast.error(
-        t("reader.missingFile.deleteFailed", "删除失败：{{error}}", {
+        t("reader.missingFile.deleteFailed", "Xóa thất bại: {{error}}", {
           error: (e as Error).message,
         }),
         { closeButton: true, duration: Infinity },
@@ -64,48 +64,48 @@ export function BookFileMissingPanel({ bookId }: { bookId: string }) {
       <FileX2 className="size-12 text-muted-foreground" />
       <div className="space-y-1">
         <p className="font-sans text-base font-medium text-foreground">
-          {t("reader.missingFile.title", "这本书的文件不见了")}
+          {t("reader.missingFile.title", "Không tìm thấy tệp sách")}
         </p>
         <p className="max-w-sm font-sans text-sm text-muted-foreground">
           {t(
             "reader.missingFile.body",
-            "文件可能被移动或删除。重新选择原文件可恢复阅读（含进度与标注），或从书库删除这本书。",
+            "Tệp có thể đã bị di chuyển hoặc xóa. Chọn lại tệp gốc để tiếp tục đọc với tiến độ và đánh dấu đã lưu, hoặc gỡ sách khỏi thư viện.",
           )}
         </p>
       </div>
       <div className="flex items-center gap-2">
         <Button onClick={() => void relink()}>
-          {t("reader.missingFile.relink", "重新选择文件")}
+          {t("reader.missingFile.relink", "Chọn lại tệp")}
         </Button>
         <Button variant="outline" onClick={backToLibrary}>
-          {t("reader.backToLibrary", "书库")}
+          {t("reader.backToLibrary", "Thư viện")}
         </Button>
         <Button variant="destructive" onClick={() => setConfirmOpen(true)}>
-          {t("reader.missingFile.delete", "从书库删除")}
+          {t("reader.missingFile.delete", "Gỡ khỏi thư viện")}
         </Button>
       </div>
       {mismatch && (
         <p className="font-sans text-sm text-destructive">
-          {t("reader.missingFile.mismatch", "这不是同一个文件（内容不一致）")}
+          {t("reader.missingFile.mismatch", "Đây không phải tệp gốc vì nội dung không khớp")}
         </p>
       )}
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogTitle>
-            {t("reader.missingFile.deleteConfirm.title", "从书库删除这本书？")}
+            {t("reader.missingFile.deleteConfirm.title", "Gỡ sách này khỏi thư viện?")}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {t(
               "reader.missingFile.deleteConfirm.body",
-              "将永久移除这本书及其所有标注、笔记、对话。此操作不可撤销。",
+              "Sách này cùng toàn bộ đánh dấu, ghi chú và cuộc trò chuyện sẽ bị xóa vĩnh viễn. Bạn không thể hoàn tác thao tác này.",
             )}
           </AlertDialogDescription>
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-              {t("reader.missingFile.deleteConfirm.cancel", "取消")}
+              {t("reader.missingFile.deleteConfirm.cancel", "Hủy")}
             </Button>
             <Button variant="destructive" onClick={() => void remove()}>
-              {t("reader.missingFile.deleteConfirm.confirm", "删除")}
+              {t("reader.missingFile.deleteConfirm.confirm", "Xóa")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

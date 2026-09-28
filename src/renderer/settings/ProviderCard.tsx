@@ -7,17 +7,18 @@ import type { ProviderDto } from "@shared/providers";
 import { PROVIDER_TYPE_LABEL } from "@shared/providers";
 import { Button } from "@renderer/components/ui/button";
 
-/** 内置 provider 的 label → @lobehub/icons 品牌 key（仅内置显示图标；label 内置不可改，是稳定身份）。 */
+/** Ánh xạ nhãn provider tích hợp sang khóa icon @lobehub/icons; nhãn tích hợp là định danh ổn định. */
 const BRAND_KEY: Record<string, string> = {
   OpenAI: "openai",
   Anthropic: "anthropic",
-  Gemini: "google", // ProviderIcon 的 provider key 是 "google"（"gemini" 是 model 级、ProviderIcon 不认）
-  DeepSeek: "deepseek", // provider 级映射存在（providerConfig keywords:[ModelProvider.DeepSeek]）
+  Gemini: "google", // ProviderIcon nhận "google" làm khóa provider; "gemini" thuộc mức model.
+  DeepSeek: "deepseek", // Ánh xạ provider DeepSeek đã có trong providerConfig.
 };
 
 /**
- * 单个 provider 卡片。测试连接是**卡片自有**状态（本地 mutation + 就地显示），不共享测试结果状态——
- * 否则会和「各 ModelPickerSection 区」的测试结果互相覆盖、显示串位（见 RA5 review）。无模型时禁用测试（避免空 model 触发后端校验错）。
+ * Một thẻ provider tự giữ state kiểm tra kết nối qua mutation cục bộ và hiển thị tại chỗ.
+ * Không chia sẻ kết quả với các ModelPickerSection để kết quả không ghi đè nhầm nhau.
+ * Tắt kiểm tra khi chưa có model để tránh lỗi xác thực ở backend.
  */
 export function ProviderCard({
   provider,
@@ -38,26 +39,26 @@ export function ProviderCard({
   });
 
   function keyText(p: ProviderDto): string {
-    return p.keyMask ?? t("settings.provider.keyNotSet", "未配置");
+    return p.keyMask ?? t("settings.provider.keyNotSet", "Chưa cấu hình");
   }
 
   return (
     <div className="rounded-lg border border-border p-3">
       <div className="flex items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-1.5">
-          {/* 内置 provider 显示品牌图标（@lobehub/icons；provider key = 我们的 type）。 */}
+          {/* Provider tích hợp hiện icon thương hiệu từ @lobehub/icons theo type. */}
           {provider.isBuiltin && provider.label && BRAND_KEY[provider.label] && (
             <ProviderIcon provider={BRAND_KEY[provider.label]} type="color" size={18} />
           )}
           <span className="truncate text-sm font-medium">
-            {provider.label ?? t("settings.provider.unnamed", "（未命名）")}
+            {provider.label ?? t("settings.provider.unnamed", "(chưa đặt tên)")}
           </span>
           <span className="shrink-0 rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground">
             {PROVIDER_TYPE_LABEL[provider.type]}
           </span>
         </div>
         <div className="flex shrink-0 gap-1">
-          <Button variant="ghost" size="sm" onClick={onEdit} aria-label={t("common.edit", "编辑")}>
+          <Button variant="ghost" size="sm" onClick={onEdit} aria-label={t("common.edit", "Sửa")}>
             <Pencil className="size-4" />
           </Button>
           <Button
@@ -65,11 +66,11 @@ export function ProviderCard({
             size="sm"
             onClick={() => test.mutate()}
             disabled={provider.models.length === 0 || test.isPending}
-            aria-label={t("settings.provider.test", "测试连接")}
+            aria-label={t("settings.provider.test", "Kiểm tra kết nối")}
             title={
               provider.models.length === 0
-                ? t("settings.provider.testDisabledNoModels", "先添加模型再测试")
-                : t("settings.provider.test", "测试连接")
+                ? t("settings.provider.testDisabledNoModels", "Thêm một model trước khi kiểm tra")
+                : t("settings.provider.test", "Kiểm tra kết nối")
             }
           >
             <PlugZap className="size-4" />
@@ -79,7 +80,7 @@ export function ProviderCard({
               variant="ghost"
               size="sm"
               onClick={onRemove}
-              aria-label={t("common.remove", "移除")}
+              aria-label={t("common.remove", "Gỡ")}
             >
               <Trash2 className="size-4" />
             </Button>
@@ -90,7 +91,7 @@ export function ProviderCard({
         <span>{t("settings.provider.keyLabel", "🔑 {{key}}", { key: keyText(provider) })}</span>
         <span className="ms-2">
           ·{" "}
-          {t("settings.provider.modelCount", "{{count}} 个模型", { count: provider.models.length })}
+          {t("settings.provider.modelCount", "{{count}} model", { count: provider.models.length })}
         </span>
       </div>
       {(test.isPending || result) && (
@@ -104,15 +105,15 @@ export function ProviderCard({
           }
         >
           {test.isPending ? (
-            t("settings.provider.testing", "测试中…")
+            t("settings.provider.testing", "Đang kiểm tra…")
           ) : result?.ok ? (
             <>
-              <Check className="size-3.5" /> {t("settings.provider.testOk", "连接成功")}
+              <Check className="size-3.5" /> {t("settings.provider.testOk", "Kết nối thành công")}
             </>
           ) : (
             <>
               <X className="size-3.5" />{" "}
-              {t("settings.provider.testFail", "失败：{{message}}", {
+              {t("settings.provider.testFail", "Thất bại: {{message}}", {
                 message: result?.message ?? "",
               })}
             </>

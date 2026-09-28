@@ -1,6 +1,6 @@
 import type { Translation } from "#/locales/zh";
 
-// 德语普遍偏长，用来压界面布局（侧栏标签、摘要 pill、按钮等）。
+// Tiếng Đức thường có từ dài, dùng để kiểm tra bố cục giao diện (nhãn thanh bên, pill tóm tắt, nút, v.v.).
 export const de: Translation = {
   app: { badge: "UI-Prototyp" },
   nav: {

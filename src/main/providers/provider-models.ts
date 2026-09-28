@@ -7,7 +7,7 @@ export interface ModelsRequest {
   headers: Record<string, string>;
 }
 
-/** 按 type 构造 /models 请求（url + 鉴权头）。base = baseUrl ?? 默认端点；openai-compatible 无默认必须给 base。 */
+/** Tạo yêu cầu /models theo API type, gồm URL và header xác thực. */
 export function buildModelsRequest(
   type: AiProviderApiType,
   baseUrl: string | null,
@@ -15,9 +15,9 @@ export function buildModelsRequest(
 ): ModelsRequest {
   const raw = baseUrl ?? DEFAULT_BASE_URL[type];
   if (!raw)
-    throw new Error(t("errors.baseUrlRequiredForProvider", "该$t(terms.provider)需要 baseUrl"));
-  // baseUrl 约定：含版本路径（openai `/v1`、anthropic `/v1`、google `/v1beta`），拉模型只拼 `/models`，
-  // 与 model-factory 生成路径的 baseURL 约定一致（自建代理填同一个 base 两处都对）。去尾斜杠避免 `//models`。
+    throw new Error(t("errors.baseUrlRequiredForProvider", "$t(terms.provider) này cần có baseUrl"));
+  // baseUrl đã có đoạn phiên bản như /v1 hoặc /v1beta; chỉ thêm /models.
+  // Bỏ dấu / cuối để tránh //models, nhất quán với URL dùng khi tạo model.
   const base = raw.replace(/\/+$/, "");
   switch (type) {
     case "openai-responses":
@@ -42,15 +42,15 @@ const googleSchema = z.object({
 const looseItem = z.object({ id: z.string() }).passthrough();
 
 /**
- * 非文本生成模型的 id 片段（图像 dall-e/gpt-image、语音合成 tts、语音转写 whisper/transcribe、
- * 向量 embed、重排 rerank、审核 moderation、视频 sora）——这些不能用于对话/文本生成，从拉取结果剔除。
- * 用 `(^|[-/])…` 词界匹配，避免误伤恰好含相同子串的对话模型；只剔确信项、未知一律保留
- * （honest：宁可多列让用户自行取舍，绝不静默漏掉可用模型）。google 走 generateContent 能力过滤，不经此名单。
+ * Các dấu hiệu chắc chắn của model không tạo văn bản: ảnh, TTS, chuyển giọng nói,
+ * embedding, rerank, moderation và video. Chỉ loại tên khớp ở ranh giới từ.
+ * Model chưa biết vẫn được giữ để người dùng tự chọn, tránh bỏ sót model chat mới.
+ * Google được lọc theo khả năng generateContent thay vì danh sách này.
  */
 const NON_TEXT_MODEL =
   /(^|[-/])(dall-e|gpt-image|tts|whisper|transcribe|embed|rerank|moderation|sora)/i;
 
-/** 从 model id 列表剔除明确的非文本生成模型（见 NON_TEXT_MODEL）。 */
+/** Bỏ model chắc chắn không dùng để tạo văn bản khỏi danh sách ID. */
 function filterTextModels(ids: string[]): string[] {
   return ids.filter((id) => !NON_TEXT_MODEL.test(id));
 }
@@ -61,7 +61,7 @@ export interface FetchModelsParams {
   apiKey: string;
 }
 
-/** HTTP 状态码标准语义兜底（标「可能方向」，绝不编造）；与 ai-sdk-tester 同款。 */
+/** Diễn giải mã HTTP khi không có lời lỗi chi tiết; chỉ nêu nguyên nhân có thể xảy ra. */
 const HTTP_HINT: Record<number, string> = {
   400: "Bad Request — the request may be rejected",
   401: "Unauthorized — the API key may be invalid or missing",
@@ -70,13 +70,12 @@ const HTTP_HINT: Record<number, string> = {
   429: "Too Many Requests — rate limited or quota exhausted",
 };
 
-/** 把抛出/非 2xx 响应映射为可读 message（优先透传 provider 原文，提不到退 HTTP 语义）。 */
+/** Chuyển lỗi thành thông điệp dễ đọc; ưu tiên thông điệp gốc của provider. */
 export function mapModelsError(
   err: unknown,
   status: number | undefined,
 ): { status?: number; message: string } {
-  // 仅取 Error.message / string 原文（避免对任意 unknown 调 String 得到 "[object Object]"）；
-  // 其它形态（对象/数字等）退到 HTTP 语义——honest，不编造。
+  // Chỉ dùng Error.message hoặc chuỗi gốc; dữ liệu khác dùng thông điệp theo mã HTTP.
   const fromErr = err instanceof Error ? err.message : typeof err === "string" ? err : "";
   if (fromErr) return { status, message: fromErr };
   if (status && HTTP_HINT[status])
@@ -84,10 +83,10 @@ export function mapModelsError(
   if (status && status >= 500)
     return { status, message: `HTTP ${status}: the provider had a server-side error` };
   if (status) return { status, message: `HTTP ${status}` };
-  return { message: t("errors.requestFailed", "请求失败") };
+  return { message: t("errors.requestFailed", "Yêu cầu thất bại") };
 }
 
-/** 从错误响应体尽力提真实 message（{error:{message}} / {error:"str"} / {message}）；提不到返 null。 */
+/** Lấy message thật từ body lỗi ở các dạng phổ biến; không có thì trả null. */
 function extractBodyMessage(body: unknown): string | null {
   if (body === null || typeof body !== "object") return null;
   const o = body as Record<string, unknown>;
@@ -101,7 +100,7 @@ function extractBodyMessage(body: unknown): string | null {
   return null;
 }
 
-/** 调 provider /models 端点 → model id 列表。失败抛 Error（message 已透传 provider 原文或 HTTP 语义）。 */
+/** Gọi endpoint /models và trả danh sách ID; lỗi chứa thông điệp provider hoặc diễn giải HTTP. */
 export async function fetchProviderModels(
   p: FetchModelsParams,
   fetchImpl: typeof fetch,
@@ -121,13 +120,13 @@ export async function fetchProviderModels(
   return adaptModelsResponse(p.type, body);
 }
 
-/** 先 Zod 校验外部响应（API 边界），再按 type 归一为 model id 列表。openai-chat-completions 放宽 best-effort。 */
+/** Kiểm tra phản hồi ngoài bằng Zod rồi chuẩn hóa danh sách model theo type. */
 export function adaptModelsResponse(type: AiProviderApiType, json: unknown): string[] {
   if (type === "google-generate-content") {
     return (
       googleSchema
         .parse(json)
-        // 缺 supportedGenerationMethods 字段时默认保留（include）：宁可多列让用户试，也不静默漏掉。
+        // Thiếu supportedGenerationMethods thì vẫn giữ model để người dùng thử.
         .models.filter((m) => m.supportedGenerationMethods?.includes("generateContent") ?? true)
         .map((m) => m.name.replace(/^models\//, ""))
     );
@@ -141,6 +140,6 @@ export function adaptModelsResponse(type: AiProviderApiType, json: unknown): str
     });
     return filterTextModels(ids);
   }
-  // openai-responses / anthropic：严格 data[].id
+  // OpenAI Responses và Anthropic chỉ chấp nhận data[].id hợp lệ.
   return filterTextModels(openaiLike.parse(json).data.map((m) => m.id));
 }

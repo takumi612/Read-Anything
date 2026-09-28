@@ -1,6 +1,6 @@
 /**
- * 无封面兜底 tile 的渐变配色调色板。**字面量写死**这些类名供 Tailwind JIT 扫描生成
- * （配合 `bg-gradient-to-br ${coverGradientClass(id)}` 使用）。
+ * Bảng màu chuyển sắc cho sách không có bìa. Viết class dưới dạng literal để Tailwind JIT nhận diện,
+ * rồi dùng với `bg-gradient-to-br ${coverGradientClass(id)}`.
  */
 export const COVER_GRADIENTS = [
   "from-violet-500 to-violet-900",
@@ -13,7 +13,7 @@ export const COVER_GRADIENTS = [
   "from-indigo-500 to-indigo-900",
 ] as const;
 
-/** 由 bookId 确定性派生一个调色板项（同书恒定、跨书多彩随机）。 */
+/** Chọn màu xác định từ bookId: cùng sách luôn cùng màu, các sách khác nhau có nhiều màu. */
 export function coverGradientClass(bookId: string): string {
   let h = 0;
   for (let i = 0; i < bookId.length; i++) h = (h * 31 + bookId.charCodeAt(i)) >>> 0;

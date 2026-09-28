@@ -23,7 +23,7 @@ function toDto(row: AnnotationRow): AnnotationDto {
   };
 }
 
-/** 列出某书的全部标注（按 createdAt 降序，最近创建在前；此即渲染层的展示顺序）。 */
+/** Liệt kê annotation của sách theo thời gian tạo giảm dần. */
 export function listAnnotationsByBook(db: DB, bookId: string): AnnotationDto[] {
   return db
     .select()
@@ -34,7 +34,7 @@ export function listAnnotationsByBook(db: DB, bookId: string): AnnotationDto[] {
     .map(toDto);
 }
 
-/** 建标注；缺书抛可读错误。 */
+/** Tạo annotation; sách không tồn tại thì báo lỗi dễ đọc. */
 export function createAnnotation(db: DB, input: CreateAnnotationInput): AnnotationDto {
   const book = db.select({ id: books.id }).from(books).where(eq(books.id, input.bookId)).get();
   if (!book) throw new Error(`createAnnotation: book ${input.bookId} not found`);
@@ -52,7 +52,7 @@ export function createAnnotation(db: DB, input: CreateAnnotationInput): Annotati
   return toDto(row);
 }
 
-/** 改样式/笔记；缺标注抛错。 */
+/** Sửa màu/ghi chú của annotation; thiếu annotation thì báo lỗi. */
 export function updateAnnotation(db: DB, input: UpdateAnnotationInput): AnnotationDto {
   const row = db
     .update(annotations)
@@ -64,7 +64,7 @@ export function updateAnnotation(db: DB, input: UpdateAnnotationInput): Annotati
   return toDto(row);
 }
 
-/** 删标注（幂等）。 */
+/** Xóa annotation; gọi lặp không gây lỗi. */
 export function deleteAnnotation(db: DB, id: string): void {
   db.delete(annotations).where(eq(annotations.id, id)).run();
 }

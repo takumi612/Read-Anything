@@ -1,13 +1,21 @@
-import * as pdfjsLib from "pdfjs-dist";
-import { AnnotationLayer, AnnotationType, TextLayer } from "pdfjs-dist";
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf.mjs";
+import { AnnotationLayer, AnnotationType, TextLayer } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { PDFDocumentProxy, RenderTask } from "pdfjs-dist";
 import type { PDFLinkService as PdfjsLinkService } from "pdfjs-dist/types/web/pdf_link_service.js";
-// vite `?url` 资产引用：dev 给源模块 URL、build 输出 asset——pdfjs 按 workerSrc 每文档
-// 自建 module worker，无共享状态。不用 `?worker` + GlobalWorkerOptions.workerPort：
-// 共享 port 的 PDFWorker wrapper 在文档销毁/重建间存在竞态（CDP 冒烟实测
-// getDocument 永久挂起、零报错），workerSrc 路径同环境实测正常。
-// oxlint-disable-next-line import/default -- Vite ?url 虚拟模块，oxlint 无法解析默认导出
-import pdfWorkerUrl from "pdfjs-dist/build/pdf.worker.mjs?url";
+import type { AnnotationDto } from "@shared/annotations";
+import {
+  exportPdfAnnotations,
+  pdfQuadsFromClientRects,
+  type PdfAnnotationExport,
+} from "./pdf-annotation-export";
+import { parsePdfLocatorRange } from "./pdf-locator";
+import { rangeFromOffsets } from "./pdf-annotations";
+// Tham chiếu Vite `?url`: dev dùng URL của module nguồn, bản build xuất asset.
+// PDF.js tạo module worker riêng cho từng tài liệu từ workerSrc, không dùng trạng thái chung.
+// Không dùng `?worker` với GlobalWorkerOptions.workerPort: PDFWorker dùng port chung có race
+// khi hủy rồi mở lại tài liệu; thử bằng CDP cho thấy getDocument treo mà không báo lỗi.
+// oxlint-disable-next-line import/default -- Module ảo Vite ?url; oxlint không phân giải được default export.
+import pdfWorkerUrl from "pdfjs-dist/legacy/build/pdf.worker.mjs?url";
 
 pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorkerUrl;
 
@@ -23,15 +31,17 @@ interface PdfLinkService {
 
 export interface PdfBook {
   pageCount: number;
-  /** 第 1 页 scale=1 尺寸（v1 假设全书同尺寸，覆盖书籍/技术文档主流场景）。 */
+  /** Kích thước trang đầu ở scale=1; bản v1 giả định mọi trang cùng cỡ. */
   baseSize: { width: number; height: number };
+  readPageText: (pageNumber: number) => Promise<{ text: string; snippetText: string }>;
   /**
-   * 渲染第 index（0-based）页到 canvas，并（若给了 textLayerDiv）叠加 pdfjs TextLayer
-   * （透明 span 流，承载原生选区）。cssWidth 为目标 CSS 宽度，canvas 内部按
-   * devicePixelRatio 放大物理像素；textLayer 坐标系为 CSS 像素。
-   * 约束：对同一 canvas 发起新渲染前必须先调用上一次的 cancel()——pdfjs 不允许
-   * 同一 canvas 并发两次 render()。done 在成功或取消时 resolve，意外渲染错误时 reject
-   * （调用方需 catch，参照 EpubReader 的 parseError 模式翻译后呈现）。
+   * Vẽ trang index (tính từ 0) lên canvas; nếu có textLayerDiv thì phủ PDF.js TextLayer
+   * để hỗ trợ vùng chọn gốc. cssWidth là chiều rộng CSS đích; canvas dùng devicePixelRatio
+   * cho pixel vật lý, còn tọa độ textLayer dùng pixel CSS.
+   * Trước khi vẽ lại cùng canvas phải cancel() lần trước vì PDF.js không cho phép render đồng thời.
+   * canvasReady hoàn tất khi có bitmap. done đợi canvas, textLayer và annotation layer hoàn tất
+   * rồi mới cleanup; nó resolve khi thành công hoặc bị hủy, reject khi gặp lỗi vẽ bất ngờ.
+   * Bên gọi cần bắt lỗi và hiển thị bản dịch, theo cách xử lý parseError của EpubReader.
    */
   renderPage: (
     index: number,
@@ -40,32 +50,37 @@ export interface PdfBook {
     textLayerDiv?: HTMLDivElement,
     annotationLayerDiv?: HTMLDivElement,
     onLinkPage?: (pageNumber: number) => void,
-  ) => { done: Promise<void>; cancel: () => void };
+    rotation?: 0 | 90 | 180 | 270,
+  ) => { done: Promise<void>; canvasReady: Promise<void>; cancel: () => void };
+  exportAnnotations: (annotations: readonly AnnotationDto[]) => Promise<Uint8Array<ArrayBuffer>>;
   destroy: () => void;
 }
 
-// pdfjs 资源目录（vite-plugin-static-copy 输出到产物根；dev 由插件中间件同路径供给）。
-// 相对 document.baseURI 绝对化：dev = devserver 根，prod = .vite/renderer/main_window/。
+// Tài nguyên PDF.js nằm ở gốc bản build nhờ vite-plugin-static-copy; dev cung cấp cùng đường dẫn.
+// Chuyển sang URL tuyệt đối theo document.baseURI: dev dùng gốc dev server, prod dùng .vite/renderer/main_window/.
 const CMAP_URL = new URL("cmaps/", document.baseURI).href;
 const STANDARD_FONT_DATA_URL = new URL("standard_fonts/", document.baseURI).href;
+const WASM_URL = new URL("wasm/", document.baseURI).href;
 
 export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
-  // pdfjs 会 transfer 传入 buffer——传副本，避免 react-query 缓存的 bytes 被 neuter。
-  // cMapUrl：CID 字体（CJK 书常见）的编码映射，缺失会致部分书文字画错/textLayer 乱码；
-  // standardFontDataUrl：标准 14 字体字形数据，非嵌入西文字体（Times/Arial 等）替代渲染用。
-  // 注：未嵌入且替代表不认识的 CJK 字体名（方正系等）仍会回退默认字体——pdfjs 字体替代
-  // 能力不及 Chrome 内置 PDFium（系统级 CJK 字体匹配链），属引擎边界非配置缺失。
+  // PDF.js chuyển quyền sở hữu buffer nên truyền bản sao để giữ nguyên bytes trong cache của React Query.
+  // cMapUrl cung cấp bảng mã cho phông CID thường gặp trong sách CJK; thiếu nó có thể làm sai textLayer.
+  // standardFontDataUrl chứa dữ liệu glyph của 14 phông chuẩn để thay phông Latin không nhúng.
+  // wasmUrl cung cấp bộ giải mã JBIG2/JPX; thiếu nó có thể khiến trang ảnh hiện trắng mà không báo lỗi.
+  // Phông CJK không nhúng và không có trong bảng thay thế vẫn rơi về phông mặc định.
+  // Đây là giới hạn của PDF.js so với cơ chế ghép phông hệ thống trong PDFium của Chrome.
   const loadingTask = pdfjsLib.getDocument({
     data: bytes.slice(),
     cMapUrl: CMAP_URL,
     cMapPacked: true,
     standardFontDataUrl: STANDARD_FONT_DATA_URL,
+    wasmUrl: WASM_URL,
   });
   let doc: PDFDocumentProxy;
   try {
     doc = await loadingTask.promise;
   } catch (err) {
-    // 加载失败时 task 不会自清——显式 destroy 释放 worker 端半初始化状态（对齐 parse.ts openPdf）。
+    // Task tải thất bại không tự dọn; destroy rõ ràng để giải phóng trạng thái worker khởi tạo dở.
     await loadingTask.destroy().catch(() => {});
     throw err;
   }
@@ -119,35 +134,79 @@ export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
     pageCount: doc.numPages,
     baseSize,
 
-    renderPage: (index, canvas, cssWidth, textLayerDiv, annotationLayerDiv, onLinkPage) => {
+    readPageText: async (pageNumber) => {
+      if (!Number.isInteger(pageNumber) || pageNumber < 1 || pageNumber > doc.numPages) {
+        return { text: "", snippetText: "" };
+      }
+      const page = await doc.getPage(pageNumber);
+      // Match textLayer.textContent's offset space. Avoid page.cleanup here: the same
+      // page proxy may be rendering its canvas while a full-document search runs.
+      const content = await page.getTextContent();
+      let text = "";
+      let snippetText = "";
+      for (const item of content.items) {
+        if (!("str" in item)) continue;
+        text += item.str;
+        snippetText += item.str;
+        if (item.hasEOL) snippetText += "\n";
+      }
+      return { text, snippetText };
+    },
+
+    renderPage: (
+      index,
+      canvas,
+      cssWidth,
+      textLayerDiv,
+      annotationLayerDiv,
+      onLinkPage,
+      rotation = 0,
+    ) => {
       let task: RenderTask | null = null;
       let textLayer: InstanceType<typeof TextLayer> | null = null;
       let cancelled = false;
+      let resolveCanvasReady!: () => void;
+      let rejectCanvasReady!: (error: unknown) => void;
+      const canvasReady = new Promise<void>((resolve, reject) => {
+        resolveCanvasReady = resolve;
+        rejectCanvasReady = reject;
+      });
+      // Thumbnail renderers only await `done`; keep this auxiliary promise handled there too.
+      void canvasReady.catch(() => {});
       const done = (async () => {
         const page = await doc.getPage(index + 1);
         try {
-          if (cancelled) return;
+          if (cancelled) {
+            resolveCanvasReady();
+            return;
+          }
           const dpr = window.devicePixelRatio || 1;
-          const pageBase = page.getViewport({ scale: 1 });
+          const pageRotation = (page.rotate + rotation) % 360;
+          const pageBase = page.getViewport({ scale: 1, rotation: pageRotation });
           const cssScale = cssWidth / pageBase.width;
-          const viewport = page.getViewport({ scale: cssScale * dpr });
+          const viewport = page.getViewport({ scale: cssScale * dpr, rotation: pageRotation });
           canvas.width = Math.floor(viewport.width);
           canvas.height = Math.floor(viewport.height);
           const ctx = canvas.getContext("2d");
-          if (!ctx) return;
+          if (!ctx) throw new Error("PDF page canvas does not support a 2D rendering context");
           task = page.render({ canvasContext: ctx, canvas, viewport });
-          // textLayer 与 canvas 共享同一次 getPage、两路都 settle 后才 cleanup——
-          // 独立生命周期会在 page.cleanup() 与进行中的另一路渲染间竞态（pdfjs 抛错）。
+          const canvasPromise = task.promise.catch((err) => {
+            // RenderingCancelledException là hủy chủ động nên bỏ qua; chuyển tiếp các lỗi khác.
+            if ((err as Error).name !== "RenderingCancelledException") throw err;
+          });
+          void canvasPromise.then(resolveCanvasReady, rejectCanvasReady);
+          // textLayer và canvas dùng chung một lần getPage; chỉ cleanup khi cả hai hoàn tất.
+          // Vòng đời riêng sẽ gây race giữa page.cleanup() và nhánh còn đang vẽ.
           const textPromise = textLayerDiv
             ? (async () => {
                 textLayerDiv.replaceChildren();
-                // v6 的 CSS 缩放变量是 --total-scale-factor（span 字号经 calc() 换算）；
-                // textLayer 用 CSS 像素 viewport（不乘 dpr）。
+                // PDF.js v6 dùng biến CSS --total-scale-factor để tính cỡ chữ span.
+                // Viewport của textLayer dùng pixel CSS, không nhân dpr.
                 textLayerDiv.style.setProperty("--total-scale-factor", String(cssScale));
                 textLayer = new TextLayer({
                   textContentSource: page.streamTextContent(),
                   container: textLayerDiv,
-                  viewport: page.getViewport({ scale: cssScale }),
+                  viewport: page.getViewport({ scale: cssScale, rotation: pageRotation }),
                 });
                 await textLayer.render();
               })()
@@ -160,7 +219,11 @@ export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
                 const annotationLayer = new AnnotationLayer({
                   div: annotationLayerDiv,
                   page,
-                  viewport: page.getViewport({ scale: cssScale, dontFlip: true }),
+                  viewport: page.getViewport({
+                    scale: cssScale,
+                    rotation: pageRotation,
+                    dontFlip: true,
+                  }),
                   linkService: linkService as unknown as PdfjsLinkService,
                   annotationStorage: doc.annotationStorage,
                   accessibilityManager: null,
@@ -176,7 +239,11 @@ export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
                   annotations,
                   div: annotationLayerDiv,
                   page,
-                  viewport: page.getViewport({ scale: cssScale, dontFlip: true }),
+                  viewport: page.getViewport({
+                    scale: cssScale,
+                    rotation: pageRotation,
+                    dontFlip: true,
+                  }),
                   linkService: linkService as unknown as PdfjsLinkService,
                   annotationStorage: doc.annotationStorage,
                   renderForms: false,
@@ -184,12 +251,9 @@ export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
               })()
             : Promise.resolve();
           const [canvasR, textR, annotationR] = await Promise.allSettled([
-            task.promise.catch((err) => {
-              // RenderingCancelledException = 主动取消，静默；其他错误透传
-              if ((err as Error).name !== "RenderingCancelledException") throw err;
-            }),
+            canvasPromise,
             textPromise.catch((err) => {
-              // 取消时 TextLayer.render 以 AbortException reject——主动取消静默
+              // TextLayer.render reject bằng AbortException khi hủy; bỏ qua trường hợp hủy chủ động.
               if (!cancelled) throw err;
             }),
             annotationPromise.catch((err) => {
@@ -203,8 +267,10 @@ export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
           page.cleanup();
         }
       })();
+      void done.catch(rejectCanvasReady);
       return {
         done,
+        canvasReady,
         cancel: () => {
           cancelled = true;
           task?.cancel();
@@ -213,9 +279,77 @@ export async function createPdfBook(bytes: Uint8Array): Promise<PdfBook> {
       };
     },
 
+    exportAnnotations: async (annotations) => {
+      const byPage = new Map<number, { annotation: AnnotationDto; start: number; end: number }[]>();
+      for (const annotation of annotations) {
+        const range = parsePdfLocatorRange(annotation.locatorRange);
+        if (!range || range.page > doc.numPages) {
+          throw new Error("Không thể lưu chú thích vì vị trí văn bản không còn khớp với PDF.");
+        }
+        const pageAnnotations = byPage.get(range.page) ?? [];
+        pageAnnotations.push({ annotation, start: range.start, end: range.end });
+        byPage.set(range.page, pageAnnotations);
+      }
+
+      const exportEntries: PdfAnnotationExport[] = [];
+      for (const [pageNumber, pageAnnotations] of byPage) {
+        const page = await doc.getPage(pageNumber);
+        const viewport = page.getViewport({ scale: 1 });
+        const host = document.createElement("div");
+        host.style.position = "fixed";
+        host.style.left = "-10000px";
+        host.style.top = "0";
+        host.style.width = `${viewport.width}px`;
+        host.style.height = `${viewport.height}px`;
+        const textLayerDiv = document.createElement("div");
+        textLayerDiv.className = "textLayer";
+        textLayerDiv.style.width = `${viewport.width}px`;
+        textLayerDiv.style.height = `${viewport.height}px`;
+        textLayerDiv.style.setProperty("--total-scale-factor", "1");
+        host.append(textLayerDiv);
+        document.body.append(host);
+        const textLayer = new TextLayer({
+          textContentSource: page.streamTextContent(),
+          container: textLayerDiv,
+          viewport,
+        });
+
+        try {
+          await textLayer.render();
+          const origin = textLayerDiv.getBoundingClientRect();
+          for (const { annotation, start, end } of pageAnnotations) {
+            const range = rangeFromOffsets(textLayerDiv, start, end);
+            if (!range || range.toString() !== annotation.selectedText) {
+              throw new Error(
+                "Không thể lưu chú thích vì vị trí văn bản không còn khớp với PDF. Hãy tạo lại chú thích đó.",
+              );
+            }
+            const quads = pdfQuadsFromClientRects(
+              Array.from(range.getClientRects()),
+              origin,
+              viewport,
+            );
+            exportEntries.push({
+              id: annotation.id,
+              page: pageNumber,
+              style: annotation.style,
+              note: annotation.note,
+              quads,
+            });
+          }
+        } finally {
+          textLayer.cancel();
+          host.remove();
+          page.cleanup();
+        }
+      }
+
+      return exportPdfAnnotations(doc, exportEntries);
+    },
+
     destroy: () => {
-      // PDFDocumentProxy 无直接 destroy()；loadingTask.destroy() 释放 worker 端文档资源
-      // 并终止该文档自有的 worker 线程（workerSrc 模式每文档一个 worker，无共享态）。
+      // PDFDocumentProxy không có destroy(); loadingTask.destroy() giải phóng tài nguyên tài liệu
+      // và dừng worker riêng của tài liệu trong chế độ workerSrc.
       void doc.loadingTask.destroy().catch(() => {});
     },
   };

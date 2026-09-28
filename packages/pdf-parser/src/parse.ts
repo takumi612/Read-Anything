@@ -1,25 +1,25 @@
 import { createRequire } from "node:module";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { getDocument } from "pdfjs-dist/legacy/build/pdf.mjs";
 import type { PDFDocumentProxy } from "pdfjs-dist";
 import type { ChapterRange, ParsedPdf, TocNode } from "./types";
 
-// pdfjs 资源目录（Node 环境 factory 用 fs 读普通路径；打包后位于 asar 内 node_modules，
-// Electron 的 fs 对 asar 透明可读）。cmaps = CID 字体编码映射——缺失时部分 CJK 书
-// getTextContent 解码出乱码（文本提取/选区上下文/AI 阅读全受影响）。
-// 解析锚点双环境兼容：主进程 vite 产物是 CJS（import.meta.url 为 undefined，但全局
-// require 真实可用）；vitest 跑 ESM 源码（无全局 require，import.meta.url 可用）。
+// Tài nguyên pdfjs đọc qua fs; Electron cũng đọc được tệp trong asar.
+// cmaps giải mã font CID, cần cho một số sách CJK để text layer không thành chữ lỗi.
+// Main bundle là CJS có require nhưng không có import.meta.url; Vitest chạy source ESM
+// có import.meta.url nhưng không có require toàn cục. Đường dẫn cần hỗ trợ cả hai.
 const requireFn = typeof require !== "undefined" ? require : createRequire(import.meta.url);
 const PDFJS_ROOT = path.dirname(requireFn.resolve("pdfjs-dist/package.json"));
-const CMAP_URL = path.join(PDFJS_ROOT, "cmaps") + path.sep;
-const STANDARD_FONT_DATA_URL = path.join(PDFJS_ROOT, "standard_fonts") + path.sep;
+const CMAP_URL = pathToFileURL(path.join(PDFJS_ROOT, "cmaps") + path.sep).href;
+const STANDARD_FONT_DATA_URL = pathToFileURL(path.join(PDFJS_ROOT, "standard_fonts") + path.sep).href;
 
-/** 文本层检测：采样页平均字符数低于此阈值 → 视为扫描版。 */
+/** Nếu số ký tự trung bình trên trang mẫu dưới ngưỡng này thì coi là PDF scan. */
 const TEXT_LAYER_MIN_AVG_CHARS = 50;
 const TEXT_LAYER_SAMPLE_PAGES = 8;
 
 /**
- * 打开 PDF 文档。pdfjs 会 transfer 传入 buffer（之后原数组不可用），故一律传副本。
+ * Mở PDF bằng pdfjs; luôn truyền bản sao vì pdfjs có thể chuyển quyền sở hữu buffer.
  */
 export async function openPdf(bytes: Uint8Array): Promise<PDFDocumentProxy> {
   const task = getDocument({
@@ -31,13 +31,13 @@ export async function openPdf(bytes: Uint8Array): Promise<PDFDocumentProxy> {
   try {
     return await task.promise;
   } catch (err) {
-    // promise reject 时 task（含 worker）不会自清——必须显式 destroy，否则 worker 泄漏。
+    // Promise lỗi không tự dọn task/worker, cần destroy tường minh.
     await task.destroy();
     throw err;
   }
 }
 
-/** 单页纯文本：items.str 拼接，hasEOL 处换行。 */
+/** Ghép items.str thành văn bản trang và xuống dòng khi hasEOL. */
 export async function pageText(doc: PDFDocumentProxy, pageNo: number): Promise<string> {
   const page = await doc.getPage(pageNo);
   const tc = await page.getTextContent();
@@ -57,7 +57,7 @@ interface FlatOutlineEntry {
   pageIndex: number; // 0-based
 }
 
-/** outline 压扁 + dest → 页号解析（named destination 经 getDestination 间接解析）。 */
+/** Trải phẳng TOC và chuyển destination thành số trang, kể cả destination theo tên. */
 async function flattenOutline(doc: PDFDocumentProxy): Promise<FlatOutlineEntry[]> {
   const outline = await doc.getOutline();
   if (!outline || outline.length === 0) return [];
@@ -74,14 +74,14 @@ async function flattenOutline(doc: PDFDocumentProxy): Promise<FlatOutlineEntry[]
           const title = item.title?.trim();
           if (title) flat.push({ title, pageIndex });
         } catch {
-          // dest 指向不存在的页（畸形书）：跳过该条目，不让整书导入失败。
+          // Destination trỏ tới trang không tồn tại: bỏ mục này, vẫn import sách.
         }
       }
       if (item.items?.length) await walk(item.items);
     }
   };
   await walk(outline);
-  // 起始页须单调不减（按阅读顺序）；个别乱序条目按起始页排序兜底。
+  // Sắp mục TOC theo trang bắt đầu nếu nguồn đưa thứ tự không đúng.
   flat.sort((a, b) => a.pageIndex - b.pageIndex);
   return flat;
 }
@@ -96,7 +96,7 @@ export async function parsePdf(bytes: Uint8Array): Promise<ParsedPdf> {
     const title = info.Title?.trim() || undefined;
     const author = info.Author?.trim() || undefined;
 
-    // 扫描版检测：前 N 页平均字符数。
+    // Phát hiện PDF scan từ số ký tự trung bình của N trang đầu.
     const sample = Math.min(TEXT_LAYER_SAMPLE_PAGES, pageCount);
     let chars = 0;
     for (let p = 1; p <= sample; p++) chars += (await pageText(doc, p)).length;
@@ -109,9 +109,8 @@ export async function parsePdf(bytes: Uint8Array): Promise<ParsedPdf> {
       toc = flat.map((e, i) => ({ label: e.title, href: `pdf-ch:${i}` }));
       chapterRanges = flat.map((e, i) => ({
         startPage: e.pageIndex + 1,
-        // endPage = 下一章起始页 − 1（= flat[i+1].pageIndex 的 1-based 前一页）；末章到 pageCount。
-        // 同页起章（两个 outline 项指向同一页）时 Math.max 保证本章至少含起始页——
-        // 刻意允许与下一章重叠一页，空章节对摘要/阅读毫无意义。
+        // Chương kết thúc ngay trước trang bắt đầu của chương kế; chương cuối đến hết sách.
+        // Nếu hai chương bắt đầu cùng trang, Math.max giữ ít nhất một trang cho chương trước.
         endPage:
           i + 1 < flat.length ? Math.max(e.pageIndex + 1, flat[i + 1]!.pageIndex) : pageCount,
       }));

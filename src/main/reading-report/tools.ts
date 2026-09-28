@@ -26,8 +26,8 @@ export interface ReadingReportToolsDeps {
   loadBytes: LoadBytes;
   imageToolResults: boolean;
   /**
-   * 派 subagent 调查一个会话。返回 null = 未拿到并发额度（主 agent 应自行翻页）。
-   * 抛错交由工具层转 failed 降级。
+   * Điều tra một hội thoại. null nghĩa là không có suất chạy nền, tác vụ chính tự đọc.
+   * Lỗi được lớp công cụ chuyển thành trạng thái failed.
    */
   investigate: (input: {
     conversationId: string;
@@ -94,7 +94,7 @@ export function createReadingReportTools(deps: ReadingReportToolsDeps) {
           }
           return { status: "ok" as const, ...investigation };
         } catch (err) {
-          // 软降级：调查失败绝不使报告生成失败，主 agent 退回自行翻页。
+          // Điều tra lỗi thì tác vụ chính tự đọc trang, không làm hỏng cả báo cáo.
           log.warn(`investigation of conversation ${conversationId} failed`, err);
           return { status: "failed" as const, suggestion: INVESTIGATION_FALLBACK };
         }

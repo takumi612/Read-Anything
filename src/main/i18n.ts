@@ -2,10 +2,10 @@ import i18next from "i18next";
 import { sharedInitOptions } from "@shared/i18n/resources";
 import type { UILanguage } from "@shared/i18n/language";
 
-// 主进程独立的 vanilla i18next 实例（不依赖 react）。只用于本地化「自产」错误消息。
+// Main dùng i18next riêng, không phụ thuộc React, để dịch các thông điệp lỗi của ứng dụng.
 const main = i18next.createInstance();
 
-/** 启动时按解析出的语言同步 init（幂等）。 */
+/** Khởi tạo đồng bộ theo ngôn ngữ đã chọn; gọi lại vẫn an toàn. */
 export function initMainI18n(language: UILanguage): void {
   if (!main.isInitialized) {
     void main.init({ ...sharedInitOptions, lng: language });
@@ -14,10 +14,10 @@ export function initMainI18n(language: UILanguage): void {
   }
 }
 
-/** 运行时切换主进程语言（偏好变更时调）。 */
+/** Đổi ngôn ngữ của main khi tùy chọn người dùng thay đổi. */
 export function setMainLanguage(language: UILanguage): void {
   void main.changeLanguage(language);
 }
 
-/** 主进程翻译函数（已由 @shared/i18n/i18next.d.ts 类型化键）。 */
+/** Hàm dịch của main với key đã được định kiểu. */
 export const t = main.t.bind(main);

@@ -8,9 +8,9 @@ import { CoverImage } from "./CoverImage";
 const log = createLogger("library");
 
 /**
- * 「继续阅读」shelf（#48 spec §6.1）：最近读过的 ≤3 本，信息卡带进度。
- * 无阅读记录（或查询失败）整个隐藏；staleTime 0——读完书返回时重挂载即 refetch。
- * shelf 是视图不是分区：同一本书同时出现在 shelf 与下方网格属预期。
+ * Kệ đọc tiếp hiển thị tối đa ba sách đọc gần đây kèm tiến độ.
+ * Ẩn khi không có lịch sử hoặc truy vấn lỗi; staleTime 0 lấy lại khi trở về thư viện.
+ * Kệ chỉ là một cách hiển thị nên sách vẫn xuất hiện trong lưới bên dưới.
  */
 export function RecentlyReadShelf({ onOpen }: { onOpen: (bookId: string) => void }) {
   const { t } = useTranslation();
@@ -20,7 +20,7 @@ export function RecentlyReadShelf({ onOpen }: { onOpen: (bookId: string) => void
     staleTime: 0,
   });
 
-  // 查询失败 → 隐藏 + warn（优雅吞错必须留 warn）。
+  // Khi truy vấn lỗi, ẩn kệ và ghi warn dù giao diện vẫn hoạt động.
   useEffect(() => {
     if (recent.error) log.warn("recently read query failed", recent.error);
   }, [recent.error]);
@@ -30,7 +30,7 @@ export function RecentlyReadShelf({ onOpen }: { onOpen: (bookId: string) => void
   return (
     <section className="mb-8">
       <h2 className="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-        {t("library.continueReading", "继续阅读")}
+        {t("library.continueReading", "Đọc tiếp")}
       </h2>
       <ul className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {recent.data.map((b) => (
@@ -45,12 +45,12 @@ export function RecentlyReadShelf({ onOpen }: { onOpen: (bookId: string) => void
               <div className="min-w-0 flex-1">
                 <p className="truncate font-serif text-sm font-semibold">{b.title ?? b.id}</p>
                 <p className="truncate text-xs text-muted-foreground">
-                  {b.author ?? t("library.unknownAuthor", "未知作者")}
+                  {b.author ?? t("library.unknownAuthor", "Không rõ tác giả")}
                 </p>
                 {b.percent != null && (
                   <div className="mt-2 flex items-center gap-2">
                     <div className="h-1 flex-1 overflow-hidden rounded-full bg-muted">
-                      {/* 进度条宽度是运行时计算值——内联 style 合规例外 */}
+                      {/* Chiều rộng thanh tiến độ được tính lúc chạy. */}
                       <div
                         className="h-full rounded-full bg-primary"
                         style={{ width: `${Math.round(b.percent * 100)}%` }}

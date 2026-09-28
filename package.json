@@ -1,21 +1,30 @@
 {
-  "name": "marginalia",
-  "version": "0.18.5",
+  "name": "read-anything",
+  "version": "0.1.0",
   "private": true,
-  "description": "Desktop ePub and PDF AI reader — select a passage and chat with a context-aware assistant in the margins.",
+  "description": "Offline-first PDF and EPUB reader with English–Vietnamese dictionary, annotations, and optional AI assistance.",
   "keywords": [],
   "license": "GPL-3.0-or-later",
   "author": {
     "name": "eurfelux",
     "email": "eurfelux@gmail.com"
   },
+  "contributors": ["takumi612"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/takumi612/Read-Anything.git"
+  },
+  "homepage": "https://github.com/takumi612/Read-Anything#readme",
+  "bugs": "https://github.com/takumi612/Read-Anything/issues",
   "main": ".vite/build/main.js",
   "scripts": {
     "dev": "pnpm build:packages && concurrently -k -n epub,app \"pnpm --filter @marginalia/epub-parser dev\" \"electron-forge start\"",
     "package": "electron-forge package",
+    "e2e:packaged": "node scripts/e2e-packaged-pdf.mjs",
+    "e2e:packaged:build": "pnpm package && pnpm e2e:packaged",
     "make": "electron-forge make",
-    "release": "GITHUB_TOKEN=$(gh auth token) electron-forge publish",
-    "release:notes": "node scripts/release-notes.mjs",
+    "make:win": "electron-forge make --platform=win32",
+    "build:windows-icon": "node scripts/make-windows-icon.mjs",
     "build:packages": "pnpm --filter @marginalia/epub-parser build",
     "typecheck": "pnpm build:packages && tsc --noEmit",
     "lint": "oxlint",
@@ -25,8 +34,8 @@
     "i18n:extract": "i18next-cli extract --sync-primary",
     "i18n:lint": "i18next-cli lint",
     "i18n:status": "i18next-cli status",
-    "test": "pnpm build:packages && ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs run",
-    "test:watch": "pnpm build:packages && ELECTRON_RUN_AS_NODE=1 electron node_modules/vitest/vitest.mjs",
+    "test": "pnpm build:packages && node scripts/run-vitest-electron.mjs run",
+    "test:watch": "pnpm build:packages && node scripts/run-vitest-electron.mjs",
     "test:all": "pnpm -r --include-workspace-root test",
     "db:generate": "drizzle-kit generate",
     "db:rebuild:electron": "electron-rebuild -f -o better-sqlite3",
@@ -133,5 +142,5 @@
     "vitest": "^4.1.7"
   },
   "packageManager": "pnpm@11.5.0+sha512.dbfcc4f81cf48597afd4bc391ffdf12c11f1a9fb83a395bfa6b0a2d9cc2fd8ffebafdb1ccbd529632153f793904c2615b7f09fe1a345473fd1c35845172a8eb1",
-  "productName": "marginalia"
+  "productName": "Read-Anything"
 }

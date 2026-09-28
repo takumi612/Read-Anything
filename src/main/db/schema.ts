@@ -29,17 +29,17 @@ export const providers = sqliteTable(
   "providers",
   {
     id: pkUuid(),
-    // 当前选用的 API 端点格式（须 ∈ compatibleApis）。
+    // Định dạng API đang dùng, phải thuộc compatibleApis.
     type: text("type", {
       enum: ["openai-responses", "openai-chat-completions", "anthropic", "google-generate-content"],
     }).notNull(),
-    // 兼容的 API 格式集合（JSON）；内置且 length>1 时允许在其中切 type。
+    // Các định dạng API hỗ trợ dưới dạng JSON; provider tích hợp có thể đổi type khi có nhiều lựa chọn.
     compatibleApis: text("compatible_apis", { mode: "json" }).$type<AiProviderApiType[]>(),
     label: text("label"),
     baseUrl: text("base_url"),
     apiKey: text("api_key"),
     models: text("models", { mode: "json" }).$type<string[]>(),
-    // 内置（启动时按 DEFAULT_PROVIDERS 补齐）provider：label / baseUrl 不可改、不可删；type 仅可在 compatibleApis 内切。
+    // Provider tích hợp được thêm từ DEFAULT_PROVIDERS: không sửa tên/URL hay xóa.
     isBuiltin: integer("is_builtin", { mode: "boolean" }).notNull().default(false),
     createdAt: nowMs(),
   },
@@ -54,29 +54,29 @@ export const providers = sqliteTable(
 export const books = sqliteTable(
   "books",
   {
-    id: text("id").primaryKey(), // 内容稳定 ID：ePub 取 dc:identifier（缺失回退文件哈希）；PDF 恒为文件哈希（#50 记有统一议题）
+    id: text("id").primaryKey(), // ID ổn định: EPUB dùng dc:identifier hoặc hash; PDF dùng hash tệp.
     title: text("title"),
     author: text("author"),
     cover: blob_("cover", { mode: "buffer" }),
     toc: text("toc", { mode: "json" }).$type<TocNode[]>(),
-    // 全书摘要正文：唯一持久化的事实。状态（pending/generating/ready/unavailable）是运行时派生，
-    // 不入 DB——summary!=null=ready，内存 inFlight=generating，内存 failed=unavailable，否则 pending。
+    // Chỉ lưu nội dung tóm tắt sách; trạng thái được suy ra khi chạy.
+    // Có summary: ready; đang chạy: generating; lỗi: unavailable; còn lại: pending.
     summary: text("summary"),
-    // 文档格式判别：双引擎分发的依据（spec 2026-06-06-pdf-support §4）。
+    // Định dạng sách quyết định dùng engine PDF hay EPUB.
     format: text("format", { enum: ["epub", "pdf"] })
       .notNull()
       .default("epub"),
-    pageCount: integer("page_count"), // PDF 专用；epub 为 null
-    // 扫描版检测结果（导入时落库）；epub 恒 true。false ⇒ AI/标注功能门控。
+    pageCount: integer("page_count"), // Chỉ PDF có số trang; EPUB dùng null.
+    // Kết quả phát hiện lớp văn bản khi import; EPUB luôn true. false giới hạn AI/annotation.
     hasTextLayer: integer("has_text_layer", { mode: "boolean" }).notNull().default(true),
     addedAt: integer("added_at")
       .notNull()
       .$defaultFn(() => Date.now()),
-    // 手动排序位（#48）：默认 0；listBooks 按 (position, added_at) 排——既有书全 0 时按导入序平断，
-    // 首次拖拽全量重写后 position 唯一。新导入 = MIN(position) - 1（排最前）。无唯一约束：
-    // 重复 position 以 added_at 平断（added_at 亦同则退 SQLite 隐式 rowid），下次拖拽全量重写自愈（spec §3）。
+    // Vị trí sắp xếp thủ công (#48); listBooks sắp theo position rồi added_at.
+    // Kéo thả sẽ ghi lại mọi position. Sách mới lấy MIN(position)-1 để đứng đầu.
+    // Nếu trùng position, dùng added_at rồi rowid để phân định; lần kéo thả sau sẽ chuẩn hóa.
     position: integer("position").notNull().default(0),
-    // 解析器版本：低于 CURRENT_PARSER_VERSION 的书开书时惰性重建索引（锚点级章节升级）。null/0 = 旧。
+    // Phiên bản parser; sách cũ sẽ dựng lại chỉ mục khi được mở. null/0 là phiên bản cũ.
     parserVersion: integer("parser_version").notNull().default(0),
   },
   (t) => [check("books_format_check", sql`${t.format} in ('epub','pdf')`)],
@@ -112,15 +112,15 @@ export const readingSessions = sqliteTable(
 export const chapters = sqliteTable(
   "chapters",
   {
-    id: pkUuid(), // uuidv7 代理键（spine id 跨书不唯一）
+    id: pkUuid(), // Khóa UUIDv7 vì spine ID có thể trùng giữa các sách.
     bookId: text("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
     title: text("title"),
     orderIndex: integer("order_index"),
-    href: text("href").notNull(), // spine 项 href（书内唯一定位）
-    anchor: text("anchor"), // 章内 #fragment（如 "filepos…"）；无锚点章为 null
-    startPage: integer("start_page"), // PDF 章节页范围（1-based 闭区间）；epub 为 null
+    href: text("href").notNull(), // Đường dẫn mục spine, định vị duy nhất trong sách.
+    anchor: text("anchor"), // #fragment trong chương, null nếu không có.
+    startPage: integer("start_page"), // Trang bắt đầu chương PDF, đánh số từ 1; EPUB dùng null.
     endPage: integer("end_page"),
     summary: text("summary"),
   },
@@ -134,8 +134,7 @@ export const progress = sqliteTable(
       .primaryKey()
       .references(() => books.id, { onDelete: "cascade" }),
     locator: text("locator").notNull(),
-    // 0–1 阅读进度「展示快照」（#48）：reader 保存进度时顺手上送（locator 黑盒保持，主进程不解析）。
-    // 老数据 null → shelf 卡不渲染进度行，读一次书即回填。
+    // Legacy position estimate retained for existing data; UI progress now uses confirmed reading pages.
     percent: real("percent"),
     updatedAt: integer("updated_at")
       .notNull()
@@ -149,6 +148,44 @@ export const progress = sqliteTable(
   ],
 );
 
+/** Trang đã đọc tối thiểu năm giây, duy nhất theo sách để tính tiến độ không giảm khi đọc lại. */
+export const confirmedReadingPages = sqliteTable(
+  "confirmed_reading_pages",
+  {
+    bookId: text("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    pageNumber: integer("page_number").notNull(),
+    confirmedAt: integer("confirmed_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [
+    primaryKey({ columns: [t.bookId, t.pageNumber] }),
+    check("confirmed_reading_pages_page_positive", sql`${t.pageNumber} >= 1`),
+    index("confirmed_reading_pages_book_id_idx").on(t.bookId),
+  ],
+);
+
+/** Tỉ lệ trang đã xác nhận và mẫu số gần nhất; tách khỏi snapshot locator và chuỗi lửa theo ngày. */
+export const confirmedReadingProgress = sqliteTable(
+  "confirmed_reading_progress",
+  {
+    bookId: text("book_id")
+      .primaryKey()
+      .references(() => books.id, { onDelete: "cascade" }),
+    totalPages: integer("total_pages").notNull(),
+    percent: real("percent").notNull(),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [
+    check("confirmed_reading_progress_total_pages_positive", sql`${t.totalPages} >= 1`),
+    check("confirmed_reading_progress_percent_check", sql`${t.percent} >= 0 and ${t.percent} <= 1`),
+  ],
+);
+
 export const annotations = sqliteTable(
   "annotations",
   {
@@ -156,7 +193,7 @@ export const annotations = sqliteTable(
     bookId: text("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
-    style: text("style").notNull(), // yellow|green|blue|pink|purple|underline
+    style: text("style").notNull(), // Built-in color, #RRGGBB, or underline.
     note: text("note").notNull().default(""),
     selectedText: text("selected_text").notNull(),
     locatorRange: text("locator_range").notNull(),
@@ -168,10 +205,68 @@ export const annotations = sqliteTable(
   (t) => [
     check(
       "annotations_style_check",
-      sql`${t.style} in ('yellow','green','blue','pink','purple','underline')`,
+      sql`${t.style} in ('yellow','green','blue','pink','purple','underline') or (length(${t.style}) = 7 and substr(${t.style}, 1, 1) = '#' and substr(${t.style}, 2) not glob '*[^0-9a-fA-F]*')`,
     ),
     index("annotations_book_id_idx").on(t.bookId),
   ],
+);
+
+/** Per-document vocabulary. Occurrence marks are derived from the PDF text layer. */
+export const vocabularyEntries = sqliteTable(
+  "vocabulary_entries",
+  {
+    id: pkUuid(),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    term: text("term").notNull(),
+    normalizedTerm: text("normalized_term").notNull(),
+    meaning: text("meaning").notNull(),
+    context: text("context").notNull(),
+    sourcePage: integer("source_page").notNull(),
+    createdAt: nowMs(),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [
+    uniqueIndex("vocabulary_book_term_unique").on(t.bookId, t.normalizedTerm),
+    index("vocabulary_book_idx").on(t.bookId),
+  ],
+);
+
+/** A different meaning for one exact text-layer occurrence. */
+export const vocabularyOverrides = sqliteTable(
+  "vocabulary_overrides",
+  {
+    entryId: text("entry_id")
+      .notNull()
+      .references(() => vocabularyEntries.id, { onDelete: "cascade" }),
+    page: integer("page").notNull(),
+    start: integer("start").notNull(),
+    end: integer("end").notNull(),
+    meaning: text("meaning").notNull(),
+  },
+  (t) => [primaryKey({ columns: [t.entryId, t.page, t.start, t.end] })],
+);
+
+/** Reader-only PDF bookmarks, independent from the document's own outline. */
+export const pdfBookmarks = sqliteTable(
+  "pdf_bookmarks",
+  {
+    id: pkUuid(),
+    bookId: text("book_id")
+      .notNull()
+      .references(() => books.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    page: integer("page").notNull(),
+    scrollRatio: real("scroll_ratio").notNull().default(0),
+    createdAt: nowMs(),
+    updatedAt: integer("updated_at")
+      .notNull()
+      .$defaultFn(() => Date.now()),
+  },
+  (t) => [index("pdf_bookmarks_book_idx").on(t.bookId)],
 );
 
 export const bookNotes = sqliteTable(
@@ -181,7 +276,7 @@ export const bookNotes = sqliteTable(
     bookId: text("book_id")
       .notNull()
       .references(() => books.id, { onDelete: "cascade" }),
-    // Markdown 源码；trim 后非空由 Zod 入口校验（shared/book-notes.ts）
+    // Nội dung Markdown; schema Zod tại shared/book-notes.ts kiểm tra không rỗng.
     content: text("content").notNull(),
     createdAt: nowMs(),
     updatedAt: integer("updated_at")
@@ -195,11 +290,11 @@ export const conversations = sqliteTable(
   "conversations",
   {
     id: pkUuid(),
-    // 可空：bookId IS NULL ⇒ 书库（library）会话（spec 2026-06-16 §3）。FK + cascade 不变。
+    // bookId null là hội thoại tại thư viện; khóa ngoại và cascade vẫn áp dụng khi có sách.
     bookId: text("book_id").references(() => books.id, { onDelete: "cascade" }),
     title: text("title"),
-    // 上下文管理（spec 2026-06-08）：滚动概要 + 已折叠到的消息 seq。
-    // null = 尚未折叠（全量逐字，等价旧行为）。
+    // Quản lý ngữ cảnh: bản tóm tắt cuốn chiếu và seq tin nhắn đã nén.
+    // null nghĩa là chưa nén, vẫn giữ nguyên toàn bộ hội thoại.
     contextSummary: text("context_summary"),
     summarizedThroughSeq: integer("summarized_through_seq"),
     memoryThroughSeq: integer("memory_through_seq"),
@@ -235,22 +330,22 @@ export const messages = sqliteTable(
   ],
 );
 
-// AI 全局记忆（spec 2026-06-10-ai-global-memory-soul-design §2.1；2026-06-16 去除来源书绑定）。
-// slug 是 AI 侧统一标识符（工具入参 / [[互链]] / 索引展示），创建后不可改；uuid 主键仅内部用。
+// Bộ nhớ AI toàn cục, không gắn với một sách cụ thể.
+// slug là ID phía AI dùng cho công cụ, liên kết [[slug]] và chỉ mục; UUID chỉ dùng nội bộ.
 export const memories = sqliteTable("memories", {
   id: pkUuid(),
   slug: text("slug").notNull().unique(),
   title: text("title").notNull(),
-  description: text("description").notNull(), // 一行摘要：常驻注入 system prompt 的就是它
-  body: text("body").notNull(), // 详细正文：readMemory 按需取；可含 [[slug]] 互链
+  description: text("description").notNull(), // Mô tả ngắn luôn có trong system prompt.
+  body: text("body").notNull(), // Nội dung chi tiết; readMemory lấy khi cần, có thể chứa [[slug]].
   createdAt: nowMs(),
   updatedAt: integer("updated_at")
     .notNull()
     .$defaultFn(() => Date.now()),
 });
 
-// 互链边表（派生索引；真相源是 memories.body 里的 [[slug]]，坏了可全量重建）。
-// 悬空链接不入表；删除记忆 CASCADE 清边（入链方 body 文本不动，自然转悬空）。
+// Bảng liên kết là chỉ mục suy ra từ [[slug]] trong memories.body và có thể dựng lại.
+// Không lưu liên kết tới slug không tồn tại; xóa bộ nhớ sẽ xóa các cạnh qua CASCADE.
 export const memoryLinks = sqliteTable(
   "memory_links",
   {
@@ -264,7 +359,7 @@ export const memoryLinks = sqliteTable(
   (t) => [primaryKey({ columns: [t.fromId, t.toId] }), index("memory_links_to_id_idx").on(t.toId)],
 );
 
-// 用户偏好持久化：key → 任意 JSON value（按 @shared/preferences 的 Zod schema 在服务层校验）。
+// Tùy chọn người dùng: key và JSON value, được service kiểm tra theo schema ở @shared/preferences.
 export const preferences = sqliteTable("preferences", {
   key: text("key").primaryKey(),
   value: text("value", { mode: "json" }).$type<unknown>().notNull(),
@@ -273,7 +368,7 @@ export const preferences = sqliteTable("preferences", {
     .$defaultFn(() => Date.now()),
 });
 
-/** 应用内部状态 KV（非用户偏好；渲染层不可见）。与 preferences 表分离，故不进任何渲染层契约。 */
+/** Trạng thái nội bộ dạng key-value, tách khỏi tùy chọn người dùng và không gửi sang renderer. */
 export const appMeta = sqliteTable("app_meta", {
   key: text("key").primaryKey(),
   value: text("value", { mode: "json" }).$type<unknown>().notNull(),
@@ -282,8 +377,8 @@ export const appMeta = sqliteTable("app_meta", {
     .$defaultFn(() => Date.now()),
 });
 
-// 阅读时长按 (书 × 本地日期) 累计（spec 2026-06-09-reading-time-tracking §2）。
-// 删书 set null 保留时长历史：bookId 置空后该行仍计入 总时长/每日柱图/streak，仅各书排行不再列它。
+// Cộng dồn thời gian đọc theo từng sách và ngày địa phương.
+// Xóa sách đặt bookId=null nhưng giữ lịch sử tổng thời gian, biểu đồ ngày và streak.
 export const readingDaily = sqliteTable(
   "reading_daily",
   {
@@ -292,7 +387,7 @@ export const readingDaily = sqliteTable(
     readingSessionId: text("reading_session_id").references(() => readingSessions.id, {
       onDelete: "set null",
     }),
-    day: text("day").notNull(), // 本地日期 'YYYY-MM-DD'
+    day: text("day").notNull(), // Ngày địa phương dạng YYYY-MM-DD.
     seconds: integer("seconds").notNull().default(0),
   },
   (t) => [
@@ -305,11 +400,30 @@ export const readingDaily = sqliteTable(
   ],
 );
 
-// 通用二进制资源池（spec 2026-06-15-assistant-avatar §2.1）。本期首个使用者＝assistant 头像；
-// 书封面 cover 迁入见 #83。业务表以 FK（如 preferences.avatarBlobId）引用，不再各自存 BLOB。
+// A page counts once per document and local day, so rereading a page cannot inflate a streak.
+export const readingPageVisits = sqliteTable(
+  "reading_page_visits",
+  {
+    id: pkUuid(),
+    bookId: text("book_id").references(() => books.id, { onDelete: "set null" }),
+    pageNumber: integer("page_number").notNull(),
+    day: text("day").notNull(),
+  },
+  (t) => [
+    check("reading_page_visits_page_positive", sql`${t.pageNumber} >= 1`),
+    uniqueIndex("reading_page_visits_book_day_page_unique")
+      .on(t.bookId, t.day, t.pageNumber)
+      .where(sql`${t.bookId} is not null`),
+    index("reading_page_visits_day_idx").on(t.day),
+    index("reading_page_visits_book_id_idx").on(t.bookId),
+  ],
+);
+
+// Kho dữ liệu nhị phân dùng chung; hiện dùng cho ảnh đại diện của trợ lý.
+// Bảng nghiệp vụ tham chiếu bằng khóa ngoại thay vì lưu BLOB riêng; xem #83 cho bìa sách.
 export const blob = sqliteTable("blob", {
   id: pkUuid(),
   data: blob_("data", { mode: "buffer" }).notNull(),
-  mimeType: text("mime_type").notNull(), // 写入时 magic-byte 嗅探一次存入；读时直接用
+  mimeType: text("mime_type").notNull(), // Nhận diện từ magic bytes khi ghi, dùng trực tiếp khi đọc.
   createdAt: nowMs(),
 });

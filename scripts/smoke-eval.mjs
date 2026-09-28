@@ -1,8 +1,9 @@
-// Playwright 冒烟助手（本地 eval 工具，等价 node -e：argv[2] 即代码，仅供本机终端手敲，勿喂任何不可信输入）
-// 前置：dev 实例以 `pnpm dev -- --remote-debugging-port=9222` 启动。
-// 用法：node scripts/smoke-eval.mjs '<await 可用的 js，page 为 app 页面>'
-// 例：node scripts/smoke-eval.mjs 'await page.locator("header button").count()'
-// 注意：Electron 的 /json/version/ 带尾斜杠返回 400，connectOverCDP 必须传 ws URL。
+// Công cụ smoke test bằng Playwright (tiện ích eval cục bộ, tương đương node -e: argv[2] là mã).
+// Chỉ nhập lệnh trực tiếp trong terminal trên máy này; không truyền đầu vào không đáng tin cậy.
+// Yêu cầu: chạy bản dev bằng `pnpm dev -- --remote-debugging-port=9222`.
+// Cách dùng: node scripts/smoke-eval.mjs '<mã JavaScript có thể await, biến page là trang ứng dụng>'
+// Ví dụ: node scripts/smoke-eval.mjs 'await page.locator("header button").count()'
+// Lưu ý: /json/version/ của Electron trả về 400 nếu URL có dấu gạch chéo cuối; connectOverCDP cần URL ws.
 import { chromium } from "playwright-core";
 
 const ver = await (await fetch("http://127.0.0.1:9222/json/version")).json();
@@ -15,7 +16,7 @@ if (!page) {
   console.error("no app page");
   process.exit(1);
 }
-// oxlint-disable-next-line no-implied-eval -- 本脚本即 eval 工具（argv 即代码），输入仅来自本机终端
+// oxlint-disable-next-line no-implied-eval -- Đây là công cụ eval (argv chứa mã); chỉ nhận đầu vào từ terminal cục bộ.
 const fn = new Function("page", `return (async () => { return ${process.argv[2]}; })()`);
 console.log(JSON.stringify(await fn(page), null, 1));
 await browser.close();

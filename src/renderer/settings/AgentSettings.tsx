@@ -10,8 +10,8 @@ import { Textarea } from "@renderer/components/ui/textarea";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 
 /**
- * 助手设置：SOUL（name + persona）+ 全局 instructions。
- * 文本输入提交模式：onBlur 时提交，空值回退原值（镜像既有设置组件的 Input 模式）。
+ * Thiết lập trợ lý gồm SOUL với tên và tính cách, cùng chỉ dẫn chung.
+ * Ô văn bản lưu khi mất focus; giá trị rỗng khôi phục giá trị cũ như các ô cài đặt khác.
  */
 export function AgentSettings() {
   const { t } = useTranslation();
@@ -30,11 +30,11 @@ export function AgentSettings() {
 
   const onFilePicked = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    e.target.value = ""; // 允许再次选同一文件
+    e.target.value = ""; // Cho phép chọn lại cùng một tệp.
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => setCropSrc(typeof reader.result === "string" ? reader.result : null);
-    reader.onerror = () => toast.error(t("settings.agent.avatarReadFailed", "无法读取图片"));
+    reader.onerror = () => toast.error(t("settings.agent.avatarReadFailed", "Không thể đọc ảnh"));
     reader.readAsDataURL(file);
   };
 
@@ -42,9 +42,9 @@ export function AgentSettings() {
     const r = await window.api.agent.setAvatar(bytes);
     if (r.status === "set") setAvatarBlobId(r.blobId);
     else if (r.status === "too-large")
-      toast.error(t("settings.agent.avatarTooLarge", "图片太大，请选择 2 MB 以内的图片"));
+      toast.error(t("settings.agent.avatarTooLarge", "Ảnh quá lớn. Hãy chọn ảnh dưới 2 MB."));
     else if (r.status === "unsupported")
-      toast.error(t("settings.agent.avatarUnsupported", "不支持的图片格式"));
+      toast.error(t("settings.agent.avatarUnsupported", "Định dạng ảnh không được hỗ trợ"));
   };
 
   const onResetAvatar = async () => {
@@ -79,25 +79,25 @@ export function AgentSettings() {
 
   return (
     <section className="space-y-5">
-      <h2 className="font-serif text-lg">{t("settings.agent", "助手")}</h2>
+      <h2 className="font-serif text-lg">{t("settings.agent", "Trợ lý")}</h2>
 
-      {/* 头像 */}
+      {/* Ảnh đại diện. */}
       <div className="space-y-1.5">
-        <span className="block text-sm font-medium">{t("settings.agent.avatar", "头像")}</span>
+        <span className="block text-sm font-medium">{t("settings.agent.avatar", "Ảnh đại diện")}</span>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           {t(
             "settings.agent.avatarDesc",
-            "显示在对话中的 AI 头像。支持 png/jpg/webp/gif，2 MB 以内。",
+            "Ảnh của AI trong cuộc trò chuyện. Hỗ trợ png, jpg, webp, gif, tối đa 2 MB.",
           )}
         </p>
         <div className="flex items-center gap-3">
           <AssistantAvatar className="size-14" />
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={onUploadClick}>
-              {t("settings.agent.avatarUpload", "上传头像")}
+              {t("settings.agent.avatarUpload", "Tải ảnh đại diện lên")}
             </Button>
             <Button variant="ghost" size="sm" onClick={onResetAvatar}>
-              {t("settings.agent.avatarReset", "恢复默认")}
+              {t("settings.agent.avatarReset", "Đặt lại mặc định")}
             </Button>
           </div>
           <input
@@ -121,55 +121,55 @@ export function AgentSettings() {
             checked={showAgentAvatar}
             onCheckedChange={(v) => setShowAgentAvatar(v === true)}
           />
-          {t("settings.agent.avatarShowInChat", "在对话中显示头像")}
+          {t("settings.agent.avatarShowInChat", "Hiện ảnh đại diện trong cuộc trò chuyện")}
         </label>
       </div>
 
-      {/* 名字 */}
+      {/* Tên. */}
       <div className="space-y-1.5">
         <label htmlFor="agent-name" className="block text-sm font-medium">
-          {t("settings.agent.name", "助手名字")}
+          {t("settings.agent.name", "Tên trợ lý")}
         </label>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t("settings.agent.nameDesc", "AI 的称呼，显示在对话界面。不允许为空。")}
+          {t("settings.agent.nameDesc", "Tên hiển thị trong giao diện trò chuyện. Không được để trống.")}
         </p>
         <Input
           id="agent-name"
           value={draftName ?? soul.name}
           onChange={(e) => setDraftName(e.target.value)}
           onBlur={commitName}
-          placeholder={t("settings.agent.namePlaceholder", "输入助手名字")}
+          placeholder={t("settings.agent.namePlaceholder", "Nhập tên trợ lý")}
           className="max-w-xs"
         />
       </div>
 
-      {/* 人设 persona */}
+      {/* Tính cách. */}
       <div className="space-y-1.5">
         <label htmlFor="agent-persona" className="block text-sm font-medium">
-          {t("settings.agent.persona", "人设")}
+          {t("settings.agent.persona", "Tính cách")}
         </label>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
-          {t("settings.agent.personaDesc", "描述 AI 的性格与说话风格。用 markdown 自由书写。")}
+          {t("settings.agent.personaDesc", "Mô tả tính cách và cách nói chuyện của AI bằng Markdown.")}
         </p>
         <Textarea
           id="agent-persona"
           value={draftPersona ?? soul.persona}
           onChange={(e) => setDraftPersona(e.target.value)}
           onBlur={commitPersona}
-          placeholder={t("settings.agent.personaPlaceholder", "描述助手的性格与风格……")}
+          placeholder={t("settings.agent.personaPlaceholder", "Mô tả tính cách và cách nói chuyện của trợ lý…")}
           className="min-h-28"
         />
       </div>
 
-      {/* 全局指令 instructions */}
+      {/* Chỉ dẫn chung. */}
       <div className="space-y-1.5">
         <label htmlFor="agent-instructions" className="block text-sm font-medium">
-          {t("settings.agent.instructions", "全局指令")}
+          {t("settings.agent.instructions", "Chỉ dẫn chung")}
         </label>
         <p className="text-[11px] leading-relaxed text-muted-foreground">
           {t(
             "settings.agent.instructionsDesc",
-            "叠加在人设之上的额外行为要求，例如「回复时始终引用原文」、「优先用中文」等。每次对话都会生效。",
+            "Yêu cầu bổ sung áp dụng cho mọi cuộc trò chuyện, chẳng hạn như luôn trích dẫn văn bản gốc hoặc ưu tiên trả lời bằng tiếng Việt.",
           )}
         </p>
         <Textarea
@@ -177,7 +177,7 @@ export function AgentSettings() {
           value={draftInstructions ?? instructions}
           onChange={(e) => setDraftInstructions(e.target.value)}
           onBlur={commitInstructions}
-          placeholder={t("settings.agent.instructionsPlaceholder", "输入全局指令……")}
+          placeholder={t("settings.agent.instructionsPlaceholder", "Nhập chỉ dẫn chung…")}
           className="min-h-28"
         />
       </div>

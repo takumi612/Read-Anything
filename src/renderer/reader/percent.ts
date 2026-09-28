@@ -1,8 +1,8 @@
-/** 阅读进度计算（#48）：reader 上送 progress.percent 与 header 进度显示共用（一份计算两处消费）。 */
+/** Tính tiến độ đọc dùng chung cho progress.percent gửi lên và breadcrumb trên thanh đầu. */
 
 const clamp01 = (v: number): number => Math.min(1, Math.max(0, v));
 
-/** epub：以全书可读文本量加权；没有文本 profile 时降级为 spine 比例。 */
+/** Với ePub, cân theo lượng văn bản đọc được; thiếu hồ sơ văn bản thì dùng tỉ lệ spine. */
 export function epubPercent(
   index: number,
   textOffset: number | null,
@@ -31,7 +31,7 @@ export function epubPercent(
   return clamp01((completed + current) / total);
 }
 
-/** PDF：页比例，精确。 */
+/** Với PDF, tính chính xác theo tỉ lệ trang. */
 export function pdfPercent(page: number, pageCount: number): number {
   if (pageCount <= 0) return 0;
   return clamp01(page / pageCount);

@@ -8,7 +8,7 @@ const DIVISIONS: { amount: number; unit: Intl.RelativeTimeFormatUnit }[] = [
   { amount: Number.POSITIVE_INFINITY, unit: "year" },
 ];
 
-/** 选出相对时间的 {数值, 单位}（fromMs 过去 → 负值）。纯函数、可测，不碰 locale。 */
+/** Tính giá trị và đơn vị thời gian tương đối; fromMs trong quá khứ cho giá trị âm, chưa định dạng theo locale. */
 export function relativeParts(
   fromMs: number,
   nowMs: number,
@@ -21,7 +21,7 @@ export function relativeParts(
   return { value: Math.round(duration), unit: "year" };
 }
 
-/** 本地化相对时间串（如「3 天前」/"3 days ago"）。locale 取 i18n.language。 */
+/** Định dạng thời gian tương đối theo i18n.language, chẳng hạn "3 ngày trước". */
 export function relativeTime(fromMs: number, nowMs: number, locale: string): string {
   const { value, unit } = relativeParts(fromMs, nowMs);
   return new Intl.RelativeTimeFormat(locale, { numeric: "auto" }).format(value, unit);

@@ -16,7 +16,7 @@ import {
 
 type MessageRow = typeof messages.$inferSelect;
 
-/** DB JSON 列 parse-on-read：metadata 形状漂移（旧数据/外部写入）时记录并降级为 null，而非靠 ?. 静默吸收。 */
+/** Kiểm tra metadata JSON khi đọc DB; dữ liệu cũ/sai schema được ghi nhận và trả null. */
 function parseMetadata(raw: MessageRow["metadata"]): MessageMetadata | null {
   if (raw == null) return null;
   const parsed = messageMetadataSchema.safeParse(raw);
@@ -43,11 +43,11 @@ export interface AppendMessageInput {
   role: MessageRole;
   parts: UIMessage["parts"];
   metadata?: MessageMetadata | null;
-  /** 终态；省略默认 complete（user/system 行恒 complete）。 */
+  /** Trạng thái cuối; mặc định complete, các dòng user/system luôn complete. */
   status?: MessageStatus;
 }
 
-/** 追加一条消息：事务内取下一 seq、插入、并推进 conversations.updatedAt。 */
+/** Thêm tin nhắn trong transaction: lấy seq kế tiếp, chèn dòng và cập nhật thời gian hội thoại. */
 export function appendMessage(db: DB, input: AppendMessageInput): MessageDto {
   return db.transaction((tx) => {
     const top = tx
@@ -55,7 +55,7 @@ export function appendMessage(db: DB, input: AppendMessageInput): MessageDto {
       .from(messages)
       .where(eq(messages.conversationId, input.conversationId))
       .get();
-    // 空会话起始 seq = 0（max 不存在时 -1 + 1）
+    // Hội thoại rỗng bắt đầu ở seq=0.
     const nextSeq = (top?.m ?? -1) + 1;
 
     const inserted = tx
@@ -80,7 +80,7 @@ export function appendMessage(db: DB, input: AppendMessageInput): MessageDto {
   });
 }
 
-/** 按 seq 升序列出会话内全部消息。 */
+/** Liệt kê toàn bộ tin nhắn theo seq tăng dần. */
 export function listMessages(db: DB, conversationId: string): MessageDto[] {
   return db
     .select()
@@ -91,8 +91,7 @@ export function listMessages(db: DB, conversationId: string): MessageDto[] {
     .map(toDto);
 }
 
-/** 分页列出会话内消息：beforeSeq 指定时返回 seq < beforeSeq 的较早一页；
- *  limit 指定时多拿一条探测 hasMore。 */
+/** Lấy một trang tin cũ với seq < beforeSeq; lấy dư một dòng để xác định hasMore. */
 export function listMessagesPaginated(
   db: DB,
   conversationId: string,
@@ -110,7 +109,7 @@ export function listMessagesPaginated(
   return { messages: page.reverse().map(toDto), hasMore };
 }
 
-/** 列出 seq > afterSeq 的尾轮（升序）；afterSeq 为 null 取全量（等价 listMessages）。 */
+/** Liệt kê tin sau afterSeq theo thứ tự tăng; null nghĩa là lấy tất cả. */
 export function listMessagesAfterSeq(
   db: DB,
   conversationId: string,
@@ -123,7 +122,7 @@ export function listMessagesAfterSeq(
   return db.select().from(messages).where(where).orderBy(asc(messages.seq)).all().map(toDto);
 }
 
-/** 倒序找最近一条带段落 chip 的 user 消息，返回其段落内容（设计文档 §6「上一次插入的」）；无则 null。 */
+/** Tìm ngược tin người dùng gần nhất có chip đoạn văn và trả nội dung đó; thiếu thì null. */
 export function getLastParagraphContent(db: DB, conversationId: string): string | null {
   const rows = db
     .select({ role: messages.role, metadata: messages.metadata })
@@ -140,17 +139,16 @@ export function getLastParagraphContent(db: DB, conversationId: string): string 
   return null;
 }
 
-/** 取单条消息 dto；无则 null。 */
+/** Lấy DTO của một tin nhắn; không có thì null. */
 export function getMessage(db: DB, messageId: string): MessageDto | null {
   const row = db.select().from(messages).where(eq(messages.id, messageId)).get();
   return row ? toDto(row) : null;
 }
 
 /**
- * 重置 user 轮以重发（事务）：① 设该 user 消息 parts=[{text}]（保留 metadata 快照）；
- * ② 删 seq > 其 seq 的全部消息；③ 若 summarizedThroughSeq >= 其 seq，重置滚动摘要
- * （contextSummary=null, summarizedThroughSeq=null，否则摘要引用已删消息）；④ 推进 updatedAt。
- * 返回该 user 消息 seq。调用方须已校验 messageId 为本会话 user 消息。
+ * Chuẩn bị gửi lại một lượt người dùng trong transaction: thay parts nhưng giữ metadata,
+ * xóa các tin phía sau, đặt lại bản tóm tắt nếu nó chứa những tin đã xóa, cập nhật updatedAt.
+ * Trả seq của lượt đó; bên gọi phải xác nhận messageId thuộc hội thoại này.
  */
 export function resetUserTurnForResend(
   db: DB,
@@ -191,8 +189,8 @@ export function resetUserTurnForResend(
 }
 
 /**
- * 崩溃恢复派生（DD-§3.1）：会话尾消息是 user 行（其后无 assistant）即「未获回复的未完成轮」。
- * 进程硬崩溃流到一半时不落 assistant，故只靠此读时派生识别——无需持久化任何运行态。
+ * Khôi phục sau crash: nếu tin cuối là của người dùng thì lượt đó chưa được trả lời.
+ * Không cần lưu thêm trạng thái chạy vì câu trả lời dở dang chưa được ghi vào DB.
  */
 export function isLastTurnIncomplete(db: DB, conversationId: string): boolean {
   const last = db

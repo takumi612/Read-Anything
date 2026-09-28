@@ -2,15 +2,15 @@ import type { AiProviderApiType, UpsertProviderInput } from "@shared/providers";
 import { DEFAULT_BACKGROUND_CONCURRENCY, DEFAULT_STEP_LIMIT } from "@shared/preferences";
 
 export interface ProviderFormState {
-  id: string | undefined; // 有=编辑，无=新建
+  id: string | undefined; // Có id là sửa, thiếu id là tạo mới.
   type: AiProviderApiType;
   label: string;
   baseUrl: string;
-  apiKey: string; // 空=不改 key（编辑保留 / 新建无 key）
+  apiKey: string; // Rỗng nghĩa là không đổi khóa khi sửa hoặc chưa có khóa khi tạo.
   models: string[];
 }
 
-/** 并集去重、保序。 */
+/** Gộp hai danh sách, bỏ trùng và giữ thứ tự. */
 export function mergeModels(existing: string[], add: string[]): string[] {
   const seen = new Set(existing);
   const out = [...existing];
@@ -23,26 +23,26 @@ export function mergeModels(existing: string[], add: string[]): string[] {
   return out;
 }
 
-/** model 下拉选项：provider 的 models ∪ {当前已存 model（若不在列表）}。 */
+/** Tùy chọn model gồm danh sách của provider và model đã lưu nếu nó chưa có trong danh sách. */
 export function providerModelOptions(providerModels: string[], current: string | null): string[] {
   if (current && !providerModels.includes(current)) return [...providerModels, current];
   return [...providerModels];
 }
 
-/** 数字输入框的 stepLimit 取值收敛到 [1, 99] 整数；非有限值（空输入/NaN）回退默认。
- *  注意：0（不限制）不经此函数——它由「不限制」复选框直接产生、不走数字框。 */
+/** Giới hạn stepLimit từ ô số thành số nguyên [1,99], giá trị không hữu hạn về mặc định.
+ *  Giá trị 0 không giới hạn do checkbox tạo trực tiếp và không qua hàm này. */
 export function clampStepLimit(raw: number): number {
   if (!Number.isFinite(raw)) return DEFAULT_STEP_LIMIT;
   return Math.min(99, Math.max(1, Math.trunc(raw)));
 }
 
-/** 数字输入框的 backgroundConcurrency 取值收敛到 [1, 10] 整数；非有限值（空输入/NaN）回退默认。 */
+/** Giới hạn backgroundConcurrency từ ô số thành số nguyên [1,10], giá trị không hữu hạn về mặc định. */
 export function clampBackgroundConcurrency(raw: number): number {
   if (!Number.isFinite(raw)) return DEFAULT_BACKGROUND_CONCURRENCY;
   return Math.min(10, Math.max(1, Math.trunc(raw)));
 }
 
-/** 表单态 → upsert IPC 入参：空 baseUrl→null、空 label→null、空 apiKey 省略（不改 key）、id 省略=新建。 */
+/** Đổi form thành tham số upsert IPC: baseUrl/label rỗng thành null, apiKey rỗng thì bỏ qua, thiếu id là tạo mới. */
 export function providerFormToUpsertInput(f: ProviderFormState): UpsertProviderInput {
   const out: UpsertProviderInput = {
     type: f.type,

@@ -6,7 +6,7 @@ import { useReaderAI } from "#/reader-ai-context";
 
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n));
 
-/** 顶栏齿轮按钮 + 阅读设置 popover（字号 / 行距 / 宽度）。轻量自实现，点击外部关闭。 */
+/** Nút bánh răng trên thanh đầu + popover cài đặt đọc (cỡ chữ / khoảng cách dòng / chiều rộng). Tự triển khai gọn nhẹ, đóng khi nhấp bên ngoài. */
 export function SettingsPopover() {
   const { t } = useTranslation();
   const { prefs, updatePrefs } = useReaderAI();

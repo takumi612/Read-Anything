@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * 临时性能实验自动化：通过 CDP 连接 dev 模式下的 Marginalia，
- * 依次打开 50/200/500/1000 条消息的测试会话，截图并采集 console 日志。
+ * Tự động thử hiệu năng tạm thời: kết nối Marginalia ở chế độ dev qua CDP,
+ * lần lượt mở các conversation thử có 50/200/500/1000 tin nhắn, chụp ảnh và thu thập log console.
  *
- * 前置：
+ * Yêu cầu trước:
  *   ./node_modules/.bin/electron-forge start -- --remote-debugging-port=9222
  *
- * 运行：
+ * Cách chạy:
  *   node scripts/perf-snapshot.mjs --complexity short
  */
 import { chromium } from "playwright-core";
@@ -39,26 +39,26 @@ async function snapshot(page, target) {
   const logs = [];
   page.on("console", (msg) => logs.push(`[${msg.type()}] ${msg.text()}`));
 
-  // Marginalia 启动后默认在 library 视图。
-  // 1. 点击右下角浮动助手按钮。
-  await page.click('[aria-label*="问问"]', { timeout: 10000 });
+  // Marginalia mở ở màn hình thư viện.
+  // 1. Nhấn nút trợ lý nổi ở góc dưới bên phải.
+  await page.click('[aria-label*="Hỏi AI"]', { timeout: 10000 });
   await sleep(500);
 
-  // 2. 打开会话列表。
-  await page.click('[aria-label="会话列表"]');
+  // 2. Mở danh sách conversation.
+  await page.click('[aria-label="Danh sách hội thoại"]');
   await sleep(300);
 
-  // 3. 点击目标会话标题。
+  // 3. Chọn tiêu đề conversation cần thử.
   await page.click(`text=${target.title}`);
-  await sleep(6500); // 给消息列表和 markdown 渲染留出时间，并等待 ChatPerf 5s 周期输出
+  await sleep(6500); // Chờ danh sách tin nhắn và Markdown hiển thị, đồng thời đợi ChatPerf ghi log theo chu kỳ 5 giây.
 
-  // 4. 截图（初始状态）。
+  // 4. Chụp ảnh trạng thái ban đầu.
   await page.screenshot({
     path: path.join(OUT_DIR, `ai-${target.name}-initial.png`),
     fullPage: false,
   });
 
-  // 5. 滚动到底部再回顶部，触发滚动 FPS 测量。
+  // 5. Cuộn xuống cuối rồi trở lại đầu để đo FPS khi cuộn.
   await page.evaluate(() => {
     const viewport = document.querySelector("[data-radix-scroll-area-viewport]");
     if (viewport) {
@@ -75,14 +75,14 @@ async function snapshot(page, target) {
   });
   await sleep(1500);
 
-  // 6. 截图（滚动后）。
+  // 6. Chụp ảnh sau khi cuộn.
   await page.screenshot({
     path: path.join(OUT_DIR, `ai-${target.name}-scrolled.png`),
     fullPage: false,
   });
 
-  // 7. 关闭 AI 面板，便于下一次循环重新打开。
-  await page.click('[aria-label="关闭面板"]');
+  // 7. Đóng bảng AI để vòng lặp tiếp theo có thể mở lại.
+  await page.click('[aria-label="Đóng bảng điều khiển"]');
   await sleep(300);
 
   fs.writeFileSync(path.join(OUT_DIR, `ai-${target.name}-console.log`), logs.join("\n"));
@@ -104,7 +104,7 @@ async function snapshot(page, target) {
     process.exit(1);
   }
 
-  // 关闭 dev 模式下自动打开的 DevTools 面板，避免它遮住主窗口。
+  // Đóng DevTools tự mở ở chế độ dev để không che cửa sổ chính.
   for (const p of context.pages()) {
     if (p.url().startsWith("devtools://")) await p.close();
   }

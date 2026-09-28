@@ -1,4 +1,4 @@
-// src/renderer/ai/FloatingAssistant.tsx —— 书库/统计视图的全局悬浮助手（spec 2026-06-16 §5.4）。
+// Trợ lý nổi dùng chung cho giao diện thư viện và thống kê, theo spec 2026-06-16 §5.4.
 import { useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { useTranslation } from "react-i18next";
@@ -14,8 +14,8 @@ export function FloatingAssistant() {
   const { t } = useTranslation();
   const agentName = usePrefsStore((s) => s.soul.name);
   const [open, setOpen] = useState(false);
-  // 进入书库/统计（AppShell 挂载）时恢复上次的 library 会话；book→library 会 remount → 重新恢复。
-  // 开关浮窗本身不 remount 故不重跑，靠 AIPanel 挂载消费仍在的 openCommand（见 chat-store openCommand）。
+  // Khi AppShell gắn trong thư viện hoặc thống kê, khôi phục hội thoại library gần nhất.
+  // Chuyển từ sách sang thư viện sẽ gắn lại; bật tắt cửa sổ nổi thì không, AIPanel dùng openCommand còn lưu.
   useRestoreConversation(LIBRARY_CONTEXT);
 
   if (!open) {
@@ -23,7 +23,7 @@ export function FloatingAssistant() {
       <Button
         size="icon"
         onClick={() => setOpen(true)}
-        aria-label={t("ai.openLibraryAssistant", "问问 {{name}}", { name: agentName })}
+        aria-label={t("ai.openLibraryAssistant", "Hỏi {{name}}", { name: agentName })}
         className="fixed bottom-6 end-6 z-40 size-12 rounded-full shadow-lg"
       >
         <MessageCircle />

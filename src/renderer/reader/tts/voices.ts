@@ -4,7 +4,7 @@ import type { TtsPlatform } from "./pick-voice";
 
 const log = createLogger("tts");
 
-/** 真 speechSynthesis 适配（接口见 tts-engine 的 SpeechPort）。 */
+/** Bản chuyển tiếp tới speechSynthesis thật theo giao diện SpeechPort của tts-engine. */
 export function browserSpeechPort(): SpeechPort {
   const synth = window.speechSynthesis;
   return {
@@ -16,24 +16,27 @@ export function browserSpeechPort(): SpeechPort {
   };
 }
 
-// 缓存不随运行期新装系统语音刷新（需重启 app）
+// Cần khởi động lại ứng dụng để cache nhận giọng hệ thống mới cài.
 let voicesCache: SpeechSynthesisVoice[] | null = null;
+let voicesPromise: Promise<SpeechSynthesisVoice[]> | null = null;
 
 /**
- * getVoices() 首次调用可能返回空数组（spec §4.4）：等 voiceschanged，
- * 超时兜底返回当前列表（可能仍空——pickVoice 对空列表返回 null，引擎默认行为朗读）。
+ * getVoices() có thể trả danh sách rỗng ở lần đầu, nên chờ voiceschanged.
+ * Khi hết giờ thì trả danh sách hiện tại, dù vẫn rỗng; pickVoice sẽ trả null để engine tự chọn.
  */
 export function getVoicesReady(timeoutMs = 2000): Promise<SpeechSynthesisVoice[]> {
   if (voicesCache?.length) return Promise.resolve(voicesCache);
+  if (voicesPromise) return voicesPromise;
   const synth = window.speechSynthesis;
   const now = synth.getVoices();
   if (now.length > 0) {
     voicesCache = now;
     return Promise.resolve(now);
   }
-  return new Promise((resolve) => {
+  voicesPromise = new Promise((resolve) => {
     const finish = (list: SpeechSynthesisVoice[]) => {
       voicesCache = list;
+      voicesPromise = null;
       resolve(list);
     };
     const timer = setTimeout(() => {
@@ -49,6 +52,7 @@ export function getVoicesReady(timeoutMs = 2000): Promise<SpeechSynthesisVoice[]
       { once: true },
     );
   });
+  return voicesPromise;
 }
 
 export function currentPlatform(): TtsPlatform {

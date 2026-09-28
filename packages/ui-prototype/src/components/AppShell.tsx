@@ -34,10 +34,10 @@ function Shell() {
   const { headerOpen } = useReaderAI();
   return (
     <>
-      {/* 钉住态：顶栏在文档流里占位 */}
+      {/* Trạng thái ghim: thanh đầu chiếm chỗ trong luồng tài liệu */}
       {headerOpen && <TopBar />}
       <Workspace />
-      {/* 收起态：顶边 hover 抽屉 */}
+      {/* Trạng thái thu gọn: ngăn kéo ở mép trên khi rê chuột */}
       {!headerOpen && (
         <PeekDrawer side="top" sizeClass="h-12">
           <TopBar />
@@ -63,7 +63,7 @@ function TopBar() {
 
   return (
     <header className="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background/80 px-3 font-sans backdrop-blur">
-      {/* 左栏开关：开/关同一位置，仅换图标 */}
+      {/* Công tắc cột trái: trạng thái bật/tắt cùng vị trí, chỉ đổi biểu tượng */}
       <Button
         variant="ghost"
         size="icon"
@@ -80,7 +80,7 @@ function TopBar() {
         {t("app.badge")}
       </span>
 
-      {/* 面包屑：书 · 当前章（随滚动更新，正文内容不走 i18n） */}
+      {/* Breadcrumb: sách · chương hiện tại (cập nhật khi cuộn; nội dung sách không dùng i18n) */}
       <div className="ml-3 hidden min-w-0 items-center gap-2 text-xs text-muted-foreground sm:flex">
         <span className="size-1 shrink-0 rounded-full bg-border" />
         <span className="truncate">
@@ -92,7 +92,7 @@ function TopBar() {
         <SettingsPopover />
         <LanguageSwitcher />
         <ThemeToggle />
-        {/* 右栏开关：开/关同一位置，仅换图标 */}
+        {/* Công tắc cột phải: trạng thái bật/tắt cùng vị trí, chỉ đổi biểu tượng */}
         <Button
           variant="ghost"
           size="icon"
@@ -105,7 +105,7 @@ function TopBar() {
             <PanelRightOpen className="size-4" />
           )}
         </Button>
-        {/* 顶栏收起/钉住：沉浸式阅读 */}
+        {/* Thu gọn/ghim thanh đầu: đọc tập trung */}
         <Button
           variant="ghost"
           size="icon"
@@ -123,7 +123,7 @@ function Workspace() {
   const { sidebarOpen, panelOpen } = useReaderAI();
   return (
     <div className="relative flex min-h-0 flex-1">
-      {/* 钉住态：在文档流里占位 */}
+      {/* Trạng thái ghim: chiếm chỗ trong luồng tài liệu */}
       {sidebarOpen && (
         <aside className="w-64 shrink-0 border-r border-border">
           <Sidebar />
@@ -138,7 +138,7 @@ function Workspace() {
         </aside>
       )}
 
-      {/* 收起态：边缘 hover 触发的浮层抽屉 */}
+      {/* Trạng thái thu gọn: ngăn kéo nổi được kích hoạt khi rê chuột ở cạnh */}
       {!sidebarOpen && (
         <PeekDrawer side="left" sizeClass="w-64">
           <Sidebar />
@@ -174,7 +174,7 @@ const PEEK = {
   },
 } as const;
 
-/** 收起态抽屉：边缘细触发区 hover → 抽屉滑入浮于内容之上；离开延时收起。 */
+/** Ngăn kéo ở trạng thái thu gọn: rê chuột vào vùng kích hoạt mảnh ở cạnh → ngăn kéo trượt vào và nổi trên nội dung; rời đi một lúc thì thu gọn. */
 function PeekDrawer({
   side,
   sizeClass,
@@ -201,7 +201,7 @@ function PeekDrawer({
 
   return (
     <>
-      {/* 边缘触发区 + 细把手（常驻提示，hover 高亮） */}
+      {/* Vùng kích hoạt ở cạnh + tay nắm mảnh (luôn gợi ý vị trí, sáng lên khi rê chuột) */}
       <div
         onMouseEnter={() => {
           cancelClose();
@@ -217,7 +217,7 @@ function PeekDrawer({
         />
       </div>
 
-      {/* 抽屉本体 */}
+      {/* Phần thân ngăn kéo */}
       <div
         onMouseEnter={cancelClose}
         onMouseLeave={scheduleClose}

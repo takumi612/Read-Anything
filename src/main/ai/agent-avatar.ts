@@ -4,11 +4,11 @@ import { sniffImageType } from "@main/library/cover-bytes";
 import { writeBlob, deleteBlob } from "@main/media/blob-store";
 import { getPreference, setPreference } from "@main/preferences/repository";
 
-/** 头像上传大小上限：2 MB（spec §5）。 */
+/** Giới hạn ảnh đại diện tải lên: 2 MB. */
 export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
 const ALLOWED = new Set(["image/png", "image/jpeg", "image/gif", "image/webp"]);
 
-/** 校验并存头像字节：写新 blob → 切 avatarBlobId → 删旧 blob（GC）。返回判别结果。 */
+/** Kiểm tra và lưu ảnh mới, đổi avatarBlobId rồi xóa blob cũ. */
 export function storeAvatar(db: DB, bytes: Uint8Array): AvatarPickResult {
   if (bytes.byteLength > AVATAR_MAX_BYTES) return { status: "too-large" };
   const mime = sniffImageType(bytes);
@@ -20,7 +20,7 @@ export function storeAvatar(db: DB, bytes: Uint8Array): AvatarPickResult {
   return { status: "set", blobId };
 }
 
-/** 重置为默认：删当前头像 blob + 置 avatarBlobId=null。无头像时无害。 */
+/** Đặt lại ảnh mặc định: xóa blob hiện tại và đặt avatarBlobId=null. */
 export function resetAvatar(db: DB): void {
   const prev = getPreference(db, "avatarBlobId");
   setPreference(db, "avatarBlobId", null);

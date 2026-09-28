@@ -32,7 +32,7 @@ function Row({
           variant="ghost"
           size="icon-xs"
           onClick={onDec}
-          aria-label={t("reader.prefs.decrease", "减小{{label}}", { label })}
+          aria-label={t("reader.prefs.decrease", "Giảm {{label}}", { label })}
         >
           <Minus />
         </Button>
@@ -41,7 +41,7 @@ function Row({
           variant="ghost"
           size="icon-xs"
           onClick={onInc}
-          aria-label={t("reader.prefs.increase", "增大{{label}}", { label })}
+          aria-label={t("reader.prefs.increase", "Tăng {{label}}", { label })}
         >
           <Plus />
         </Button>
@@ -61,16 +61,16 @@ function FontRow() {
   const { t } = useTranslation();
   const fontFamily = usePrefsStore((s) => s.prefs.fontFamily);
   const updatePrefs = usePrefsStore((s) => s.updatePrefs);
-  // label 必须是字面 t() 调用:i18next-cli extract 识别不了动态键,动态键会被 removeUnusedKeys 清掉
+  // Nhãn phải gọi t() với khóa literal để i18next-cli nhận diện và không xóa nhầm khi extract.
   const labels: Record<ReaderFontFamily, string> = {
-    default: t("reader.prefs.fontDefault", "原书默认"),
-    wenkai: t("reader.prefs.fontWenkai", "文楷"),
-    serif: t("reader.prefs.fontSerif", "宋体"),
-    sans: t("reader.prefs.fontSans", "黑体"),
+    default: t("reader.prefs.fontDefault", "Phông chữ gốc"),
+    wenkai: t("reader.prefs.fontWenkai", "Wenkai"),
+    serif: t("reader.prefs.fontSerif", "Có chân"),
+    sans: t("reader.prefs.fontSans", "Không chân"),
   };
   return (
     <div className="space-y-1.5">
-      <span className="text-xs text-muted-foreground">{t("reader.prefs.fontFamily", "字体")}</span>
+      <span className="text-xs text-muted-foreground">{t("reader.prefs.fontFamily", "Phông chữ")}</span>
       <div className="grid grid-cols-2 gap-1.5">
         {FONT_OPTIONS.map((o) => (
           <Button
@@ -78,7 +78,7 @@ function FontRow() {
             variant={fontFamily === o.value ? "secondary" : "outline"}
             size="sm"
             aria-pressed={fontFamily === o.value}
-            // 预览即所得:按钮用自家字体栈渲染(运行时数据驱动,内联 style 属规范允许的例外)
+            // Nút xem trước dùng chính bộ phông đã chọn; style được tính từ dữ liệu lúc chạy.
             style={o.stack ? { fontFamily: o.stack } : undefined}
             onClick={() => updatePrefs({ fontFamily: o.value })}
           >
@@ -103,7 +103,7 @@ export function ReaderPrefs() {
             variant="ghost"
             size="icon"
             className="text-muted-foreground"
-            aria-label={t("reader.prefs.title", "阅读偏好")}
+            aria-label={t("reader.prefs.title", "Tùy chọn đọc")}
           />
         }
       >
@@ -111,19 +111,19 @@ export function ReaderPrefs() {
       </PopoverTrigger>
       <PopoverContent align="end" sideOffset={8} className="w-60 space-y-2">
         <Row
-          label={t("reader.prefs.fontSize", "字号")}
+          label={t("reader.prefs.fontSize", "Cỡ chữ")}
           value={`${Math.round(prefs.fontScale * 100)}%`}
           onDec={() => updatePrefs({ fontScale: round2(clamp(prefs.fontScale - 0.05, 0.8, 1.5)) })}
           onInc={() => updatePrefs({ fontScale: round2(clamp(prefs.fontScale + 0.05, 0.8, 1.5)) })}
         />
         <Row
-          label={t("reader.prefs.lineHeight", "行距")}
+          label={t("reader.prefs.lineHeight", "Chiều cao dòng")}
           value={prefs.lineHeight.toFixed(1)}
           onDec={() => updatePrefs({ lineHeight: round2(clamp(prefs.lineHeight - 0.1, 1.4, 2.4)) })}
           onInc={() => updatePrefs({ lineHeight: round2(clamp(prefs.lineHeight + 0.1, 1.4, 2.4)) })}
         />
         <Row
-          label={t("reader.prefs.columnWidth", "栏宽")}
+          label={t("reader.prefs.columnWidth", "Độ rộng cột")}
           value={`${prefs.maxWidth}px`}
           onDec={() => updatePrefs({ maxWidth: clamp(prefs.maxWidth - 40, 480, 820) })}
           onInc={() => updatePrefs({ maxWidth: clamp(prefs.maxWidth + 40, 480, 820) })}

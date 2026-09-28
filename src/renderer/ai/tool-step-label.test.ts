@@ -5,7 +5,7 @@ import type { ChapterRefDto } from "@shared/library";
 import type { ToolPart } from "@renderer/ai/segments";
 import { isErrorShape, toolStepLabel, toolStepStatus } from "@renderer/ai/tool-step-label";
 
-/** stub t：返回 defaultValue 并做 {{var}} 插值，验证 key 选择与参数传递。 */
+/** Hàm t giả trả defaultValue và thay {{var}} để kiểm tra khóa cùng tham số truyền vào. */
 const t = ((_key: string, defaultValue: string, options?: Record<string, unknown>) => {
   return defaultValue.replace(/\{\{(\w+)\}\}/g, (_m, k: string) => {
     const value = options?.[k];
@@ -42,13 +42,13 @@ const part = (type: string, over: Record<string, unknown> = {}): ToolPart =>
 describe("toolStepLabel", () => {
   it("readPage with page number", () => {
     expect(toolStepLabel(part("tool-readPage", { input: { page: 12 } }), chapters, t)).toBe(
-      "读取第 12 页",
+      "Đọc trang 12",
     );
   });
 
   it("readPage falls back when input is partial (streaming)", () => {
     expect(toolStepLabel(part("tool-readPage", { input: undefined }), chapters, t)).toBe(
-      "读取页面",
+      "Đọc trang",
     );
   });
 
@@ -59,7 +59,7 @@ describe("toolStepLabel", () => {
         chapters,
         t,
       ),
-    ).toBe("读取〈Preface〉");
+    ).toBe("Đọc “Preface”");
   });
 
   it("readChapterText resolves chapter by href", () => {
@@ -69,19 +69,19 @@ describe("toolStepLabel", () => {
         chapters,
         t,
       ),
-    ).toBe("读取〈Preface〉");
+    ).toBe("Đọc “Preface”");
   });
 
   it("readChapterText resolves chapter by unique case-insensitive title", () => {
     expect(
       toolStepLabel(part("tool-readChapterText", { input: { chapterId: "preface" } }), chapters, t),
-    ).toBe("读取〈Preface〉");
+    ).toBe("Đọc “Preface”");
   });
 
   it("readChapterText falls back when unresolved or title is null", () => {
     expect(
       toolStepLabel(part("tool-readChapterText", { input: { chapterId: "nope" } }), chapters, t),
-    ).toBe("读取章节文本");
+    ).toBe("Đọc nội dung chương");
     const untitled = [chapter({ title: null })];
     expect(
       toolStepLabel(
@@ -89,14 +89,14 @@ describe("toolStepLabel", () => {
         untitled,
         t,
       ),
-    ).toBe("读取章节文本");
+    ).toBe("Đọc nội dung chương");
   });
 
   it("ambiguous title (two matches) falls back", () => {
     const dup = [chapter({}), chapter({ id: "ch-uuid-2", href: "text/p2.xhtml" })];
     expect(
       toolStepLabel(part("tool-readChapterText", { input: { chapterId: "Preface" } }), dup, t),
-    ).toBe("读取章节文本");
+    ).toBe("Đọc nội dung chương");
   });
 
   it("getChapterSummary with resolved title", () => {
@@ -106,17 +106,17 @@ describe("toolStepLabel", () => {
         chapters,
         t,
       ),
-    ).toBe("读取〈Preface〉摘要");
+    ).toBe("Đọc tóm tắt của “Preface”");
   });
 
   it("getChapterSummary falls back when unresolved", () => {
     expect(
       toolStepLabel(part("tool-getChapterSummary", { input: { chapterId: "nope" } }), chapters, t),
-    ).toBe("读取章节摘要");
+    ).toBe("Đọc tóm tắt chương");
   });
 
   it("getToc", () => {
-    expect(toolStepLabel(part("tool-getToc"), chapters, t)).toBe("读取目录");
+    expect(toolStepLabel(part("tool-getToc"), chapters, t)).toBe("Đọc mục lục");
   });
 
   it("unknown dynamic tool falls back to raw toolName", () => {

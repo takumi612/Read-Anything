@@ -2,16 +2,16 @@ import { EpubCFI } from "epubjs";
 import type { ChapterRefDto } from "@shared/library";
 import { chaptersMatchingHref } from "./chapter-id-by-href";
 
-/** 共享 href 锚点章的边界：该章起点元素的 CFI。anchorBoundaries 按 cfi 升序排列。 */
+/** Ranh giới chương chung href là CFI của phần tử neo đầu chương; anchorBoundaries sắp tăng theo CFI. */
 export interface AnchorBoundary {
   chapterId: string;
   cfi: string;
 }
 
 /**
- * ePub 标注/位置 CFI → 章节 id（与 PDF chapterIdAtPage 对称）。
- * 两级：spinePos→href 唯一章直接返回；共享 href（锚点切章）用 anchorBoundaries 经 EpubCFI.compare 细分。
- * anchorBoundaries 未就绪/无该 href 边界 → null（退化，宁可不显示不错章）。
+ * Đổi CFI của chú thích hoặc vị trí ePub thành id chương, tương tự chapterIdAtPage của PDF.
+ * Nếu href chỉ có một chương thì trả ngay; nếu chung href thì so CFI với anchorBoundaries.
+ * Trả null khi chưa có ranh giới để tránh hiện sai chương.
  */
 export function chapterIdAtCfi(
   chapters: ChapterRefDto[],
@@ -32,7 +32,7 @@ export function chapterIdAtCfi(
   if (matches.length === 0) return null;
   if (matches.length === 1) return matches[0]!.id;
 
-  // 共享 href（锚点切章）→ anchor 级细分
+  // Chương chung href được phân biệt tiếp theo điểm neo.
   const ids = new Set(matches.map((c) => c.id));
   const relevant = anchorBoundaries.filter((b) => ids.has(b.chapterId));
   if (relevant.length === 0) return null;

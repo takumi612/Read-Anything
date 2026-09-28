@@ -2,7 +2,7 @@ import { eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { books } from "@main/db/schema";
 
-/** 按 magic bytes 嗅探图片 content-type（epub-parser 只给封面字节、不给 MIME，故读时判）。 */
+/** Nhận diện MIME ảnh từ magic bytes vì epub-parser chỉ cung cấp bytes bìa. */
 export function sniffImageType(bytes: Uint8Array): string {
   if (bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff)
     return "image/jpeg";
@@ -31,7 +31,7 @@ export function sniffImageType(bytes: Uint8Array): string {
   return "application/octet-stream";
 }
 
-/** 读某书封面字节 + content-type（注入 db）。无此书 / 无封面 → null。`cover://` 协议 handler 用。 */
+/** Lấy bytes bìa và MIME cho cover://; sách không có bìa thì trả null. */
 export function coverResponseFor(
   db: DB,
   bookId: string,

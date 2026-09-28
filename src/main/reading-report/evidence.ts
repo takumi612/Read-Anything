@@ -13,11 +13,11 @@ export interface SessionConversationSummary {
   title: string | null;
   createdAt: number;
   updatedAt: number;
-  /** 本次阅读窗口内的消息条数——供模型判断该会话该自己读还是外派 subagent。 */
+  /** Số tin nhắn trong phiên đọc để chọn cách xử lý hội thoại. */
   messageCount: number;
-  /** 窗口内消息正文的粗略 token 估算（同上用途）。 */
+  /** Số token ước tính của các tin nhắn trong phiên đọc. */
   estimatedTokens: number;
-  /** 是否存在可用的滚动概要（多数会话为 false：仅超长会话才会被压缩）。 */
+  /** Hội thoại có bản tóm tắt cuốn chiếu hay không; thường chỉ hội thoại dài mới có. */
   hasCompactedContext: boolean;
 }
 
@@ -32,22 +32,22 @@ export interface SessionMessageExcerpt {
 
 export const SESSION_CONVERSATION_DEFAULT_LIMIT = 20;
 /**
- * 主 agent 单次取回的条数上限：护栏，防它一口气把整段原文灌进自己的上下文。
- * subagent 不受此限（见 maxLimit 参数）——它只装一个会话，条数该由 token 预算封顶。
+ * Số tin tối đa tác vụ chính đọc trong một lần để không lấp đầy ngữ cảnh.
+ * Tác vụ điều tra một hội thoại có thể dùng maxLimit khác; ngân sách token vẫn kiểm soát kích thước.
  */
 export const SESSION_CONVERSATION_MAX_LIMIT = 50;
 /**
- * 单次读取返回的正文 token 预算（口径见 estimateTokens）。记 token 而非字符：按字符计会让
- * 同一数字在中文下约等于 24k token、在英文下只有约 6k token，行为相差约 4 倍。
+ * Ngân sách token nội dung cho một lần đọc (xem estimateTokens).
+ * Đếm token thay vì ký tự vì mật độ token khác nhau đáng kể giữa các ngôn ngữ.
  */
 export const SESSION_CONVERSATION_TOKEN_BUDGET = 24_000;
 
 export interface SessionConversationReadOptions {
   afterSeq?: number;
   limit?: number;
-  /** 覆盖单次读取的 token 预算（subagent 只装一个会话，可吃得更粗）。 */
+  /** Ghi đè ngân sách token của một lần đọc cho tác vụ điều tra. */
   tokenBudget?: number;
-  /** 覆盖条数上限的校验值；缺省用给主 agent 的 SESSION_CONVERSATION_MAX_LIMIT。 */
+  /** Ghi đè giới hạn số tin; mặc định dùng SESSION_CONVERSATION_MAX_LIMIT. */
   maxLimit?: number;
 }
 
@@ -59,8 +59,8 @@ export interface SessionConversationMessage extends SessionMessageExcerpt {
 export interface SessionConversationReadResult {
   status: "messages";
   /**
-   * 该会话的滚动概要（若有）。原始消息现已全部可读，故这只是背景——它可能含本次阅读之前的
-   * 讨论，不可当作本次阅读的证据。
+   * Bản tóm tắt cuốn chiếu của hội thoại nếu có. Đây chỉ là bối cảnh,
+   * có thể chứa trao đổi trước phiên đọc hiện tại nên không dùng làm bằng chứng.
    */
   compactedContext: { summary: string; throughSeq: number } | null;
   messages: SessionConversationMessage[];
@@ -159,7 +159,7 @@ export function listSessionConversations(
     .orderBy(desc(conversations.updatedAt))
     .all();
   return rows.map(({ contextSummary, ...conversation }) => {
-    // 规模只按窗口内消息计：清单是模型分配读取预算的唯一依据，须与它随后能读到的范围一致。
+    // Quy mô chỉ tính tin trong phiên đọc để kế hoạch ngân sách khớp vùng có thể đọc.
     const inWindow = db
       .select({ parts: messages.parts })
       .from(messages)
@@ -205,10 +205,9 @@ export function readSessionConversation(
   if (!Number.isInteger(budget) || budget < 1) {
     throw new Error("conversation token budget must be a positive integer");
   }
-  // 刻意不按 summarizedThroughSeq 过滤：压缩只是让聊天时不必把旧轮塞进上下文，原始消息仍完好
-  // 存在。曾经过滤掉压缩前缀，使一个 470 条的会话只有最后 110 条对报告可见（76% 的证据凭空消失，
-  // 只剩一段概要）。长会话现在由 investigateConversation 的 subagent 分页消化，单次调用另有
-  // token 预算护着，无需再靠这道过滤保护上下文。
+  // Không lọc theo summarizedThroughSeq: nén ngữ cảnh chat không xóa tin gốc.
+  // Lọc phần đã nén sẽ làm báo cáo mất bằng chứng cũ. Hội thoại dài hiện được
+  // đọc theo trang và giới hạn token ở từng lần gọi.
   const cursor = options.afterSeq ?? -1;
   const rawRows = db
     .select()
@@ -226,7 +225,7 @@ export function readSessionConversation(
     .all();
 
   if (rawRows.length === 0) {
-    // 游标已走完时返回空页；否则该会话在本次阅读窗口内根本没有消息，属调用方传错 id。
+    // Hết cursor thì trả trang rỗng; không có tin nào trong phiên là ID đầu vào sai.
     if (options.afterSeq !== undefined) {
       return {
         status: "messages",

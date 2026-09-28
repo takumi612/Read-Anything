@@ -4,8 +4,8 @@ import { createLogger } from "@main/logger";
 
 const log = createLogger("update");
 
-/** 与 forge.config.ts PublisherGithub 一致；发布全为 draft+prerelease，故走 /releases 列表（匿名 API 自动过滤 draft、含 prerelease、按 created_at 降序）。 */
-const REPO = { owner: "EurFelux", name: "marginalia" } as const;
+/** Lấy danh sách /releases để thấy prerelease; API ẩn draft với người chưa đăng nhập. */
+const REPO = { owner: "takumi612", name: "Read-Anything" } as const;
 
 interface GithubRelease {
   tag_name: string;
@@ -21,8 +21,8 @@ export async function checkForUpdate(
     const url = `https://api.github.com/repos/${repo.owner}/${repo.name}/releases?per_page=10`;
     const res = await fetchImpl(url, {
       headers: {
-        // GitHub API 缺 User-Agent 直接 403，务必带上。
-        "User-Agent": "marginalia",
+        // GitHub API cần User-Agent để không trả 403.
+        "User-Agent": "Read-Anything",
         Accept: "application/vnd.github+json",
         "X-GitHub-Api-Version": "2022-11-28",
       },

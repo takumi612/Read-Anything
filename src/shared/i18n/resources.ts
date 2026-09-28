@@ -1,18 +1,17 @@
 import type { InitOptions } from "i18next";
-import zhCN from "./locales/zh-CN";
+import vi from "./locales/vi";
 import en from "./locales/en";
 
-/** i18next init 资源（两进程共用）。键用带连字符的 BCP 47 字符串。 */
+/** Tài nguyên i18next dùng chung cho hai tiến trình; key ngôn ngữ theo BCP 47. */
 export const resources = {
-  "zh-CN": { translation: zhCN },
+  vi: { translation: vi },
   en: { translation: en },
 } as const;
 
 /**
- * 两进程 i18next init 的共享项，确保 main（vanilla）与 renderer（react-i18next）配置一致。
- * keySeparator/nsSeparator 关闭 → 扁平点分键（整串如 errors.foo 即 key，便于全文搜索，
- * 与 i18next.config.ts 抽取设置和 i18next.d.ts 的 CustomTypeOptions 对齐）。
- * 调用方再补 `lng`（及 renderer 的 react 选项）。
+ * Cấu hình chung để main và renderer khởi tạo i18next nhất quán.
+ * Tắt keySeparator/nsSeparator để `errors.foo` là một key phẳng, dễ tìm trong source.
+ * Bên gọi thêm lng và renderer thêm tùy chọn React.
  */
 export const sharedInitOptions: InitOptions = {
   resources,

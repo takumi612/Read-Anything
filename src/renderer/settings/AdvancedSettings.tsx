@@ -25,18 +25,42 @@ export function AdvancedSettings() {
   const setStepLimit = usePrefsStore((s) => s.setStepLimit);
   const backgroundConcurrency = usePrefsStore((s) => s.backgroundConcurrency);
   const setBackgroundConcurrency = usePrefsStore((s) => s.setBackgroundConcurrency);
+  const restorePdfTabs = usePrefsStore((s) => s.restorePdfTabs);
+  const setRestorePdfTabs = usePrefsStore((s) => s.setRestorePdfTabs);
   const unlimited = stepLimit === 0;
   const [busy, setBusy] = useState(false);
-  // 已检视、待用户确认的还原目标；非 null 时打开确认弹窗。
+  // Bản sao lưu đã kiểm tra và đang chờ xác nhận; khác null thì mở hộp xác nhận.
   const [pendingRestore, setPendingRestore] = useState<BackupInspection | null>(null);
 
   const [appVersion, setAppVersion] = useState<string | null>(null);
+  const [platform, setPlatform] = useState<string | null>(null);
+  const [pdfAssociationStatus, setPdfAssociationStatus] = useState<"default" | "other" | "unknown">(
+    "unknown",
+  );
   const [checking, setChecking] = useState(false);
   const [latestAvailable, setLatestAvailable] = useState<string | null>(null);
 
   useEffect(() => {
-    void window.api.app.getInfo().then((info) => setAppVersion(info.version));
+    void window.api.app.getInfo().then((info) => {
+      setAppVersion(info.version);
+      setPlatform(info.platform);
+    });
   }, []);
+
+  useEffect(() => {
+    if (platform !== "win32") return;
+    const refresh = () => {
+      void window.api.app
+        .pdfAssociationStatus()
+        .then(setPdfAssociationStatus)
+        .catch(() => {
+          setPdfAssociationStatus("unknown");
+        });
+    };
+    refresh();
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
+  }, [platform]);
 
   const onCheckUpdate = async () => {
     setChecking(true);
@@ -45,21 +69,21 @@ export function AdvancedSettings() {
       const res = await window.api.app.checkUpdate();
       if (res.status === "update-available") {
         setLatestAvailable(res.latestVersion);
-        toast(t("update.available", "发现新版本 {{version}}", { version: res.latestVersion }), {
+        toast(t("update.available", "Có phiên bản mới {{version}}", { version: res.latestVersion }), {
           action: {
-            label: t("update.view", "查看"),
+            label: t("update.view", "Xem"),
             onClick: () => void window.api.app.openExternal({ url: res.releaseUrl }),
           },
           duration: Infinity,
           closeButton: true,
         });
       } else if (res.status === "up-to-date") {
-        toast.success(t("update.upToDate", "已是最新版本"));
+        toast.success(t("update.upToDate", "Bạn đang dùng phiên bản mới nhất"));
       } else {
-        toast.error(t("update.checkFailed", "检查更新失败"));
+        toast.error(t("update.checkFailed", "Không thể kiểm tra cập nhật"));
       }
     } catch {
-      toast.error(t("update.checkFailed", "检查更新失败"));
+      toast.error(t("update.checkFailed", "Không thể kiểm tra cập nhật"));
     } finally {
       setChecking(false);
     }
@@ -70,24 +94,24 @@ export function AdvancedSettings() {
     try {
       const res = await window.api.backup.export({ kind });
       if (res) {
-        toast.success(t("settings.backup.exportDone", "备份已导出：{{path}}", { path: res.path }));
+        toast.success(t("settings.backup.exportDone", "Đã xuất bản sao lưu: {{path}}", { path: res.path }));
       }
     } catch {
-      toast.error(t("settings.backup.exportFailed", "备份导出失败"));
+      toast.error(t("settings.backup.exportFailed", "Không thể xuất bản sao lưu"));
     } finally {
       setBusy(false);
     }
   };
 
-  // 选包并检视；兼容则打开确认弹窗，不兼容/读取失败弹 toast。
+  // Chọn và kiểm tra bản sao lưu; nếu tương thích thì hỏi xác nhận, nếu lỗi thì hiện toast.
   const onPickRestore = async () => {
     setBusy(true);
     try {
       const ins = await window.api.backup.inspect();
-      if (!ins) return; // 用户取消
+      if (!ins) return; // Người dùng đã hủy.
       if (!ins.compatible) {
         toast.error(
-          t("settings.backup.incompatible", "无法还原：备份来自更新版本（{{reason}}）", {
+          t("settings.backup.incompatible", "Không thể khôi phục: bản sao lưu được tạo bằng phiên bản ứng dụng mới hơn ({{reason}})", {
             reason: ins.reason ?? "",
           }),
         );
@@ -96,13 +120,13 @@ export function AdvancedSettings() {
       setPendingRestore(ins);
     } catch (err) {
       const msg = err instanceof Error && err.message ? err.message : "";
-      toast.error(msg || t("settings.backup.readFailed", "无法读取该备份"));
+      toast.error(msg || t("settings.backup.readFailed", "Không thể đọc bản sao lưu này"));
     } finally {
       setBusy(false);
     }
   };
 
-  // 确认还原：成功后主进程 relaunch（正常不返回）；失败透传真实错误（含 pre-restore 恢复路径）。
+  // Sau khi khôi phục thành công main process mở lại ứng dụng; nếu lỗi thì hiện thông báo thật gồm đường dẫn phục hồi.
   const onConfirmRestore = async () => {
     const ins = pendingRestore;
     setPendingRestore(null);
@@ -112,7 +136,7 @@ export function AdvancedSettings() {
       await window.api.backup.restore({ path: ins.path, archiveSha256: ins.archiveSha256 });
     } catch (err) {
       const msg = err instanceof Error && err.message ? err.message : "";
-      toast.error(msg || t("settings.backup.restoreFailed", "还原失败"), {
+      toast.error(msg || t("settings.backup.restoreFailed", "Khôi phục thất bại"), {
         closeButton: true,
         duration: Infinity,
       });
@@ -129,17 +153,17 @@ export function AdvancedSettings() {
   return (
     <>
       <section className="space-y-4">
-        <h2 className="font-serif text-lg">{t("settings.advanced", "高级")}</h2>
+        <h2 className="font-serif text-lg">{t("settings.advanced", "Nâng cao")}</h2>
 
         <div className="flex items-start justify-between gap-3">
           <label htmlFor="step-limit" className="min-w-0 cursor-pointer">
             <span className="block text-sm font-medium">
-              {t("settings.advanced.stepLimit", "单次回复最多步数")}
+              {t("settings.advanced.stepLimit", "Số bước tối đa mỗi câu trả lời")}
             </span>
             <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
               {t(
                 "settings.advanced.stepLimitDesc",
-                "AI 单次回复中连续调用工具的步数上限，阅读 PDF 逐页时需要调高。勾选「不限制」后仅靠模型自然停止与手动停止收尾——模型若陷入循环会持续消耗额度。",
+                "Giới hạn số bước gọi công cụ liên tiếp trong một câu trả lời. Tăng giới hạn khi cần đọc PDF theo từng trang. Nếu chọn Không giới hạn, model hoặc bạn phải tự dừng lượt trả lời; model bị lặp có thể tiếp tục dùng token.",
               )}
             </span>
           </label>
@@ -163,7 +187,7 @@ export function AdvancedSettings() {
                 checked={unlimited}
                 onCheckedChange={(checked) => setStepLimit(checked ? 0 : DEFAULT_STEP_LIMIT)}
               />
-              <span className="text-sm">{t("settings.advanced.stepLimitUnlimited", "不限制")}</span>
+              <span className="text-sm">{t("settings.advanced.stepLimitUnlimited", "Không giới hạn")}</span>
             </label>
           </div>
         </div>
@@ -171,12 +195,12 @@ export function AdvancedSettings() {
         <div className="flex items-start justify-between gap-3">
           <label htmlFor="background-concurrency" className="min-w-0 cursor-pointer">
             <span className="block text-sm font-medium">
-              {t("settings.advanced.backgroundConcurrency", "后台任务并发上限")}
+              {t("settings.advanced.backgroundConcurrency", "Số tác vụ nền tối đa")}
             </span>
             <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
               {t(
                 "settings.advanced.backgroundConcurrencyDesc",
-                "同时进行的后台 AI 任务（章节/全书摘要、会话命名、长对话压缩）数量上限。调低可缓解额度/速率压力；不影响你正在进行的对话回复。",
+                "Số tác vụ AI chạy nền cùng lúc, gồm tóm tắt chương và sách, đặt tên cuộc trò chuyện và rút gọn hội thoại dài. Giảm giá trị này để hạn chế mức sử dụng và tốc độ gọi API. Cài đặt không ảnh hưởng câu trả lời trong cuộc trò chuyện đang mở.",
               )}
             </span>
           </label>
@@ -196,12 +220,12 @@ export function AdvancedSettings() {
         <div className="flex items-center justify-between gap-3">
           <div className="min-w-0">
             <span className="block text-sm font-medium">
-              {t("settings.advanced.about", "关于")}
+              {t("settings.advanced.about", "Giới thiệu")}
             </span>
             <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
-              {t("settings.advanced.currentVersion", "当前版本")} v{appVersion ?? "…"}
+              {t("settings.advanced.currentVersion", "Phiên bản hiện tại")} v{appVersion ?? "…"}
               {latestAvailable
-                ? ` · ${t("update.available", "发现新版本 {{version}}", { version: latestAvailable })}`
+                ? ` · ${t("update.available", "Có phiên bản mới {{version}}", { version: latestAvailable })}`
                 : ""}
             </span>
           </div>
@@ -211,24 +235,95 @@ export function AdvancedSettings() {
             disabled={checking}
             onClick={() => void onCheckUpdate()}
           >
-            {t("settings.advanced.checkUpdate", "检查更新")}
+            {t("settings.advanced.checkUpdate", "Kiểm tra cập nhật")}
           </Button>
         </div>
 
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <span className="block text-sm font-medium">
+              {t("settings.advanced.dictionary.title", "Offline English–Vietnamese dictionary")}
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
+              {t(
+                "settings.advanced.dictionary.description",
+                "Word lookup works offline and does not use an AI API. Dictionary data is licensed CC BY-SA 4.0.",
+              )}
+            </span>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() =>
+              void window.api.app.openExternal({
+                url: "https://github.com/skypediacode/english-vietnamese-dictionary/blob/388adc0826300912e5b0311c089e0e70494b065f/ATTRIBUTION.md",
+              })
+            }
+          >
+            {t("settings.advanced.dictionary.source", "Source & attribution")}
+          </Button>
+        </div>
+
+        <div className="flex items-start justify-between gap-3">
+          <label htmlFor="restore-pdf-tabs" className="min-w-0 cursor-pointer">
+            <span className="block text-sm font-medium">
+              {t("settings.advanced.restorePdfTabs.title")}
+            </span>
+            <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
+              {t("settings.advanced.restorePdfTabs.description")}
+            </span>
+          </label>
+          <Checkbox
+            id="restore-pdf-tabs"
+            checked={restorePdfTabs}
+            onCheckedChange={(checked) => setRestorePdfTabs(checked === true)}
+          />
+        </div>
+
+        {platform === "win32" && (
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <span className="block text-sm font-medium">
+                {t("settings.advanced.pdfDefault.title", "Default PDF reader")}
+              </span>
+              <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
+                {t(
+                  "settings.advanced.pdfDefault.description",
+                  "Choose Read-Anything for .pdf files in Windows Default Apps settings.",
+                )}
+              </span>
+              <span className="mt-1 block text-xs font-medium">
+                {pdfAssociationStatus === "default"
+                  ? t("settings.advanced.pdfDefault.active")
+                  : pdfAssociationStatus === "other"
+                    ? t("settings.advanced.pdfDefault.inactive")
+                    : t("settings.advanced.pdfDefault.unknown")}
+              </span>
+            </div>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => void window.api.app.openExternal({ url: "ms-settings:defaultapps" })}
+            >
+              {t("settings.advanced.pdfDefault.open", "Open Windows Settings")}
+            </Button>
+          </div>
+        )}
+
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm font-medium">{t("settings.logs", "日志")}</span>
+          <span className="text-sm font-medium">{t("settings.logs", "Nhật ký")}</span>
           <Button variant="outline" size="sm" onClick={() => void window.api.app.openLogsDir()}>
             <FolderOpen />
-            {t("settings.openLogsFolder", "打开日志文件夹")}
+            {t("settings.openLogsFolder", "Mở thư mục nhật ký")}
           </Button>
         </div>
 
         <div className="space-y-2">
-          <span className="text-sm font-medium">{t("settings.backup.title", "备份与还原")}</span>
+          <span className="text-sm font-medium">{t("settings.backup.title", "Sao lưu và khôi phục")}</span>
           <p className="text-[11px] leading-relaxed text-muted-foreground">
             {t(
               "settings.backup.warning",
-              "精简备份包含全部应用数据但不含书籍原文件，适合在设备间传递；完整备份额外包含所有 EPUB / PDF。两种备份都含明文 API key，请妥善保管。",
+              "Bản sao lưu gọn nhẹ không gồm tệp sách. Bản đầy đủ gồm cả sách. API key không được sao lưu; hãy nhập lại sau khi khôi phục.",
             )}
           </p>
           <div className="flex gap-2">
@@ -240,7 +335,7 @@ export function AdvancedSettings() {
               onClick={() => void onPickRestore()}
             >
               <Upload />
-              {t("settings.backup.restore", "还原备份")}
+              {t("settings.backup.restore", "Khôi phục bản sao lưu")}
             </Button>
           </div>
         </div>
@@ -255,7 +350,7 @@ export function AdvancedSettings() {
         <AlertDialogContent>
           <AlertDialogTitle>
             {restoreCopy ? t(restoreCopy.kindKey, restoreCopy.kind) : ""}
-            {` · ${t("settings.backup.restoreTitle", "还原备份？")}`}
+            {` · ${t("settings.backup.restoreTitle", "Khôi phục bản sao lưu?")}`}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {restoreCopy && pendingRestore
@@ -267,10 +362,10 @@ export function AdvancedSettings() {
           </AlertDialogDescription>
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => setPendingRestore(null)}>
-              {t("settings.backup.cancel", "取消")}
+              {t("settings.backup.cancel", "Hủy")}
             </Button>
             <Button variant="destructive" onClick={() => void onConfirmRestore()}>
-              {t("settings.backup.restore", "还原备份")}
+              {t("settings.backup.restore", "Khôi phục bản sao lưu")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

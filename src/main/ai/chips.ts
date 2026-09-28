@@ -3,7 +3,7 @@ import { estimateTokens } from "@shared/tokens";
 import type { BuildChipsInput, Chip } from "@shared/chat";
 import type { MessageMetadata } from "@shared/types";
 
-/** 由 renderer 提取的原始文本构造 selection / paragraph chip（构建为 on：随消息发送、UI 可整体删除；"required" 仅历史水合产出）。 */
+/** Tạo chip đoạn chọn/đoạn văn từ renderer; chip mới bật sẵn và có thể xóa trong UI. */
 export function buildChips(input: BuildChipsInput): Chip[] {
   const chips: Chip[] = [];
 
@@ -33,13 +33,13 @@ export function buildChips(input: BuildChipsInput): Chip[] {
   return chips;
 }
 
-/** 段落去重（设计文档 §6）：段落内容与本会话上一次插入的相同则省略该段落 chip。 */
+/** Bỏ chip đoạn văn nếu trùng với đoạn gần nhất đã gửi trong hội thoại. */
 export function dedupeParagraph(chips: Chip[], previousParagraph: string | null): Chip[] {
   if (previousParagraph == null) return chips;
   return chips.filter((c) => !(c.id === "paragraph" && c.content === previousParagraph));
 }
 
-/** 把 live chip 投影为持久化快照（落入 UIMessage.metadata.contextChips）。 */
+/** Chuyển chip hiện tại thành snapshot lưu trong metadata.contextChips. */
 export function toContextChips(chips: Chip[]): NonNullable<MessageMetadata["contextChips"]> {
   return chips.map((c) => ({ id: c.id, content: c.content, tokenCount: c.tokenCount }));
 }

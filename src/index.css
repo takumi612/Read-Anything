@@ -1,10 +1,24 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "katex/dist/katex.min.css";
-/* 流式正文逐字淡入的 keyframes 与 [data-sd-animate] 规则（MessageList 的 animated 选项依赖） */
+/* Keyframes và quy tắc [data-sd-animate] tạo hiệu ứng hiện dần từng chữ cho nội dung stream; MessageList dùng tùy chọn animated. */
 @import "streamdown/styles.css";
 @plugin '@tailwindcss/typography';
-/* Streamdown 在其打包产物里用 Tailwind 工具类渲染 markdown——让 Tailwind 扫描它以生成这些类 */
+
+@keyframes streak-ignite {
+  0% {
+    opacity: 0.65;
+    transform: scale(0.78);
+  }
+  65% {
+    transform: scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+/* Streamdown dùng các lớp Tailwind để hiển thị Markdown trong gói đã biên dịch; thêm gói này vào phạm vi quét để Tailwind tạo các lớp đó. */
 @source "../node_modules/streamdown/dist/*.js";
 @source "../node_modules/@streamdown/math/dist/*.js";
 
@@ -103,8 +117,8 @@
   --muted-foreground: oklch(0.705 0.015 286.067);
   --accent: oklch(0.274 0.006 286.033);
   --accent-foreground: oklch(0.985 0 0);
-  /* 暗色 destructive 调亮以保证文字可访问性（text-destructive 压在近黑表面上）：
-     旧值 oklch(0.396 …) L 太低、对比不足；改用 shadcn neutral 现行暗色值（L≈0.70）。 */
+  /* Tăng độ sáng destructive trong giao diện tối để chữ dễ đọc trên nền gần đen.
+     Giá trị cũ oklch(0.396 …) có độ sáng L quá thấp; dùng giá trị tối hiện tại của shadcn neutral (L≈0.70). */
   --destructive: oklch(0.704 0.191 22.216);
   --destructive-foreground: oklch(0.637 0.237 25.331);
   --border: oklch(0.274 0.006 286.033);
@@ -275,13 +289,39 @@ pre code {
   margin-inline: auto;
 }
 
-/* Apple 图书式：完全隐藏滚动条但保留滚动能力 */
+/* Other UI regions can hide their scrollbar; readers keep a quiet, discoverable one. */
 .no-scrollbar {
   scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* 旧 Edge / IE */
+  -ms-overflow-style: none; /* Edge cũ / IE */
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* WebKit */
+}
+
+.reader-scroll-region {
+  scrollbar-width: auto;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 52%, transparent) transparent;
+}
+
+.reader-scroll-region::-webkit-scrollbar {
+  width: 14px;
+  height: 14px;
+}
+
+.reader-scroll-region::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.reader-scroll-region::-webkit-scrollbar-thumb {
+  border: 2px solid transparent;
+  border-radius: 999px;
+  background: color-mix(in oklab, var(--muted-foreground) 52%, transparent);
+  background-clip: padding-box;
+}
+
+.reader-scroll-region::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--muted-foreground) 76%, transparent);
+  background-clip: padding-box;
 }
 
 .display-title {
@@ -382,12 +422,12 @@ a {
   background: color-mix(in oklab, var(--header-bg) 84%, transparent 16%);
 }
 
-/* pdfjs textLayer（v6）：透明 span 绝对定位叠在页面 canvas 上，仅承载原生文本选区。
-   --total-scale-factor 由 pdf-book renderPage 按页设置；--scale-round-* 是 pdfjs
-   round() 表达式要求的量化步长（官方默认 1px）。
-   几何规则须与官方 pdf_viewer.css 对齐：pdfjs v6 只往 span 写 CSS 变量
-   （--font-height / --scale-x / --rotate），字号与横向校正全靠下方 calc() 消费——
-   漏掉任何一条 span 都会偏离 canvas 文字实际位置（选区对不上字）。 */
+/* textLayer của pdfjs v6: các span trong suốt được định vị tuyệt đối trên canvas, chỉ dùng cho chọn văn bản.
+   pdf-book đặt --total-scale-factor theo từng trang; --scale-round-* là bước lượng tử hóa cần cho
+   biểu thức round() của pdfjs (mặc định chính thức là 1px).
+   Quy tắc hình học phải khớp pdf_viewer.css chính thức: pdfjs v6 chỉ ghi biến CSS vào span
+   (--font-height / --scale-x / --rotate); calc() bên dưới dùng chúng để tính cỡ chữ và hiệu chỉnh chiều ngang.
+   Thiếu bất kỳ quy tắc nào cũng làm chữ lệch khỏi canvas và vùng chọn không khớp. */
 .textLayer {
   position: absolute;
   inset: 0;
@@ -426,7 +466,8 @@ a {
 .textLayer .markedContent {
   display: contents;
 }
-/* hover 可点击目标（标注高亮/活跃选区）时 pointer（对齐 ePub）：PdfPage mousemove 命中测试挂/摘此属性。 */
+/* Hiện con trỏ dạng bàn tay khi rê trên vùng có thể nhấn (đánh dấu hoặc vùng chọn đang hoạt động), đồng bộ với EPUB.
+   PdfPage thêm hoặc gỡ thuộc tính này dựa trên kiểm tra vị trí con trỏ khi mousemove. */
 .textLayer[data-pointer],
 .textLayer[data-pointer] :is(span, br) {
   cursor: pointer;
@@ -435,9 +476,9 @@ a {
   background: rgb(59 130 246 / 0.35);
 }
 
-/* pdfjs annotationLayer：这里只承载 PDF 链接/基础表单热点，不引入整套 viewer.css。
-   几何由 pdfjs 写入 section/a 的 inline transform；本层在 textLayer 之上，链接可点击；
-   textLayer 进入选择态时关 pointer，避免链接层截断拖选。 */
+/* annotationLayer của pdfjs chỉ chứa liên kết và vùng tương tác của biểu mẫu PDF; không nạp toàn bộ viewer.css.
+   pdfjs ghi hình học vào inline transform của section/a. Lớp này nằm trên textLayer để liên kết có thể nhấn;
+   khi textLayer đang được chọn, tắt pointer ở lớp này để liên kết không chặn thao tác kéo chọn văn bản. */
 .annotationLayer {
   position: absolute;
   inset: 0;
@@ -508,7 +549,7 @@ a {
   }
 }
 
-/* 系统开启「减弱动态效果」时关闭流式淡入 */
+/* Tắt hiệu ứng hiện dần khi hệ thống bật tùy chọn giảm chuyển động. */
 @media (prefers-reduced-motion: reduce) {
   [data-sd-animate] {
     animation: none;

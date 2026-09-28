@@ -1,2 +1,2 @@
-/** barrel：仅 re-export createLogger——渲染层业务代码唯一入口（与主进程 logger 同形）。 */
+/** Điểm xuất logger duy nhất cho mã renderer, chỉ xuất lại createLogger như ở main process. */
 export { createLogger } from "./logger-service";

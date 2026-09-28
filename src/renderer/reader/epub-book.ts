@@ -7,39 +7,39 @@ import { readableTextLength } from "./epub-text-position";
 
 const log = createLogger("epub");
 
-/** 高亮 mark 的 class；CFI 计算 / toRange 时作为 ignoreClass 传入，防止 mark 污染 CFI 路径。 */
+/** Class của mark tô sáng; truyền làm ignoreClass khi tính CFI và toRange để mark không đổi đường dẫn. */
 export const ANNO_IGNORE_CLASS = "anno";
 
 export interface EpubBook {
-  /** spine 项数（= VirtualDocs 的 count）。 */
+  /** Số mục spine, cũng là count của VirtualDocs. */
   count: number;
-  /** 各 spine 项的可读文本长度；创建书对象时一次性扫描，顺序与 spine 一致。 */
+  /** Độ dài văn bản đọc được của từng mục spine, quét một lần khi tạo sách và giữ đúng thứ tự spine. */
   readonly textLengths: readonly number[];
-  /** 渲染第 index 个 spine 项为资源已解析的 HTML 串（喂 VirtualDocs.loadSection）。 */
+  /** Vẽ mục spine thứ index thành HTML đã phân giải tài nguyên cho VirtualDocs.loadSection. */
   loadSection: (index: number) => Promise<string>;
-  /** spine 项的 href（→ chapterIdByHref → 当前章/进度）。 */
+  /** Href của mục spine để chapterIdByHref tìm chương và tiến độ hiện tại. */
   hrefAtIndex: (index: number) => string | null;
-  /** href → spine index（跳章）；找不到返回 -1。 */
+  /** Tìm chỉ số spine từ href để chuyển chương; trả -1 nếu không thấy. */
   indexOfHref: (href: string) => number;
-  /** 顶部 section 起点 CFI（进度存储）；section 未就绪返回 null。 */
+  /** CFI đầu section để lưu tiến độ; trả null nếu section chưa sẵn sàng. */
   cfiAtIndex: (index: number) => string | null;
-  /** CFI → spine index（恢复）；非法/越界返回 -1。 */
+  /** Tìm chỉ số spine từ CFI khi khôi phục; trả -1 nếu không hợp lệ hoặc vượt phạm vi. */
   indexOfCfi: (cfi: string) => number;
-  /** iframe range → CFI（选区落点）；失败返回 null。 */
+  /** Đổi Range trong iframe thành CFI cho vùng chọn; trả null nếu thất bại. */
   cfiFromRange: (index: number, range: Range) => string | null;
-  /** CFI 区间串 → 给定 section 文档内的 DOM Range（高亮渲染）；失败返回 null。 */
+  /** Đổi chuỗi khoảng CFI thành DOM Range trong section đã cho để vẽ tô sáng; trả null nếu thất bại. */
   rangeFromCfi: (cfi: string, doc: Document) => Range | null;
-  /** 当前 spine section 内的可读 DOM 文本长度（进度与虚拟高度权重口径），未知时返回 0。 */
+  /** Độ dài văn bản DOM đọc được trong section, dùng cho tiến độ và trọng số chiều cao ảo; chưa biết thì trả 0. */
   textLengthAtIndex: (index: number) => number;
-  /** 当前 spine section 经 readChapterText 同口径规整后的文本长度，尚未渲染时返回 0。 */
+  /** Độ dài văn bản section sau khi chuẩn hóa như readChapterText; chưa vẽ thì trả 0. */
   chapterTextLengthAtIndex: (index: number) => number;
-  /** 卸载第 index 个 section 的解析文档（释放内存）；幂等，未加载/越界为 no-op。仅对远离视口的 section 调用。 */
+  /** Tháo tài liệu section thứ index để giải phóng bộ nhớ; an toàn khi gọi lại hoặc ngoài phạm vi. Chỉ dùng với section xa khung nhìn. */
   unloadSection: (index: number) => void;
-  /** 给定 section 文档与其内某元素，算该元素起点 CFI（进度锚点级存储）。失败返回 null。 */
+  /** Tính CFI đầu phần tử trong section để lưu tiến độ theo điểm neo; trả null nếu thất bại. */
   cfiFromElement: (index: number, el: Element) => string | null;
-  /** 确保 section 已渲染，为其中 anchorId 元素生成 point CFI；失败返回 null。 */
+  /** Đảm bảo section đã vẽ rồi tạo point CFI cho phần tử anchorId; trả null nếu thất bại. */
   anchorCfi: (index: number, anchorId: string) => Promise<string | null>;
-  /** 释放 epubjs 资源（卸载书、blob URL）。 */
+  /** Giải phóng tài nguyên epubjs, gồm sách và blob URL. */
   destroy: () => void;
 }
 
@@ -60,7 +60,7 @@ export interface SectionTextProfile {
   chapterTextLength: number;
 }
 
-/** 把 epubjs section 的运行时 load/document/unload 协议适配为可独立测试的顺序扫描接口。 */
+/** Bọc load/document/unload của epubjs section thành giao diện quét tuần tự có thể kiểm thử riêng. */
 export function adaptTextScanSection(
   index: number,
   section: Pick<Section, "href" | "document" | "load" | "unload"> | null,
@@ -78,7 +78,7 @@ export function adaptTextScanSection(
   };
 }
 
-/** 顺序扫描 spine，建立进度与章节文本两套同源坐标；单节失败记为 0 并继续。 */
+/** Quét spine theo thứ tự để lập tọa độ tiến độ và văn bản chương cùng nguồn; section lỗi tính là 0 rồi tiếp tục. */
 export async function scanSectionTextProfiles(
   sections: readonly TextScanSection[],
   onWarning: (warning: TextScanWarning) => void,
@@ -101,40 +101,39 @@ export async function scanSectionTextProfiles(
   return profiles;
 }
 
-/** 取 section 文档里第一个块级元素（section 起点 CFI 的锚）。 */
+/** Lấy phần tử khối đầu tiên trong section làm neo cho CFI đầu section. */
 function firstBlock(doc: Document): Element {
   return doc.body?.firstElementChild ?? doc.documentElement;
 }
 
-/** 取 href 末段文件名（去 fragment/query），用于跨实现的 href 匹配兜底。 */
+/** Lấy tên tệp cuối href sau khi bỏ fragment và query để dự phòng khi ghép href giữa các thư viện. */
 function basenameOf(href: string): string {
   const p = href.split("#")[0]!.split("?")[0]!;
   return p.slice(p.lastIndexOf("/") + 1);
 }
 
 /**
- * 用 epubjs 解析 ePub 字节，暴露虚拟化渲染 + CFI 所需的最小接口。
- * 不使用 epubjs 的 Rendition/manager；仅作解析/资源/CFI 库。
+ * Phân tích byte ePub bằng epubjs và cung cấp giao diện tối thiểu cho vẽ ảo cùng CFI.
+ * Chỉ dùng epubjs để phân tích, tải tài nguyên và xử lý CFI; không dùng Rendition/manager.
  */
 export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
-  // epubjs 接受 ArrayBuffer；Uint8Array 取其底层 buffer。
+  // epubjs nhận ArrayBuffer; lấy buffer nền của Uint8Array.
   const book: Book = ePub(bytes.buffer as ArrayBuffer);
   await book.ready;
-  // ready 只等元数据解析，不等「全书资源 → blob URL 替换表」（resources.replacements()，
-  // 由 opened 门控；epubjs 自家 Rendition 也 gate 在 opened 上）。只等 ready 时，首屏 section
-  // 可能在替换表填充前 serialize——substitute 对空表静默跳过，img 留相对路径，在 srcDoc
-  // iframe 里永久裂图（仅滚远触发 unload 再滚回重 render 才自愈）。replacements() 对单资源
-  // 失败一律 catch 成 null，不会 reject，故此处不需要超时兜底。
+  // ready chỉ chờ metadata, chưa chờ bảng thay tài nguyên bằng blob URL của cả sách.
+  // opened bảo đảm resources.replacements() đã xong, cũng là điều kiện của Rendition trong epubjs.
+  // Nếu chỉ chờ ready, section đầu có thể được serialize trước khi có bảng thay thế;
+  // ảnh còn đường dẫn tương đối sẽ hỏng vĩnh viễn trong iframe srcDoc, trừ khi tháo rồi vẽ lại.
+  // replacements() bắt lỗi từng tài nguyên thành null nên không reject và không cần timeout ở đây.
   await book.opened;
 
   const spine = book.spine;
-  // spine 项数：运行时 epubjs Spine 有 `.length`（unpack 时由 items.length 赋值），
-  // 但 0.3.93 的 spine.d.ts 未声明该属性，故需断言读取。
+  // epubjs Spine có .length lúc chạy nhưng spine.d.ts bản 0.3.93 chưa khai báo, nên cần ép kiểu khi đọc.
   const count: number = (spine as unknown as { length: number }).length;
 
   const sectionAt = (index: number): Section | null => {
     try {
-      // 运行时 spine.get 越界返回 null（.d.ts 标注为非空 Section，保留 ?? 防御）。
+      // spine.get trả null khi vượt phạm vi dù .d.ts khai báo Section không rỗng; giữ ?? để phòng lỗi.
       return spine.get(index) ?? null;
     } catch {
       return null;
@@ -159,11 +158,10 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
 
     loadSection: async (index) => {
       const s = sectionAt(index);
-      if (!s) return `<p>${i18n.t("reader.sectionMissing", "（本节不存在）")}</p>`;
-      // render 产出资源已解析的 HTML 串；request = book.load.bind(book)。
-      // 注：section.d.ts 0.3.93 把 render 误标为同步返回 string，但运行时返回 Promise<string>
-      // （lib/section.js 里 render 返回 defer().promise），故按真实类型断言后 await。
-      // 渲染后 s.document 保留，供 cfiAtIndex/cfiFromRange（不 unload）。
+      if (!s) return `<p>${i18n.t("reader.sectionMissing", "(Không tìm thấy mục này)")}</p>`;
+      // render tạo chuỗi HTML đã phân giải tài nguyên; request dùng book.load.bind(book).
+      // section.d.ts 0.3.93 ghi sai kiểu trả về string, trong khi runtime trả Promise<string>;
+      // ép theo kiểu thực rồi await. Giữ s.document sau khi vẽ cho cfiAtIndex/cfiFromRange.
       const html = await (s.render(request) as unknown as Promise<string>);
       chapterTextLengths[index] = htmlToText(html).length;
       return html;
@@ -173,7 +171,7 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
 
     indexOfHref: (href) => {
       const bare = href.split("#")[0]!;
-      // 先按 epubjs 的 href 空间精确查（spine.get(string) 内部已去 fragment、查 href 表）。
+      // Trước hết tìm chính xác theo href của epubjs; spine.get tự bỏ fragment và tra bảng href.
       const direct = (() => {
         try {
           return spine.get(bare) ?? spine.get(href) ?? null;
@@ -182,9 +180,9 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
         }
       })();
       if (direct) return direct.index;
-      // 兜底：epub-parser 的 href 带 OPF 目录前缀（如 OEBPS/ch1.xhtml），而 epubjs 的
-      // section.href 是 OPF 内裸形式（ch1.xhtml）——前缀不对称会让上面的精确查对「OPF 在子目录」
-      // 的书失配（跳章失效）。退到 basename 匹配（与 chapterIdByHref 对称）；多命中视为歧义返 -1。
+      // Dự phòng: href của epub-parser có tiền tố thư mục OPF, còn section.href của epubjs thì không.
+      // Với sách đặt OPF trong thư mục con, tìm chính xác có thể trượt và không chuyển được chương.
+      // Khi đó ghép theo tên tệp như chapterIdByHref; nhiều kết quả là mơ hồ nên trả -1.
       const base = basenameOf(bare);
       let found = -1;
       for (let i = 0; i < count; i++) {
@@ -199,11 +197,11 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
 
     cfiAtIndex: (index) => {
       const s = sectionAt(index);
-      // s.document 在 render 前为 undefined；.d.ts 标为非空 Document，保留真值检查防御。
+      // s.document là undefined trước render dù .d.ts khai báo Document; giữ kiểm tra giá trị.
       if (!s || !s.document) return null;
       try {
-        // section.cfiFromElement 签名不收 ignoreClass，改用 EpubCFI 构造器传入 ANNO_IGNORE_CLASS，
-        // 确保已插入的 <mark class="anno"> 节点对 CFI 路径透明。
+        // cfiFromElement không nhận ignoreClass; dùng EpubCFI với ANNO_IGNORE_CLASS
+        // để <mark class="anno"> đã chèn không ảnh hưởng đường dẫn CFI.
         return new EpubCFI(firstBlock(s.document), s.cfiBase, ANNO_IGNORE_CLASS).toString();
       } catch {
         return null;
@@ -224,8 +222,8 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       const s = sectionAt(index);
       if (!s) return null;
       try {
-        // section.cfiFromRange 签名不收 ignoreClass，改用 EpubCFI 构造器传入 ANNO_IGNORE_CLASS，
-        // 确保已插入的 <mark class="anno"> 节点对 CFI 路径透明。
+        // cfiFromRange không nhận ignoreClass; dùng EpubCFI với ANNO_IGNORE_CLASS
+        // để <mark class="anno"> đã chèn không ảnh hưởng đường dẫn CFI.
         return new EpubCFI(range, s.cfiBase, ANNO_IGNORE_CLASS).toString();
       } catch {
         return null;
@@ -234,8 +232,8 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
 
     rangeFromCfi: (cfi, doc) => {
       try {
-        // toRange 的 .d.ts 标为非空 Range，但实际在 startContainer 缺失时会返回 null
-        // （epubjs epubcfi.js）；用 ?? null 把这一路径显式化（接口已声明 Range | null）。
+        // toRange được khai báo trả Range nhưng thực tế trả null nếu thiếu startContainer;
+        // dùng ?? null để khớp giao diện Range | null.
         return new EpubCFI(cfi).toRange(doc, ANNO_IGNORE_CLASS) ?? null;
       } catch {
         return null;
@@ -260,7 +258,7 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       const s = sectionAt(index);
       if (!s) return null;
       try {
-        // s.document 在 render 前为 undefined；未就绪先 render（与 loadSection 同路径）。
+        // s.document chưa có trước render; nếu chưa sẵn sàng thì vẽ như trong loadSection.
         if (!s.document) await (s.render(request) as unknown as Promise<string>);
         const el = s.document?.getElementById(anchorId) ?? null;
         if (!el) return null;
@@ -272,7 +270,7 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
 
     unloadSection: (index) => {
       const s = sectionAt(index);
-      // s.document 未加载时 unload 为 no-op；epubjs Section.unload 已声明返回 void。
+      // Nếu s.document chưa tải thì unload không làm gì; epubjs Section.unload trả void.
       if (s) s.unload();
     },
 
@@ -280,7 +278,7 @@ export async function createEpubBook(bytes: Uint8Array): Promise<EpubBook> {
       try {
         book.destroy();
       } catch {
-        /* best-effort 释放 */
+        /* Cố gắng giải phóng tài nguyên. */
       }
     },
   };

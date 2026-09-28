@@ -17,7 +17,7 @@ const log = createLogger("library");
 
 export function getToc(db: DB, bookId: string): TocNode[] {
   const row = db.select({ toc: books.toc }).from(books).where(eq(books.id, bookId)).get();
-  // parse-on-read：DB JSON 列做一次 Zod 校验（防 JSON 漂移）
+  // Kiểm tra cột JSON bằng Zod khi đọc để phát hiện dữ liệu lệch schema.
   // Because tocNodeSchema is recursive, a node whose *any* descendant fails validation causes the
   // entire top-level entry to be dropped — intentional defensive degradation for now; surgical
   // subtree pruning is a future follow-up.
@@ -53,9 +53,9 @@ export async function readChapterText(
     .get();
   if (!ch) throw new Error(`content: chapter ${chapterId} not found in book ${bookId}`);
   if (book.format === "pdf") {
-    // 扫描版防御（spec §8）：绝不静默返回空文本——模型/调用方必须收到真实原因。
+    // PDF scan không có lớp chữ: báo nguyên nhân thật thay vì trả văn bản rỗng.
     if (!book.hasTextLayer) {
-      throw new Error(t("errors.noTextLayer", "扫描版 PDF 没有文本层，无法提取文本"));
+      throw new Error(t("errors.noTextLayer", "PDF được quét không có lớp văn bản nên không thể trích xuất nội dung"));
     }
     return extractPdfText(bytes, {
       startPage: ch.startPage ?? 1,
@@ -64,10 +64,9 @@ export async function readChapterText(
       maxChars: opts.maxChars,
     });
   }
-  // epub：本章正文 = 从本章 (href, anchor) 起，到「下一目录项」(阅读顺序 = orderIndex 递增) 的
-  // (href, anchor) 之前，按 spine 顺序跨文件拼接。下一目录项可能在另一个 spine 文件，中间没有独立
-  // 目录项的孤儿 spine 文件（如《七个习惯》第二章正文所在的 split 文件）由 extractChapterAcrossSpine
-  // 归入本章——单 href 抽取会把它们整段漏掉。末章（无下一项）读到全书末尾。
+  // Chương EPUB kéo dài từ (href, anchor) hiện tại đến trước mục TOC kế tiếp,
+  // ghép theo thứ tự spine. Tệp spine ở giữa không có mục TOC riêng vẫn thuộc chương;
+  // extractChapterAcrossSpine lấy cả chúng. Chương cuối đọc tới hết sách.
   let end: { href: string; anchor?: string } | undefined;
   if (ch.orderIndex != null) {
     const next = db
@@ -88,9 +87,9 @@ export async function readChapterText(
 }
 
 /**
- * 取全书正文：按 spine 顺序（orderIndex）拼接所有章节正文，累计到 `maxChars` 截断。
- * 供全书摘要一次性喂模型（用户决策「直接喂整本书」）。委托 `extractBookText`——**只解压一次**
- * （逐章 extractChapterText 会每次全解压 epub，N 章 = N 次、同步阻塞主进程，导致重新生成时 app 卡死）。
+ * Lấy văn bản cả sách theo thứ tự spine, giới hạn ở maxChars.
+ * Dùng extractBookText để chỉ giải nén EPUB một lần; gọi extractChapterText từng chương
+ * sẽ giải nén lại N lần và có thể chặn main process.
  */
 export async function readBookText(
   db: DB,
@@ -101,9 +100,9 @@ export async function readBookText(
   const book = getBook(db, bookId);
   if (!book) throw new Error(`content: book ${bookId} not found`);
   if (book.format === "pdf") {
-    // 扫描版防御（spec §8）：绝不静默返回空文本——模型/调用方必须收到真实原因。
+    // PDF scan không có lớp chữ: báo nguyên nhân thật thay vì trả văn bản rỗng.
     if (!book.hasTextLayer) {
-      throw new Error(t("errors.noTextLayer", "扫描版 PDF 没有文本层，无法提取文本"));
+      throw new Error(t("errors.noTextLayer", "PDF được quét không có lớp văn bản nên không thể trích xuất nội dung"));
     }
     const slice = await extractPdfText(bytes, {
       startPage: 1,
@@ -124,24 +123,23 @@ export async function readBookText(
 }
 
 /**
- * 扫描版门控（spec §8 主进程防御层）：无文本层的书绝不静默生成空摘要。
+ * Chặn tóm tắt rỗng cho PDF scan không có lớp văn bản (spec §8).
  */
 export function assertTextLayer(db: DB, bookId: string): void {
   const book = getBook(db, bookId);
-  // 缺书也要抛：静默通过会让后续 fire-and-forget ensure* 把 not-found 吞进 warn 日志，
-  // 渲染层收不到任何 reject，摘要永远卡 pending。
+  // Sách không tồn tại cũng phải ném lỗi để renderer nhận được reject,
+  // nếu không tác vụ nền chỉ ghi warn và UI sẽ kẹt ở pending.
   if (!book) throw new Error(`content: book ${bookId} not found`);
   if (!book.hasTextLayer) {
-    throw new Error(t("errors.noTextLayer", "扫描版 PDF 没有文本层，无法提取文本"));
+    throw new Error(t("errors.noTextLayer", "PDF được quét không có lớp văn bản nên không thể trích xuất nội dung"));
   }
 }
 
 /**
- * 列出用于导航的「章节」——**以 TOC 为准**：章节是目录里有标题的条目，而非 spine 文档本身。
- * spine 含封面/版权/分隔等非正文页，它们不在 TOC、无标题，不应算章节（spec §7.2 / 8.1 设计）。
- * 嵌套 TOC（章→节）以 `level` 表达（0=章，1+=节）。多个 TOC 条目指向同一 spine 文件（带锚点的小节）
- * 因当前无锚定能力（RA1-full）按 spine 文件去重、仅保留首个。
- * 兜底：epub 无可用 TOC（罕见，畸形书）时退回 spine 顺序编号（title 缺失 → UI 渲染为「第 N 章」）。
+ * Liệt kê chương để điều hướng theo TOC, không coi mọi tệp spine là một chương.
+ * Spine còn có bìa, bản quyền và trang phân cách; TOC lồng nhau dùng level để biểu diễn cấp.
+ * Khi nhiều mục TOC trỏ cùng tệp spine, giữ mục đầu nếu đường đọc hiện tại chưa hỗ trợ anchor.
+ * EPUB không có TOC thì dùng thứ tự spine và UI tự đặt tên chương khi title thiếu.
  */
 export function listChapters(db: DB, bookId: string): ChapterRefDto[] {
   const out: ChapterRefDto[] = [];
@@ -174,7 +172,7 @@ export function listChapters(db: DB, bookId: string): ChapterRefDto[] {
   walk(getToc(db, bookId), 0);
   if (out.length > 0) return out;
 
-  // 无 TOC 兜底：spine 顺序，标题缺失。
+  // Không có TOC: dùng thứ tự spine, title để trống.
   return db
     .select({
       id: chapters.id,

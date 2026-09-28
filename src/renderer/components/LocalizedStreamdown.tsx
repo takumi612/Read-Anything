@@ -77,7 +77,7 @@ export function LocalizedStreamdown({
   ...props
 }: StreamdownProps) {
   const { t } = useTranslation();
-  // 不手写 useMemo：渲染层启用 React Compiler，自动记忆化。
+  // React Compiler tự ghi nhớ trong renderer nên không cần useMemo thủ công.
   const localized = buildStreamdownTranslations(t);
   return (
     <Streamdown

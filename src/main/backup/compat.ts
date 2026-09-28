@@ -1,5 +1,6 @@
-/** 还原版本兼容判定（纯函数）：备份的 schemaHead 必须 ∈ 当前 app 的迁移目录集。
- * 命中 = 备份 schema 等于或早于当前（重启后迁移补齐）；未命中 = 备份来自更新版本，无法降级。 */
+/** Kiểm tra phiên bản sao lưu: schemaHead phải nằm trong các migration của ứng dụng.
+ * Nếu có, bản sao lưu cùng hoặc cũ hơn và sẽ được migration khi khởi động lại;
+ * nếu không, có thể thuộc bản mới hơn nên không thể khôi phục an toàn. */
 export function checkRestoreCompatibility(
   bundleSchemaHead: string,
   knownMigrationDirs: string[],

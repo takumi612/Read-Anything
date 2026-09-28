@@ -1,10 +1,10 @@
 import { strToU8, zipSync } from "fflate";
 
-/** 构造最小但结构合法的 EPUB3 字节流，供解析/内容测试与消费方复用。 */
+/** Tạo luồng byte EPUB3 tối thiểu nhưng hợp lệ để dùng trong kiểm thử parser, nội dung và bên dùng. */
 export function makeFixtureEpub(opts?: {
   identifier?: string | null;
   coverViaMeta?: boolean;
-  /** 覆盖 <dc:title>；变更标题即改变字节流，用于构造「同 identifier、不同内容」的夹具。 */
+  /** Ghi đè <dc:title>; đổi tiêu đề sẽ đổi luồng byte, dùng để tạo mẫu cùng identifier nhưng nội dung khác. */
   title?: string;
 }): Uint8Array {
   const identifier = opts?.identifier === undefined ? "urn:uuid:fixture-001" : opts.identifier;

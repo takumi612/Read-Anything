@@ -34,26 +34,25 @@ describe("resolveRestore", () => {
       resolveRestore({ kind: "book", bookId: "b1" }, state({ activeByBook: { b1: "c2" } }), list),
     ).toEqual({ kind: "restore", id: "c2" });
   });
-  it("book empty state presets summary chips", () => {
+  it("book with no remembered conversation restores empty state", () => {
     expect(
       resolveRestore({ kind: "book", bookId: "b1" }, state({ activeByBook: { b1: null } }), list),
-    ).toEqual({ kind: "empty", presetSummaryChips: true });
+    ).toEqual({ kind: "empty" });
   });
   it("library: restores the conversation remembered in activeLibraryConversation", () => {
     expect(
       resolveRestore({ kind: "library" }, state({ activeLibraryConversation: "c1" }), list),
     ).toEqual({ kind: "restore", id: "c1" });
   });
-  it("library empty state does NOT preset summary chips (no book/chapter)", () => {
+  it("library empty state remains empty", () => {
     expect(
       resolveRestore({ kind: "library" }, state({ activeLibraryConversation: null }), list),
-    ).toEqual({ kind: "empty", presetSummaryChips: false });
+    ).toEqual({ kind: "empty" });
   });
   it("library first use (null slot) opens a fresh conversation, not the latest", () => {
     // activeLibraryConversation 初值即 null → empty（开新会话），不回落 list[0]
     expect(resolveRestore({ kind: "library" }, state(), list)).toEqual({
       kind: "empty",
-      presetSummaryChips: false,
     });
   });
 });

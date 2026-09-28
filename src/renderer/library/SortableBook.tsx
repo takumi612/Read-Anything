@@ -5,23 +5,26 @@ import { useDragGuard } from "@renderer/lib/use-drag-guard";
 import { BookCover } from "./BookCover";
 
 /**
- * 可排序书卡（#48 spec §6.2）：useSortable 包 BookCover。listeners 挂 li——
- * PointerSensor 带 distance 8px 激活约束（注入处见 LibraryView），普通点击仍走 onOpen，
- * 且只响应主键，右键 ContextMenu 不受影响。transform/transition 是运行时计算值（内联 style 合规）。
+ * Thẻ sách có thể sắp xếp bằng useSortable bọc BookCover; listener gắn trên li.
+ * PointerSensor cần di chuyển 8px mới kích hoạt nên nhấn thường vẫn mở sách.
+ * Chỉ nút chuột chính kéo được, menu chuột phải không bị ảnh hưởng.
+ * transform và transition được tính lúc chạy nên dùng inline style.
  *
- * listeners 经 useDragGuard 包一层：BookCover 的编辑/删除 dialog 经 React Portal 渲染，在
- * React 树里是本 li 的后代、事件会冒泡回来——守卫按 DOM 归属拦下「在 dialog 里拖拽误触发书籍
- * 拖拽」，同时不阉割浮层自身的事件上浮（见 use-drag-guard）。
+ * useDragGuard bọc listener vì dialog sửa/xóa của BookCover nằm trong React Portal.
+ * Sự kiện từ dialog nổi bọt về li trong cây React dù DOM nằm chỗ khác; kiểm tra DOM
+ * ngăn thao tác trong dialog kéo nhầm sách mà vẫn giữ sự kiện của lớp nổi.
  */
 export function SortableBook({
   book,
   onOpen,
   onDelete,
+  onClearData,
   onUpdate,
 }: {
   book: BookSummaryDto;
   onOpen: () => void;
   onDelete: () => void;
+  onClearData: () => void;
   onUpdate: (patch: { title: string; author: string | null }) => void;
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
@@ -36,7 +39,13 @@ export function SortableBook({
       {...attributes}
       {...guard.listeners}
     >
-      <BookCover book={book} onOpen={onOpen} onDelete={onDelete} onUpdate={onUpdate} />
+      <BookCover
+        book={book}
+        onOpen={onOpen}
+        onDelete={onDelete}
+        onClearData={onClearData}
+        onUpdate={onUpdate}
+      />
     </li>
   );
 }

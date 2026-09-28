@@ -13,21 +13,21 @@ import { createLogger } from "@main/logger";
 
 const log = createLogger("summary");
 
-/** 尾轮估算超此值（token）才触发压缩。 */
+/** Chỉ nén khi số token ước tính của các lượt gần đây vượt ngưỡng này. */
 export const TAIL_TOKENS_HIGH = 100_000;
-/** 压缩目标：折叠到尾轮估算 ≤ 此值。 */
+/** Mục tiêu sau nén: số token ước tính còn dưới hoặc bằng ngưỡng này. */
 export const TAIL_TOKENS_LOW = 10_000;
-/** 最少逐字保留的消息条数（地板，优先于低水位）。 */
+/** Số tin nhắn gần nhất tối thiểu phải giữ nguyên văn. */
 export const MIN_RECENT_TURNS = 20;
-/** 滚动概要单次再摘要的输出上限（token）。 */
+/** Giới hạn token đầu ra khi cập nhật bản tóm tắt cuốn chiếu. */
 export const SUMMARY_MAX_TOKENS = 4096;
-/** 折叠转写喂模型的字符上限；超出前载截断（保留较新的折叠内容）。 */
+/** Giới hạn ký tự của hội thoại gửi cho model; nếu quá dài thì bỏ phần cũ. */
 export const COMPACTION_INPUT_MAX_CHARS = 180_000;
 
 export interface FoldPlan {
-  /** S 推进到的消息 seq（最后一条被折叠的 assistant 消息）。 */
+  /** Seq cuối cùng đã được nén vào bản tóm tắt. */
   foldThroughSeq: number;
-  /** 被折叠进概要的轮（升序）。 */
+  /** Các lượt được nén, theo thứ tự tăng dần. */
   foldedTurns: MessageDto[];
 }
 
@@ -38,9 +38,10 @@ export interface FoldBudget {
 }
 
 /**
- * 纯函数：给定尾轮（seq 升序、user/assistant 交替起于 user）与每条估算 token 的函数，
- * 决定折叠哪个前缀。仅当尾轮估算 > high 才折；尽量多保留近期轮（折到 ≤ low），但至少
- * 保留 minRecent 条，且折叠边界落在 assistant 上（折完整对话对）。无可折返回 null。
+ * Chọn phần đầu hội thoại cần nén từ các lượt đã sắp theo seq.
+ * Chỉ nén khi vượt high; giữ tối đa các lượt mới sao cho phần còn lại không quá low,
+ * nhưng luôn giữ ít nhất minRecent tin nhắn. Ranh giới nén nằm sau lượt trợ lý để
+ * giữ nguyên cặp hỏi đáp; trả null nếu không có phần nào nén được.
  */
 export function planFold(
   tail: MessageDto[],
@@ -50,7 +51,7 @@ export function planFold(
   const total = tail.reduce((s, m) => s + tokensOf(m), 0);
   if (total <= budget.high) return null;
 
-  // 从最新往旧累积保留：keep 至少 minRecent 条；超过后，一旦再加更老一条会越过 low 就停。
+  // Tính từ mới về cũ; giữ ít nhất minRecent và dừng trước khi vượt ngưỡng low.
   let keep = 0;
   let acc = 0;
   for (let i = tail.length - 1; i >= 0; i--) {
@@ -60,7 +61,7 @@ export function planFold(
     keep++;
   }
 
-  // 对齐：保留区须以 user 起（折叠区以 assistant 收）；若首条是 assistant，多保留它前面的 user。
+  // Phần giữ lại phải bắt đầu bằng lượt người dùng; thêm lượt trước đó nếu cần.
   let keepStart = tail.length - keep;
   if (keepStart > 0 && keepStart < tail.length && tail[keepStart]!.role === "assistant")
     keepStart--;
@@ -70,7 +71,7 @@ export function planFold(
   return { foldThroughSeq: tail[foldCount - 1]!.seq, foldedTurns: tail.slice(0, foldCount) };
 }
 
-/** 把折叠轮转写成「User: …\nAssistant: …」串；超长前载截断保留较新内容。 */
+/** Chuyển các lượt bị nén thành văn bản có nhãn vai trò; nếu dài thì giữ phần mới hơn. */
 export function renderFoldedTranscript(
   folded: MessageDto[],
   maxChars = COMPACTION_INPUT_MAX_CHARS,
@@ -81,9 +82,9 @@ export function renderFoldedTranscript(
 
 export interface CompactionDeps {
   db: DB;
-  /** 摘要模型解析器（与章节/全书摘要、自动命名同源 resolveSummaryModel）。 */
+  /** Hàm chọn model tóm tắt, dùng chung với các tác vụ AI nền khác. */
   resolveModel: () => ResolvedModel;
-  /** 后台并发限流端口（与摘要/命名共用全局上限）。 */
+  /** Giới hạn tác vụ nền chạy đồng thời, dùng chung với tóm tắt và đặt tên. */
   runBackground: RunBackground;
 }
 
@@ -94,18 +95,19 @@ const COMPACTION_SYSTEM =
   "preferences and decisions, and any facts the assistant should remember. Drop pleasantries " +
   "and redundancy. Output only the summary, no preamble.";
 
-// 压缩中状态：进程内瞬态去重（镜像 summary.ts 的 inFlight*），重启自然归零。
+// Trạng thái nén tạm trong bộ nhớ để tránh chạy trùng; khởi động lại sẽ xóa.
 const compactingConversations = new Set<string>();
 
-/** 仅供测试：清空压缩运行时态。 */
+/** Chỉ dùng trong kiểm thử: xóa trạng thái nén đang chạy. */
 export function __resetCompactionRuntime(): void {
   compactingConversations.clear();
 }
 
 /**
- * 轮后 fire-and-forget：尾轮（seq > S）超预算时，把最老的若干完整对话对折叠进滚动概要，
- * 推进 summarizedThroughSeq。失败/未配置模型/会话被删一律 warn 并保持原状（下轮再试），
- * 绝不阻塞发送。budget 默认用模块常量，测试可注入小阈值强制触发。
+ * Sau mỗi lượt, nếu các tin nhắn có seq > S vượt ngân sách, nén những cặp hỏi đáp cũ
+ * vào bản tóm tắt cuốn chiếu rồi tăng summarizedThroughSeq.
+ * Nếu lỗi, chưa có model hoặc hội thoại bị xóa, ghi cảnh báo và thử lại sau; không chặn gửi chat.
+ * Kiểm thử có thể truyền ngưỡng nhỏ để buộc tác vụ chạy.
  */
 export async function maybeCompactConversation(
   deps: CompactionDeps,
@@ -117,7 +119,7 @@ export async function maybeCompactConversation(
   },
 ): Promise<void> {
   const { db, resolveModel } = deps;
-  if (compactingConversations.has(conversationId)) return; // 并发去重
+  if (compactingConversations.has(conversationId)) return; // Tránh nén trùng.
   const resolved = resolveModel();
   if (!resolved.ok) {
     log.warn("summary model not configured; skip compaction", resolved.reason);
@@ -133,18 +135,18 @@ export async function maybeCompactConversation(
       .from(conversations)
       .where(eq(conversations.id, conversationId))
       .get();
-    if (!convo) return; // 会话已删
+    if (!convo) return; // Hội thoại đã bị xóa.
 
     const tail = listMessagesAfterSeq(db, conversationId, convo.through);
     const plan = planFold(tail, (m) => estimateTokens(renderHistoryMessage(m)), budget);
-    if (!plan) return; // 未超高水位 / 无可折
+    if (!plan) return; // Chưa vượt ngưỡng hoặc không có phần cần nén.
 
     const prior = convo.summary?.trim() ? `Previous summary:\n${convo.summary.trim()}\n\n` : "";
     const transcript = renderFoldedTranscript(plan.foldedTurns);
     const { text } = await deps.runBackground(() =>
       generateText({
         model: resolved.model,
-        reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
+        reasoning: resolved.reasoningEffort, // undefined dùng mặc định của provider.
         instructions: COMPACTION_SYSTEM,
         prompt: `${prior}New exchanges:\n${transcript}`,
         maxOutputTokens: SUMMARY_MAX_TOKENS,
@@ -156,7 +158,7 @@ export async function maybeCompactConversation(
       return;
     }
 
-    // 写回前复查会话仍在（压缩中途被删 → 丢弃；better-sqlite3 同步驱动，check-then-act 安全）
+    // Kiểm tra hội thoại còn tồn tại trước khi ghi; nếu đã bị xóa thì bỏ kết quả.
     const still = db
       .select({ id: conversations.id })
       .from(conversations)

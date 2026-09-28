@@ -1,8 +1,9 @@
-import type { AnnotationDto } from "@shared/annotations";
+import type { AnnotationDto, AnnotationStyle } from "@shared/annotations";
 import type { EpubBook } from "./epub-book";
 import { hasNote } from "./highlight";
+import { annotationColorHex } from "./annotation-colors";
 
-/** 移除文档内全部高亮 mark（用其文本内容替换 mark，再合并相邻文本节点）。 */
+/** Xóa mọi mark tô sáng: thay bằng nội dung chữ rồi gộp các text node kề nhau. */
 export function clearAnnoMarks(doc: Document): void {
   const marks = Array.from(doc.querySelectorAll("mark.anno"));
   for (const mark of marks) {
@@ -14,8 +15,14 @@ export function clearAnnoMarks(doc: Document): void {
   }
 }
 
-/** 把一个 Range（可能跨多个文本节点）按文本节点逐段包成 <mark>。 */
-function wrapRange(range: Range, doc: Document, className: string, annoId: string): void {
+/** Bọc từng phần của Range bằng <mark>, kể cả khi Range qua nhiều text node. */
+function wrapRange(
+  range: Range,
+  doc: Document,
+  className: string,
+  annoId: string,
+  style: AnnotationStyle,
+): void {
   const root = range.commonAncestorContainer;
   const walker = doc.createTreeWalker(
     root.nodeType === Node.ELEMENT_NODE
@@ -41,18 +48,19 @@ function wrapRange(range: Range, doc: Document, className: string, annoId: strin
     const mark = doc.createElement("mark");
     mark.className = className;
     mark.setAttribute("data-anno-id", annoId);
+    if (style.startsWith("#")) mark.style.setProperty("--anno-custom-color", annotationColorHex(style));
     try {
-      sub.surroundContents(mark); // 单文本节点内的子 Range 可安全 surround
+      sub.surroundContents(mark); // Range con trong một text node có thể bọc an toàn.
     } catch {
-      /* 极端结构跳过该段（best-effort） */
+      /* Bỏ qua đoạn có cấu trúc bất thường. */
     }
   }
 }
 
 /**
- * 把属于第 index 个 section 的标注渲染为高亮 mark。先清旧 mark（幂等），
- * 再按 `book.indexOfCfi(locatorRange)===index` 过滤、`book.rangeFromCfi` 取 Range 后包裹。
- * toRange 失败（CFI 失效）跳过该条（best-effort），它仍在侧栏列表（快照展示）。
+ * Vẽ chú thích thuộc section thứ index thành mark tô sáng. Xóa mark cũ trước để gọi lại an toàn,
+ * lọc bằng book.indexOfCfi rồi lấy Range qua book.rangeFromCfi để bọc.
+ * Bỏ qua chú thích có CFI không còn hợp lệ; nó vẫn hiện trong danh sách bên từ dữ liệu đã lưu.
  */
 export function applyAnnotations(
   book: EpubBook,
@@ -66,6 +74,7 @@ export function applyAnnotations(
     const range = book.rangeFromCfi(a.locatorRange, doc);
     if (!range) continue;
     const noted = hasNote(a.note) ? " anno-noted" : "";
-    wrapRange(range, doc, `anno anno-${a.style}${noted}`, a.id);
+    const styleClass = a.style.startsWith("#") ? "anno-custom" : `anno-${a.style}`;
+    wrapRange(range, doc, `anno ${styleClass}${noted}`, a.id, a.style);
   }
 }

@@ -10,7 +10,7 @@ export interface AddReadingSecondsInput {
   seconds: number;
 }
 
-/** 累加某轮次某本地日的阅读秒数。非正秒数忽略。 */
+/** Cộng số giây đọc cho sách trong ngày địa phương; bỏ giá trị không dương. */
 export function addSeconds(db: DB, input: AddReadingSecondsInput): void {
   if (input.seconds <= 0) return;
   db.insert(readingDaily)
@@ -23,7 +23,7 @@ export function addSeconds(db: DB, input: AddReadingSecondsInput): void {
     .run();
 }
 
-/** 每日合计（跨全部书，含已删书的 bookId=null 行），按 day 升序。 */
+/** Tổng thời gian mỗi ngày của mọi sách, gồm sách đã xóa; sắp ngày tăng dần. */
 export function dailyTotals(db: DB): DailyPoint[] {
   return db
     .select({ day: readingDaily.day, seconds: sql<number>`sum(${readingDaily.seconds})` })
@@ -33,7 +33,7 @@ export function dailyTotals(db: DB): DailyPoint[] {
     .all();
 }
 
-/** 各书合计，仅现存书（inner join 天然排除 bookId=null），按秒降序。 */
+/** Tổng theo sách còn trong thư viện, sắp theo giây giảm dần. */
 export function perBookTotals(db: DB): BookReadingTotal[] {
   return db
     .select({

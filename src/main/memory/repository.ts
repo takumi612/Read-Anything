@@ -1,5 +1,5 @@
-// src/main/memory/repository.ts —— 全局记忆 CRUD + 互链边表同步（spec 2026-06-10 §2）。
-// 纯函数注入 DB；不触 Electron。边表是派生索引：任何 body 写入路径都过 syncLinks。
+// CRUD bộ nhớ AI toàn cục và đồng bộ bảng liên kết [[slug]].
+// Hàm nhận DB từ bên ngoài, không phụ thuộc Electron; mọi thay đổi body đều gọi syncLinks.
 import { and, asc, eq, inArray } from "drizzle-orm";
 import type { DB, DBTransaction } from "@main/db/client";
 import { memories, memoryLinks } from "@main/db/schema";
@@ -15,7 +15,7 @@ export interface MemoryNeighbor {
   description: string;
 }
 
-/** readMemory 工具视图：正文 + 出链/入链 + 悬空链接（spec §4）。 */
+/** Dữ liệu cho readMemory: nội dung, liên kết đi/đến và liên kết không có đích. */
 export interface MemoryDetail extends MemoryRow {
   outgoing: MemoryNeighbor[];
   incoming: MemoryNeighbor[];
@@ -72,7 +72,7 @@ export function updateMemoryById(db: DB, patch: UpdateMemoryInput): MemoryRow | 
 }
 
 export function deleteMemoryById(db: DB, id: string): void {
-  db.delete(memories).where(eq(memories.id, id)).run(); // 边表 CASCADE 清边
+  db.delete(memories).where(eq(memories.id, id)).run(); // CASCADE xóa các cạnh liên kết.
 }
 
 export function getMemoryById(db: DB, id: string): MemoryRow | null {
@@ -91,7 +91,7 @@ export function getMemoryBySlug(db: DB, slug: string): MemoryDetail | null {
           .where(inArray(memories.slug, linked))
           .all()
       : [];
-  // 按 body 中 [[slug]] 出现序重建 outgoing，避免 inArray 查询的不确定顺序（LLM 按行文顺序消费）。
+  // Giữ thứ tự [[slug]] trong body khi dựng liên kết đi; thứ tự truy vấn inArray không ổn định.
   const slugToRow = new Map(outgoingRows.map((r) => [r.slug, r]));
   const outgoing = linked.filter((s) => slugToRow.has(s)).map((s) => slugToRow.get(s)!);
   const existing = new Set(outgoingRows.map((o) => o.slug));
@@ -109,7 +109,7 @@ export function getMemoryBySlug(db: DB, slug: string): MemoryDetail | null {
   };
 }
 
-/** 确定性排序 (createdAt, id)——索引渲染与管理列表共用（spec §5 抖动纪律）。 */
+/** Sắp ổn định theo createdAt và ID cho cả chỉ mục lẫn danh sách quản lý. */
 export function listMemories(db: DB): MemoryDto[] {
   return db
     .select({

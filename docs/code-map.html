@@ -1,0 +1,4280 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Bản đồ mã nguồn Read-Anything</title>
+    <link rel="stylesheet" href="source-guide.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="code-map.html">Read-Anything · hướng dẫn mã nguồn</a>
+      <nav class="site-nav" aria-label="Tài liệu">
+        <a href="code-map.html" aria-current="page">Bản đồ code</a
+        ><a href="architecture.html">Kiến trúc</a><a href="runtime-flows.html">Luồng chạy</a
+        ><a href="run-from-source.html">Chạy từ source</a
+        ><a href="build-windows-exe.html">Tạo EXE</a>
+      </nav>
+    </header>
+    <div class="layout">
+      <main class="content">
+        <div class="eyebrow">Tài liệu tra cứu · sinh từ cây source</div>
+        <h1>Bản đồ mã nguồn</h1>
+        <p class="lead">
+          Trang này có đường dẫn tới từng tệp trong <code>src</code>, <code>packages</code>,
+          <code>scripts</code>, <code>assets</code>, <code>patches</code> và các cấu hình gốc. Mở
+          từng nhóm phía dưới để tra cứu.
+        </p>
+        <div class="callout">
+          Danh mục gồm 746 tệp trong 70 nhóm tại thời điểm tạo. Tạo lại danh sách so sánh bằng
+          <code>rg --files src packages scripts assets patches</code> cùng các cấu hình ở thư mục
+          gốc. File <code>*.test.*</code> là kiểm thử; file <code>fixture.ts</code> trong các parser
+          và <code>packages/ui-prototype/src/mock/fixtures.ts</code> là dữ liệu mẫu; migration là
+          lịch sử schema; <code>packages/ui-prototype</code> không thuộc build ứng dụng chính.
+        </div>
+        <h2 id="entry">Bắt đầu đọc ở đâu</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Điểm vào</th>
+                <th>Vai trò</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <a href="../src/main.ts"><code>src/main.ts</code></a>
+                </td>
+                <td>Khởi động Electron, DB, IPC, cửa sổ và renderer server.</td>
+              </tr>
+              <tr>
+                <td>
+                  <a href="../src/preload.ts"><code>src/preload.ts</code></a>
+                </td>
+                <td>Mở API an toàn cho renderer qua contextBridge.</td>
+              </tr>
+              <tr>
+                <td>
+                  <a href="../src/preload-api.ts"><code>src/preload-api.ts</code></a>
+                </td>
+                <td>Ánh xạ hợp đồng IPC thành window.api có kiểu.</td>
+              </tr>
+              <tr>
+                <td>
+                  <a href="../src/renderer.tsx"><code>src/renderer.tsx</code></a>
+                </td>
+                <td>Gắn React, CSS, theme, i18n và React Query.</td>
+              </tr>
+              <tr>
+                <td>
+                  <a href="../src/renderer/App.tsx"><code>src/renderer/App.tsx</code></a>
+                </td>
+                <td>Điều hướng ứng dụng và khôi phục tab PDF.</td>
+              </tr>
+              <tr>
+                <td>
+                  <a href="../src/shared/ipc.ts"><code>src/shared/ipc.ts</code></a>
+                </td>
+                <td>Tên channel và Zod input.</td>
+              </tr>
+              <tr>
+                <td>
+                  <a href="../src/main/db/schema.ts"><code>src/main/db/schema.ts</code></a>
+                </td>
+                <td>Bảng dữ liệu Drizzle.</td>
+              </tr>
+              <tr>
+                <td>
+                  <a href="../forge.config.ts"><code>forge.config.ts</code></a>
+                </td>
+                <td>Cấu hình Electron Forge và installer.</td>
+              </tr>
+              <tr>
+                <td>
+                  <a href="../package.json"><code>package.json</code></a>
+                </td>
+                <td>Scripts, dependency và phiên bản.</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <h2 id="areas">Các miền code</h2>
+        <div class="grid">
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-ai"><code>src/main/ai/</code></a>
+            </h3>
+            <p>
+              Tạo prompt, tìm ngữ cảnh và stream trả lời AI. Thư mục search chứa backend tìm kiếm
+              mạng.
+            </p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-app"><code>src/main/app/</code></a>
+            </h3>
+            <p>
+              Dịch vụ môi trường, đường dẫn, nền ứng dụng, URL, renderer server và liên kết PDF của
+              Windows.
+            </p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-backup"><code>src/main/backup/</code></a>
+            </h3>
+            <p>Snapshot, manifest, ZIP và khôi phục dữ liệu.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-chat"><code>src/main/chat/</code></a>
+            </h3>
+            <p>Hội thoại, tin nhắn và đặt tên cuộc trò chuyện.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-db"><code>src/main/db/</code></a>
+            </h3>
+            <p>SQLite, schema Drizzle và đường dẫn migration.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-ipc"><code>src/main/ipc/</code></a>
+            </h3>
+            <p>Ánh xạ hợp đồng shared vào hàm nghiệp vụ của main.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-library"><code>src/main/library/</code></a>
+            </h3>
+            <p>Import, metadata, file sách, nội dung, tiến độ, annotation, note và bookmark.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-providers"><code>src/main/providers/</code></a>
+            </h3>
+            <p>Nhà cung cấp AI, model và endpoint.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-reading-report"><code>src/main/reading-report/</code></a>
+            </h3>
+            <p>Tạo báo cáo phiên đọc và thu thập bằng chứng.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-stats"><code>src/main/stats/</code></a>
+            </h3>
+            <p>Thời gian đọc, lượt đọc trang và chuỗi ngày.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-main-vocabulary"><code>src/main/vocabulary/</code></a>
+            </h3>
+            <p>Từ điển offline, thuật ngữ kỹ thuật và từ vựng theo sách.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-renderer-ai"><code>src/renderer/ai/</code></a>
+            </h3>
+            <p>Panel chat, composer, lịch sử, context chips và IPC stream.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-renderer-reader"><code>src/renderer/reader/</code></a>
+            </h3>
+            <p>Reader EPUB/PDF, search, zoom, vùng chọn, annotation, sidebar và TTS.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-renderer-reading"><code>src/renderer/reading/</code></a>
+            </h3>
+            <p>Điều hướng theo trạng thái phiên đọc và báo cáo.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-renderer-settings"><code>src/renderer/settings/</code></a>
+            </h3>
+            <p>Giao diện cài đặt, provider, giao diện, sao lưu và tìm kiếm web.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-renderer-store"><code>src/renderer/store/</code></a>
+            </h3>
+            <p>Zustand store: điều hướng, cài đặt, layout, chat, tab PDF và TTS.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-renderer-theme"><code>src/renderer/theme/</code></a>
+            </h3>
+            <p>Theme, nền ứng dụng, màu trang và độ sáng PDF.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-renderer-stats"><code>src/renderer/stats/</code></a>
+            </h3>
+            <p>Lịch tháng, biểu đồ, thời gian và streak.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-src-shared"><code>src/shared/</code></a>
+            </h3>
+            <p>Schema Zod, kiểu chung và hợp đồng IPC.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-packages-epub-parser"><code>packages/epub-parser/</code></a>
+            </h3>
+            <p>Package parser EPUB dùng trong app.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-packages-pdf-parser"><code>packages/pdf-parser/</code></a>
+            </h3>
+            <p>Package parser PDF dùng trong main.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-packages-virtual-docs"><code>packages/virtual-docs/</code></a>
+            </h3>
+            <p>Khung section và tài liệu phía renderer.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-packages-ui-prototype"><code>packages/ui-prototype/</code></a>
+            </h3>
+            <p>Prototype UI độc lập, nằm ngoài pnpm workspace chính.</p>
+          </div>
+          <div class="card">
+            <h3>
+              <a href="#dir-scripts"><code>scripts/</code></a>
+            </h3>
+            <p>Kịch bản E2E, kiểm thử, tạo icon và tiện ích phát triển.</p>
+          </div>
+        </div>
+        <h2 id="inventory">Danh mục tệp đầy đủ</h2>
+        <p>
+          Nhấn tên thư mục để mở. Mỗi tên tệp dẫn tới bản source tương ứng. Các file
+          <code>*.test.*</code> là test; <code>migration.sql</code> và <code>snapshot.json</code> là
+          migration; asset nhị phân không phải mã TypeScript.
+        </p>
+        <details id="dir-c-u-h-nh---g-c">
+          <summary>Cấu hình ở gốc <span class="muted">(22 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../.oxfmtrc.json"><code>.oxfmtrc.json</code></a>
+            </li>
+            <li>
+              <a href="../.oxlintrc.json"><code>.oxlintrc.json</code></a>
+            </li>
+            <li>
+              <a href="../AGENTS.md"><code>AGENTS.md</code></a>
+            </li>
+            <li>
+              <a href="../CLAUDE.md"><code>CLAUDE.md</code></a>
+            </li>
+            <li>
+              <a href="../LICENSE"><code>LICENSE</code></a>
+            </li>
+            <li>
+              <a href="../README.md"><code>README.md</code></a>
+            </li>
+            <li>
+              <a href="../README.vi.md"><code>README.vi.md</code></a>
+            </li>
+            <li>
+              <a href="../components.json"><code>components.json</code></a>
+            </li>
+            <li>
+              <a href="../drizzle.config.ts"><code>drizzle.config.ts</code></a>
+            </li>
+            <li>
+              <a href="../forge.config.ts"><code>forge.config.ts</code></a>
+            </li>
+            <li>
+              <a href="../forge.env.d.ts"><code>forge.env.d.ts</code></a>
+            </li>
+            <li>
+              <a href="../i18next.config.ts"><code>i18next.config.ts</code></a>
+            </li>
+            <li>
+              <a href="../index.html"><code>index.html</code></a>
+            </li>
+            <li>
+              <a href="../package.json"><code>package.json</code></a>
+            </li>
+            <li>
+              <a href="../pnpm-lock.yaml"><code>pnpm-lock.yaml</code></a>
+            </li>
+            <li>
+              <a href="../pnpm-workspace.yaml"><code>pnpm-workspace.yaml</code></a>
+            </li>
+            <li>
+              <a href="../tsconfig.json"><code>tsconfig.json</code></a>
+            </li>
+            <li>
+              <a href="../vite.main.config.ts"><code>vite.main.config.ts</code></a>
+            </li>
+            <li>
+              <a href="../vite.preload.config.ts"><code>vite.preload.config.ts</code></a>
+            </li>
+            <li>
+              <a href="../vite.renderer.config.ts"><code>vite.renderer.config.ts</code></a>
+            </li>
+            <li>
+              <a href="../vitest.config.ts"><code>vitest.config.ts</code></a>
+            </li>
+            <li>
+              <a href="../vitest.setup.ts"><code>vitest.setup.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-assets-dictionary">
+          <summary>assets/dictionary <span class="muted">(3 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../assets/dictionary/ATTRIBUTION.md"
+                ><code>assets/dictionary/ATTRIBUTION.md</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+            <li>
+              <a href="../assets/dictionary/README.md"><code>assets/dictionary/README.md</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+            <li>
+              <a href="../assets/dictionary/dictionary_en_vi.db"
+                ><code>assets/dictionary/dictionary_en_vi.db</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-assets">
+          <summary>assets <span class="muted">(5 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../assets/icon.svg"><code>assets/icon.svg</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+            <li>
+              <a href="../assets/library-zh-CN.jpg"><code>assets/library-zh-CN.jpg</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+            <li>
+              <a href="../assets/library.jpg"><code>assets/library.jpg</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+            <li>
+              <a href="../assets/reader-zh-CN.png"><code>assets/reader-zh-CN.png</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+            <li>
+              <a href="../assets/reader.png"><code>assets/reader.png</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-assets-icons">
+          <summary>assets/icons <span class="muted">(2 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../assets/icons/icon.icns"><code>assets/icons/icon.icns</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+            <li>
+              <a href="../assets/icons/icon.ico"><code>assets/icons/icon.ico</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-epub-parser">
+          <summary>packages/epub-parser <span class="muted">(4 tệp)</span></summary>
+          <p class="muted">Package parser EPUB dùng trong app.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/epub-parser/package.json"
+                ><code>packages/epub-parser/package.json</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/epub-parser/tsconfig.json"
+                ><code>packages/epub-parser/tsconfig.json</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/epub-parser/tsup.config.ts"
+                ><code>packages/epub-parser/tsup.config.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/epub-parser/vitest.config.ts"
+                ><code>packages/epub-parser/vitest.config.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-epub-parser-src">
+          <summary>packages/epub-parser/src <span class="muted">(9 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/epub-parser/src/content.test.ts"
+                ><code>packages/epub-parser/src/content.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/epub-parser/src/content.ts"
+                ><code>packages/epub-parser/src/content.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/epub-parser/src/dist-browser-safe.test.ts"
+                ><code>packages/epub-parser/src/dist-browser-safe.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/epub-parser/src/fixture.test.ts"
+                ><code>packages/epub-parser/src/fixture.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/epub-parser/src/fixture.ts"
+                ><code>packages/epub-parser/src/fixture.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/epub-parser/src/index.ts"
+                ><code>packages/epub-parser/src/index.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/epub-parser/src/parse.test.ts"
+                ><code>packages/epub-parser/src/parse.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/epub-parser/src/parse.ts"
+                ><code>packages/epub-parser/src/parse.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/epub-parser/src/types.ts"
+                ><code>packages/epub-parser/src/types.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-pdf-parser">
+          <summary>packages/pdf-parser <span class="muted">(2 tệp)</span></summary>
+          <p class="muted">Package parser PDF dùng trong main.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/pdf-parser/package.json"
+                ><code>packages/pdf-parser/package.json</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/pdf-parser/tsconfig.json"
+                ><code>packages/pdf-parser/tsconfig.json</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-pdf-parser-src">
+          <summary>packages/pdf-parser/src <span class="muted">(10 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/pdf-parser/src/content.test.ts"
+                ><code>packages/pdf-parser/src/content.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/pdf-parser/src/content.ts"
+                ><code>packages/pdf-parser/src/content.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/pdf-parser/src/fixture.test.ts"
+                ><code>packages/pdf-parser/src/fixture.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/pdf-parser/src/fixture.ts"
+                ><code>packages/pdf-parser/src/fixture.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/pdf-parser/src/index.ts"
+                ><code>packages/pdf-parser/src/index.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/pdf-parser/src/parse.test.ts"
+                ><code>packages/pdf-parser/src/parse.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/pdf-parser/src/parse.ts"
+                ><code>packages/pdf-parser/src/parse.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/pdf-parser/src/render.test.ts"
+                ><code>packages/pdf-parser/src/render.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/pdf-parser/src/render.ts"
+                ><code>packages/pdf-parser/src/render.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/pdf-parser/src/types.ts"
+                ><code>packages/pdf-parser/src/types.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype">
+          <summary>packages/ui-prototype <span class="muted">(6 tệp)</span></summary>
+          <p class="muted">Prototype UI độc lập, nằm ngoài pnpm workspace chính.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/README.md"
+                ><code>packages/ui-prototype/README.md</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/components.json"
+                ><code>packages/ui-prototype/components.json</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/package.json"
+                ><code>packages/ui-prototype/package.json</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/pnpm-lock.yaml"
+                ><code>packages/ui-prototype/pnpm-lock.yaml</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/tsconfig.json"
+                ><code>packages/ui-prototype/tsconfig.json</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/vite.config.ts"
+                ><code>packages/ui-prototype/vite.config.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-public">
+          <summary>packages/ui-prototype/public <span class="muted">(5 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/public/favicon.ico"
+                ><code>packages/ui-prototype/public/favicon.ico</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/public/logo192.png"
+                ><code>packages/ui-prototype/public/logo192.png</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/public/logo512.png"
+                ><code>packages/ui-prototype/public/logo512.png</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/public/manifest.json"
+                ><code>packages/ui-prototype/public/manifest.json</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/public/robots.txt"
+                ><code>packages/ui-prototype/public/robots.txt</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-src-components">
+          <summary>packages/ui-prototype/src/components <span class="muted">(6 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/src/components/AppShell.tsx"
+                ><code>packages/ui-prototype/src/components/AppShell.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/LanguageSwitcher.tsx"
+                ><code>packages/ui-prototype/src/components/LanguageSwitcher.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/ScrollArea.tsx"
+                ><code>packages/ui-prototype/src/components/ScrollArea.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/SettingsPopover.tsx"
+                ><code>packages/ui-prototype/src/components/SettingsPopover.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/ThemeToggle.tsx"
+                ><code>packages/ui-prototype/src/components/ThemeToggle.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/use-popover.ts"
+                ><code>packages/ui-prototype/src/components/use-popover.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-src-components-ai-panel">
+          <summary>
+            packages/ui-prototype/src/components/ai-panel <span class="muted">(4 tệp)</span>
+          </summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/src/components/ai-panel/AIPanel.tsx"
+                ><code>packages/ui-prototype/src/components/ai-panel/AIPanel.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/ai-panel/ChipBar.tsx"
+                ><code>packages/ui-prototype/src/components/ai-panel/ChipBar.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/ai-panel/Composer.tsx"
+                ><code>packages/ui-prototype/src/components/ai-panel/Composer.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/ai-panel/MessageList.tsx"
+                ><code>packages/ui-prototype/src/components/ai-panel/MessageList.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-src-components-reader">
+          <summary>
+            packages/ui-prototype/src/components/reader <span class="muted">(4 tệp)</span>
+          </summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/src/components/reader/HighlightPopover.tsx"
+                ><code>packages/ui-prototype/src/components/reader/HighlightPopover.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/reader/ReaderPane.tsx"
+                ><code>packages/ui-prototype/src/components/reader/ReaderPane.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/reader/SelectionToolbar.tsx"
+                ><code>packages/ui-prototype/src/components/reader/SelectionToolbar.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/components/reader/useSelection.ts"
+                ><code>packages/ui-prototype/src/components/reader/useSelection.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-src-components-sidebar">
+          <summary>
+            packages/ui-prototype/src/components/sidebar <span class="muted">(1 tệp)</span>
+          </summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/src/components/sidebar/Sidebar.tsx"
+                ><code>packages/ui-prototype/src/components/sidebar/Sidebar.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-src-components-ui">
+          <summary>
+            packages/ui-prototype/src/components/ui <span class="muted">(1 tệp)</span>
+          </summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/src/components/ui/button.tsx"
+                ><code>packages/ui-prototype/src/components/ui/button.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-src">
+          <summary>packages/ui-prototype/src <span class="muted">(6 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/src/highlight.ts"
+                ><code>packages/ui-prototype/src/highlight.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/i18n.ts"
+                ><code>packages/ui-prototype/src/i18n.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/reader-ai-context.tsx"
+                ><code>packages/ui-prototype/src/reader-ai-context.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/router.tsx"
+                ><code>packages/ui-prototype/src/router.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/styles.css"
+                ><code>packages/ui-prototype/src/styles.css</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/summary.ts"
+                ><code>packages/ui-prototype/src/summary.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-src-lib">
+          <summary>packages/ui-prototype/src/lib <span class="muted">(1 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/src/lib/utils.ts"
+                ><code>packages/ui-prototype/src/lib/utils.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-src-locales">
+          <summary>packages/ui-prototype/src/locales <span class="muted">(3 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/src/locales/de.ts"
+                ><code>packages/ui-prototype/src/locales/de.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/locales/en.ts"
+                ><code>packages/ui-prototype/src/locales/en.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/locales/zh.ts"
+                ><code>packages/ui-prototype/src/locales/zh.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-src-mock">
+          <summary>packages/ui-prototype/src/mock <span class="muted">(3 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/src/mock/fixtures.ts"
+                ><code>packages/ui-prototype/src/mock/fixtures.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/mock/types.ts"
+                ><code>packages/ui-prototype/src/mock/types.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/mock/useMockChat.ts"
+                ><code>packages/ui-prototype/src/mock/useMockChat.ts</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-ui-prototype-src-routes">
+          <summary>packages/ui-prototype/src/routes <span class="muted">(3 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/ui-prototype/src/routes/__root.tsx"
+                ><code>packages/ui-prototype/src/routes/__root.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/routes/index.tsx"
+                ><code>packages/ui-prototype/src/routes/index.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+            <li>
+              <a href="../packages/ui-prototype/src/routes/vdocs-lab.tsx"
+                ><code>packages/ui-prototype/src/routes/vdocs-lab.tsx</code></a
+              ><span class="badge">prototype</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-virtual-docs">
+          <summary>packages/virtual-docs <span class="muted">(3 tệp)</span></summary>
+          <p class="muted">Khung section và tài liệu phía renderer.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/virtual-docs/package.json"
+                ><code>packages/virtual-docs/package.json</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/tsconfig.json"
+                ><code>packages/virtual-docs/tsconfig.json</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/vitest.config.ts"
+                ><code>packages/virtual-docs/vitest.config.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-packages-virtual-docs-src">
+          <summary>packages/virtual-docs/src <span class="muted">(12 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../packages/virtual-docs/src/SectionFrame.tsx"
+                ><code>packages/virtual-docs/src/SectionFrame.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/VirtualDocs.tsx"
+                ><code>packages/virtual-docs/src/VirtualDocs.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/geometry.test.ts"
+                ><code>packages/virtual-docs/src/geometry.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/geometry.ts"
+                ><code>packages/virtual-docs/src/geometry.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/index.ts"
+                ><code>packages/virtual-docs/src/index.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/link-target.test.ts"
+                ><code>packages/virtual-docs/src/link-target.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/link-target.ts"
+                ><code>packages/virtual-docs/src/link-target.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/precision.test.ts"
+                ><code>packages/virtual-docs/src/precision.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/precision.ts"
+                ><code>packages/virtual-docs/src/precision.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/use-machine.ts"
+                ><code>packages/virtual-docs/src/use-machine.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/viewport-machine.test.ts"
+                ><code>packages/virtual-docs/src/viewport-machine.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../packages/virtual-docs/src/viewport-machine.ts"
+                ><code>packages/virtual-docs/src/viewport-machine.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-patches">
+          <summary>patches <span class="muted">(1 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../patches/pdfjs-dist.patch"><code>patches/pdfjs-dist.patch</code></a
+              ><span class="badge">asset/patch</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-scripts">
+          <summary>scripts <span class="muted">(8 tệp)</span></summary>
+          <p class="muted">Kịch bản E2E, kiểm thử, tạo icon và tiện ích phát triển.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../scripts/e2e-packaged-pdf.mjs"><code>scripts/e2e-packaged-pdf.mjs</code></a
+              ><span class="badge">script</span>
+            </li>
+            <li>
+              <a href="../scripts/make-icons.sh"><code>scripts/make-icons.sh</code></a
+              ><span class="badge">script</span>
+            </li>
+            <li>
+              <a href="../scripts/make-windows-icon.mjs"
+                ><code>scripts/make-windows-icon.mjs</code></a
+              ><span class="badge">script</span>
+            </li>
+            <li>
+              <a href="../scripts/perf-snapshot.mjs"><code>scripts/perf-snapshot.mjs</code></a
+              ><span class="badge">script</span>
+            </li>
+            <li>
+              <a href="../scripts/release-notes.mjs"><code>scripts/release-notes.mjs</code></a
+              ><span class="badge">script</span>
+            </li>
+            <li>
+              <a href="../scripts/run-vitest-electron.mjs"
+                ><code>scripts/run-vitest-electron.mjs</code></a
+              ><span class="badge">script</span>
+            </li>
+            <li>
+              <a href="../scripts/seed-long-conversation.mjs"
+                ><code>scripts/seed-long-conversation.mjs</code></a
+              ><span class="badge">script</span>
+            </li>
+            <li>
+              <a href="../scripts/smoke-eval.mjs"><code>scripts/smoke-eval.mjs</code></a
+              ><span class="badge">script</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src">
+          <summary>src <span class="muted">(7 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/env.d.ts"><code>src/env.d.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/index.css"><code>src/index.css</code></a>
+            </li>
+            <li>
+              <a href="../src/main.ts"><code>src/main.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/preload-api.test.ts"><code>src/preload-api.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/preload-api.ts"><code>src/preload-api.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/preload.ts"><code>src/preload.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/renderer.tsx"><code>src/renderer.tsx</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-ai">
+          <summary>src/main/ai <span class="muted">(43 tệp)</span></summary>
+          <p class="muted">
+            Tạo prompt, tìm ngữ cảnh và stream trả lời AI. Thư mục search chứa backend tìm kiếm
+            mạng.
+          </p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/ai/agent-avatar.test.ts"
+                ><code>src/main/ai/agent-avatar.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/agent-avatar.ts"><code>src/main/ai/agent-avatar.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ai/agent-context.test.ts"
+                ><code>src/main/ai/agent-context.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/agent-context.ts"
+                ><code>src/main/ai/agent-context.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/assistant-model.test.ts"
+                ><code>src/main/ai/assistant-model.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/assistant-model.ts"
+                ><code>src/main/ai/assistant-model.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/background-limiter.test.ts"
+                ><code>src/main/ai/background-limiter.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/background-limiter.ts"
+                ><code>src/main/ai/background-limiter.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/base-prompt.test.ts"
+                ><code>src/main/ai/base-prompt.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/base-prompt.ts"><code>src/main/ai/base-prompt.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ai/chips.test.ts"><code>src/main/ai/chips.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/chips.ts"><code>src/main/ai/chips.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ai/consent.ts"><code>src/main/ai/consent.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ai/context-compaction.test.ts"
+                ><code>src/main/ai/context-compaction.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/context-compaction.ts"
+                ><code>src/main/ai/context-compaction.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/context-tools.test.ts"
+                ><code>src/main/ai/context-tools.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/context-tools.ts"
+                ><code>src/main/ai/context-tools.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/library-tools.test.ts"
+                ><code>src/main/ai/library-tools.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/library-tools.ts"
+                ><code>src/main/ai/library-tools.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/memory-consolidation.test.ts"
+                ><code>src/main/ai/memory-consolidation.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/memory-consolidation.ts"
+                ><code>src/main/ai/memory-consolidation.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/memory-tools.test.ts"
+                ><code>src/main/ai/memory-tools.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/memory-tools.ts"><code>src/main/ai/memory-tools.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ai/model-factory.test.ts"
+                ><code>src/main/ai/model-factory.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/model-factory.ts"
+                ><code>src/main/ai/model-factory.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/pdf-retrieval.test.ts"
+                ><code>src/main/ai/pdf-retrieval.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/pdf-retrieval.ts"
+                ><code>src/main/ai/pdf-retrieval.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/prompt-caching.test.ts"
+                ><code>src/main/ai/prompt-caching.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/prompt-caching.ts"
+                ><code>src/main/ai/prompt-caching.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/prompt.test.ts"><code>src/main/ai/prompt.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/prompt.ts"><code>src/main/ai/prompt.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ai/reading-session-tools.test.ts"
+                ><code>src/main/ai/reading-session-tools.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/reading-session-tools.ts"
+                ><code>src/main/ai/reading-session-tools.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/send-deps.test.ts"
+                ><code>src/main/ai/send-deps.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/send-deps.ts"><code>src/main/ai/send-deps.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ai/send.test.ts"><code>src/main/ai/send.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/send.ts"><code>src/main/ai/send.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ai/stream-assistant.ts"
+                ><code>src/main/ai/stream-assistant.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/structured-output.ts"
+                ><code>src/main/ai/structured-output.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/summary.test.ts"><code>src/main/ai/summary.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/summary.ts"><code>src/main/ai/summary.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ai/tools.test.ts"><code>src/main/ai/tools.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/tools.ts"><code>src/main/ai/tools.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-ai-search">
+          <summary>src/main/ai/search <span class="muted">(7 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/ai/search/mcp-backend.test.ts"
+                ><code>src/main/ai/search/mcp-backend.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/search/mcp-backend.ts"
+                ><code>src/main/ai/search/mcp-backend.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/search/search-service.test.ts"
+                ><code>src/main/ai/search/search-service.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/search/search-service.ts"
+                ><code>src/main/ai/search/search-service.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ai/search/types.ts"><code>src/main/ai/search/types.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ai/search/web-search-tool.test.ts"
+                ><code>src/main/ai/search/web-search-tool.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ai/search/web-search-tool.ts"
+                ><code>src/main/ai/search/web-search-tool.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main">
+          <summary>src/main <span class="muted">(5 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/app-info.test.ts"><code>src/main/app-info.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/app-info.ts"><code>src/main/app-info.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/i18n.test.ts"><code>src/main/i18n.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/i18n.ts"><code>src/main/i18n.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/notify.ts"><code>src/main/notify.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-app-meta">
+          <summary>src/main/app-meta <span class="muted">(2 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/app-meta/repository.test.ts"
+                ><code>src/main/app-meta/repository.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/app-meta/repository.ts"
+                ><code>src/main/app-meta/repository.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-app">
+          <summary>src/main/app <span class="muted">(16 tệp)</span></summary>
+          <p class="muted">
+            Dịch vụ môi trường, đường dẫn, nền ứng dụng, URL, renderer server và liên kết PDF của
+            Windows.
+          </p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/app/app-service.test.ts"
+                ><code>src/main/app/app-service.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/app/app-service.ts"><code>src/main/app/app-service.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/app/application-background.test.ts"
+                ><code>src/main/app/application-background.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/app/application-background.ts"
+                ><code>src/main/app/application-background.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/app/external-url.test.ts"
+                ><code>src/main/app/external-url.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/app/external-url.ts"
+                ><code>src/main/app/external-url.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/app/index.ts"><code>src/main/app/index.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/app/protocol-schemes.ts"
+                ><code>src/main/app/protocol-schemes.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/app/renderer-protocol-path.test.ts"
+                ><code>src/main/app/renderer-protocol-path.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/app/renderer-protocol-path.ts"
+                ><code>src/main/app/renderer-protocol-path.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/app/renderer-server.test.ts"
+                ><code>src/main/app/renderer-server.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/app/renderer-server.ts"
+                ><code>src/main/app/renderer-server.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/app/update-check.test.ts"
+                ><code>src/main/app/update-check.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/app/update-check.ts"
+                ><code>src/main/app/update-check.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/app/windows-pdf-association.test.ts"
+                ><code>src/main/app/windows-pdf-association.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/app/windows-pdf-association.ts"
+                ><code>src/main/app/windows-pdf-association.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-backup">
+          <summary>src/main/backup <span class="muted">(12 tệp)</span></summary>
+          <p class="muted">Snapshot, manifest, ZIP và khôi phục dữ liệu.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/backup/archive.test.ts"
+                ><code>src/main/backup/archive.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/backup/archive.ts"><code>src/main/backup/archive.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/backup/backup-service.test.ts"
+                ><code>src/main/backup/backup-service.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/backup/backup-service.ts"
+                ><code>src/main/backup/backup-service.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/backup/compat.test.ts"
+                ><code>src/main/backup/compat.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/backup/compat.ts"><code>src/main/backup/compat.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/backup/filename.test.ts"
+                ><code>src/main/backup/filename.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/backup/filename.ts"><code>src/main/backup/filename.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/backup/manifest.test.ts"
+                ><code>src/main/backup/manifest.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/backup/manifest.ts"><code>src/main/backup/manifest.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/backup/restore.test.ts"
+                ><code>src/main/backup/restore.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/backup/restore.ts"><code>src/main/backup/restore.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-chat">
+          <summary>src/main/chat <span class="muted">(6 tệp)</span></summary>
+          <p class="muted">Hội thoại, tin nhắn và đặt tên cuộc trò chuyện.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/chat/conversation-title.test.ts"
+                ><code>src/main/chat/conversation-title.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/chat/conversation-title.ts"
+                ><code>src/main/chat/conversation-title.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/chat/conversations.test.ts"
+                ><code>src/main/chat/conversations.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/chat/conversations.ts"
+                ><code>src/main/chat/conversations.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/chat/messages.test.ts"
+                ><code>src/main/chat/messages.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/chat/messages.ts"><code>src/main/chat/messages.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-db">
+          <summary>src/main/db <span class="muted">(9 tệp)</span></summary>
+          <p class="muted">SQLite, schema Drizzle và đường dẫn migration.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/db/client.test.ts"><code>src/main/db/client.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/db/client.ts"><code>src/main/db/client.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/db/conversations-memory-through-seq.test.ts"
+                ><code>src/main/db/conversations-memory-through-seq.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/db/instance.ts"><code>src/main/db/instance.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/db/migrate-assistants-data-carry.test.ts"
+                ><code>src/main/db/migrate-assistants-data-carry.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrate-reading-sessions.test.ts"
+                ><code>src/main/db/migrate-reading-sessions.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations-path.test.ts"
+                ><code>src/main/db/migrations-path.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations-path.ts"
+                ><code>src/main/db/migrations-path.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/db/schema.ts"><code>src/main/db/schema.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-db-migrations">
+          <summary>src/main/db/migrations <span class="muted">(66 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/db/migrations/20260531070945_elite_viper/migration.sql"
+                ><code>src/main/db/migrations/20260531070945_elite_viper/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260531070945_elite_viper/snapshot.json"
+                ><code>src/main/db/migrations/20260531070945_elite_viper/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260602135810_damp_maestro/migration.sql"
+                ><code>src/main/db/migrations/20260602135810_damp_maestro/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260602135810_damp_maestro/snapshot.json"
+                ><code>src/main/db/migrations/20260602135810_damp_maestro/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260602172018_curly_sue_storm/migration.sql"
+                ><code>src/main/db/migrations/20260602172018_curly_sue_storm/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260602172018_curly_sue_storm/snapshot.json"
+                ><code>src/main/db/migrations/20260602172018_curly_sue_storm/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260602185035_wakeful_thunderbird/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260602185035_wakeful_thunderbird/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260602185035_wakeful_thunderbird/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260602185035_wakeful_thunderbird/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603011333_nebulous_ezekiel/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260603011333_nebulous_ezekiel/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603011333_nebulous_ezekiel/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260603011333_nebulous_ezekiel/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603043311_mature_speed_demon/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260603043311_mature_speed_demon/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603043311_mature_speed_demon/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260603043311_mature_speed_demon/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603061536_sleepy_mentor/migration.sql"
+                ><code>src/main/db/migrations/20260603061536_sleepy_mentor/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603061536_sleepy_mentor/snapshot.json"
+                ><code>src/main/db/migrations/20260603061536_sleepy_mentor/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603064546_silky_puff_adder/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260603064546_silky_puff_adder/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603064546_silky_puff_adder/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260603064546_silky_puff_adder/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603112655_clever_terrax/migration.sql"
+                ><code>src/main/db/migrations/20260603112655_clever_terrax/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603112655_clever_terrax/snapshot.json"
+                ><code>src/main/db/migrations/20260603112655_clever_terrax/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603120839_flimsy_black_cat/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260603120839_flimsy_black_cat/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603120839_flimsy_black_cat/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260603120839_flimsy_black_cat/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603123622_mute_the_professor/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260603123622_mute_the_professor/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603123622_mute_the_professor/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260603123622_mute_the_professor/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603124833_thankful_flatman/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260603124833_thankful_flatman/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260603124833_thankful_flatman/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260603124833_thankful_flatman/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260604000000_plaintext_api_key/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260604000000_plaintext_api_key/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260604000000_plaintext_api_key/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260604000000_plaintext_api_key/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260605055325_pretty_ultimates/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260605055325_pretty_ultimates/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260605055325_pretty_ultimates/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260605055325_pretty_ultimates/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260606145055_stiff_spitfire/migration.sql"
+                ><code>src/main/db/migrations/20260606145055_stiff_spitfire/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260606145055_stiff_spitfire/snapshot.json"
+                ><code>src/main/db/migrations/20260606145055_stiff_spitfire/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260607123304_mature_blonde_phantom/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260607123304_mature_blonde_phantom/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260607123304_mature_blonde_phantom/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260607123304_mature_blonde_phantom/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260608070815_wide_surge/migration.sql"
+                ><code>src/main/db/migrations/20260608070815_wide_surge/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260608070815_wide_surge/snapshot.json"
+                ><code>src/main/db/migrations/20260608070815_wide_surge/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260608155900_clear_dreadnoughts/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260608155900_clear_dreadnoughts/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260608155900_clear_dreadnoughts/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260608155900_clear_dreadnoughts/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260608172021_slippery_gorilla_man/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260608172021_slippery_gorilla_man/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260608172021_slippery_gorilla_man/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260608172021_slippery_gorilla_man/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260609051433_grey_gertrude_yorkes/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260609051433_grey_gertrude_yorkes/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260609051433_grey_gertrude_yorkes/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260609051433_grey_gertrude_yorkes/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260610023642_empty_blink/migration.sql"
+                ><code>src/main/db/migrations/20260610023642_empty_blink/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260610023642_empty_blink/snapshot.json"
+                ><code>src/main/db/migrations/20260610023642_empty_blink/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260610110032_lazy_praxagora/migration.sql"
+                ><code>src/main/db/migrations/20260610110032_lazy_praxagora/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260610110032_lazy_praxagora/snapshot.json"
+                ><code>src/main/db/migrations/20260610110032_lazy_praxagora/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260610121829_known_ken_ellis/migration.sql"
+                ><code>src/main/db/migrations/20260610121829_known_ken_ellis/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260610121829_known_ken_ellis/snapshot.json"
+                ><code>src/main/db/migrations/20260610121829_known_ken_ellis/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260611151719_steep_mattie_franklin/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260611151719_steep_mattie_franklin/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260611151719_steep_mattie_franklin/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260611151719_steep_mattie_franklin/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260615041601_dazzling_sabra/migration.sql"
+                ><code>src/main/db/migrations/20260615041601_dazzling_sabra/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260615041601_dazzling_sabra/snapshot.json"
+                ><code>src/main/db/migrations/20260615041601_dazzling_sabra/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260615221822_slow_silk_fever/migration.sql"
+                ><code>src/main/db/migrations/20260615221822_slow_silk_fever/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260615221822_slow_silk_fever/snapshot.json"
+                ><code>src/main/db/migrations/20260615221822_slow_silk_fever/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260616000326_little_namor/migration.sql"
+                ><code>src/main/db/migrations/20260616000326_little_namor/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260616000326_little_namor/snapshot.json"
+                ><code>src/main/db/migrations/20260616000326_little_namor/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260616082526_luxuriant_centennial/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260616082526_luxuriant_centennial/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260616082526_luxuriant_centennial/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260616082526_luxuriant_centennial/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260714063947_reading_sessions/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260714063947_reading_sessions/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260714063947_reading_sessions/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260714063947_reading_sessions/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260714072347_derive_reading_state/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260714072347_derive_reading_state/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260714072347_derive_reading_state/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260714072347_derive_reading_state/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260924084756_robust_joseph/migration.sql"
+                ><code>src/main/db/migrations/20260924084756_robust_joseph/migration.sql</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260924084756_robust_joseph/snapshot.json"
+                ><code>src/main/db/migrations/20260924084756_robust_joseph/snapshot.json</code></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260924155237_complex_black_panther/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260924155237_complex_black_panther/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260924155237_complex_black_panther/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260924155237_complex_black_panther/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260925070227_famous_hammerhead/migration.sql"
+                ><code
+                  >src/main/db/migrations/20260925070227_famous_hammerhead/migration.sql</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+            <li>
+              <a href="../src/main/db/migrations/20260925070227_famous_hammerhead/snapshot.json"
+                ><code
+                  >src/main/db/migrations/20260925070227_famous_hammerhead/snapshot.json</code
+                ></a
+              ><span class="badge">migration</span>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-ipc">
+          <summary>src/main/ipc <span class="muted">(21 tệp)</span></summary>
+          <p class="muted">Ánh xạ hợp đồng shared vào hàm nghiệp vụ của main.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/ipc/agent-handlers.ts"
+                ><code>src/main/ipc/agent-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/ai-handlers.test.ts"
+                ><code>src/main/ipc/ai-handlers.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ipc/ai-handlers.ts"><code>src/main/ipc/ai-handlers.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ipc/annotations-handlers.ts"
+                ><code>src/main/ipc/annotations-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/app-handlers.ts"
+                ><code>src/main/ipc/app-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/backup-handlers.ts"
+                ><code>src/main/ipc/backup-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/bindings-coverage.test.ts"
+                ><code>src/main/ipc/bindings-coverage.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ipc/book-notes-handlers.ts"
+                ><code>src/main/ipc/book-notes-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/chat-handlers.ts"
+                ><code>src/main/ipc/chat-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/library-handlers.ts"
+                ><code>src/main/ipc/library-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/log-handlers.ts"
+                ><code>src/main/ipc/log-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/memory-handlers.ts"
+                ><code>src/main/ipc/memory-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/preferences-handlers.ts"
+                ><code>src/main/ipc/preferences-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/reading-sessions-handlers.test.ts"
+                ><code>src/main/ipc/reading-sessions-handlers.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ipc/reading-sessions-handlers.ts"
+                ><code>src/main/ipc/reading-sessions-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/registry.ts"><code>src/main/ipc/registry.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ipc/settings-handlers.ts"
+                ><code>src/main/ipc/settings-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/stats-handlers.ts"
+                ><code>src/main/ipc/stats-handlers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/ipc/validate.test.ts"
+                ><code>src/main/ipc/validate.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/ipc/validate.ts"><code>src/main/ipc/validate.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/ipc/vocabulary-handlers.ts"
+                ><code>src/main/ipc/vocabulary-handlers.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-library">
+          <summary>src/main/library <span class="muted">(23 tệp)</span></summary>
+          <p class="muted">
+            Import, metadata, file sách, nội dung, tiến độ, annotation, note và bookmark.
+          </p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/library/annotations.test.ts"
+                ><code>src/main/library/annotations.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/library/annotations.ts"
+                ><code>src/main/library/annotations.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/book-files.test.ts"
+                ><code>src/main/library/book-files.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/library/book-files.ts"
+                ><code>src/main/library/book-files.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/book-notes.test.ts"
+                ><code>src/main/library/book-notes.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/library/book-notes.ts"
+                ><code>src/main/library/book-notes.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/clear-book-category.test.ts"
+                ><code>src/main/library/clear-book-category.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/library/clear-book-category.ts"
+                ><code>src/main/library/clear-book-category.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/clear-pdf-data.ts"
+                ><code>src/main/library/clear-pdf-data.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/content.test.ts"
+                ><code>src/main/library/content.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/library/content.ts"><code>src/main/library/content.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/library/cover-bytes.test.ts"
+                ><code>src/main/library/cover-bytes.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/library/cover-bytes.ts"
+                ><code>src/main/library/cover-bytes.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/cover-protocol.ts"
+                ><code>src/main/library/cover-protocol.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/export-pdf.test.ts"
+                ><code>src/main/library/export-pdf.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/library/export-pdf.ts"
+                ><code>src/main/library/export-pdf.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/import-source.test.ts"
+                ><code>src/main/library/import-source.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/library/import-source.ts"
+                ><code>src/main/library/import-source.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/pdf-bookmarks.ts"
+                ><code>src/main/library/pdf-bookmarks.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/progress.test.ts"
+                ><code>src/main/library/progress.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/library/progress.ts"
+                ><code>src/main/library/progress.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/library/repository.test.ts"
+                ><code>src/main/library/repository.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/library/repository.ts"
+                ><code>src/main/library/repository.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-logger">
+          <summary>src/main/logger <span class="muted">(5 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/logger/file-sink.test.ts"
+                ><code>src/main/logger/file-sink.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/logger/file-sink.ts"
+                ><code>src/main/logger/file-sink.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/logger/index.ts"><code>src/main/logger/index.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/logger/logger-service.test.ts"
+                ><code>src/main/logger/logger-service.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/logger/logger-service.ts"
+                ><code>src/main/logger/logger-service.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-media">
+          <summary>src/main/media <span class="muted">(3 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/media/blob-store.test.ts"
+                ><code>src/main/media/blob-store.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/media/blob-store.ts"
+                ><code>src/main/media/blob-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/media/media-protocol.ts"
+                ><code>src/main/media/media-protocol.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-memory">
+          <summary>src/main/memory <span class="muted">(4 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/memory/links.test.ts"
+                ><code>src/main/memory/links.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/memory/links.ts"><code>src/main/memory/links.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/memory/repository.test.ts"
+                ><code>src/main/memory/repository.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/memory/repository.ts"
+                ><code>src/main/memory/repository.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-onboarding">
+          <summary>src/main/onboarding <span class="muted">(4 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/onboarding/sample-book.test.ts"
+                ><code>src/main/onboarding/sample-book.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/onboarding/sample-book.ts"
+                ><code>src/main/onboarding/sample-book.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/onboarding/seed-sample.test.ts"
+                ><code>src/main/onboarding/seed-sample.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/onboarding/seed-sample.ts"
+                ><code>src/main/onboarding/seed-sample.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-preferences">
+          <summary>src/main/preferences <span class="muted">(2 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/preferences/repository.test.ts"
+                ><code>src/main/preferences/repository.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/preferences/repository.ts"
+                ><code>src/main/preferences/repository.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-providers">
+          <summary>src/main/providers <span class="muted">(10 tệp)</span></summary>
+          <p class="muted">Nhà cung cấp AI, model và endpoint.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/providers/default-providers.test.ts"
+                ><code>src/main/providers/default-providers.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/providers/default-providers.ts"
+                ><code>src/main/providers/default-providers.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/providers/mask.test.ts"
+                ><code>src/main/providers/mask.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/providers/mask.ts"><code>src/main/providers/mask.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/providers/provider-factory.test.ts"
+                ><code>src/main/providers/provider-factory.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/providers/provider-factory.ts"
+                ><code>src/main/providers/provider-factory.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/providers/provider-models.test.ts"
+                ><code>src/main/providers/provider-models.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/providers/provider-models.ts"
+                ><code>src/main/providers/provider-models.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/providers/repository.test.ts"
+                ><code>src/main/providers/repository.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/providers/repository.ts"
+                ><code>src/main/providers/repository.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-reading-report">
+          <summary>src/main/reading-report <span class="muted">(18 tệp)</span></summary>
+          <p class="muted">Tạo báo cáo phiên đọc và thu thập bằng chứng.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/reading-report/agent.ts"
+                ><code>src/main/reading-report/agent.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/reading-report/evidence.test.ts"
+                ><code>src/main/reading-report/evidence.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/reading-report/evidence.ts"
+                ><code>src/main/reading-report/evidence.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/reading-report/investigation-runner.ts"
+                ><code>src/main/reading-report/investigation-runner.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/reading-report/investigator.test.ts"
+                ><code>src/main/reading-report/investigator.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/reading-report/investigator.ts"
+                ><code>src/main/reading-report/investigator.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/reading-report/memory-workspace.test.ts"
+                ><code>src/main/reading-report/memory-workspace.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/reading-report/memory-workspace.ts"
+                ><code>src/main/reading-report/memory-workspace.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/reading-report/progress.test.ts"
+                ><code>src/main/reading-report/progress.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/reading-report/progress.ts"
+                ><code>src/main/reading-report/progress.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/reading-report/prompt.test.ts"
+                ><code>src/main/reading-report/prompt.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/reading-report/prompt.ts"
+                ><code>src/main/reading-report/prompt.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/reading-report/runtime.test.ts"
+                ><code>src/main/reading-report/runtime.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/reading-report/runtime.ts"
+                ><code>src/main/reading-report/runtime.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/reading-report/service.test.ts"
+                ><code>src/main/reading-report/service.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/reading-report/service.ts"
+                ><code>src/main/reading-report/service.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/reading-report/tools.test.ts"
+                ><code>src/main/reading-report/tools.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/reading-report/tools.ts"
+                ><code>src/main/reading-report/tools.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-reading-sessions">
+          <summary>src/main/reading-sessions <span class="muted">(2 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/reading-sessions/repository.test.ts"
+                ><code>src/main/reading-sessions/repository.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/reading-sessions/repository.ts"
+                ><code>src/main/reading-sessions/repository.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-secrets">
+          <summary>src/main/secrets <span class="muted">(5 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/secrets/ai-sdk-tester.test.ts"
+                ><code>src/main/secrets/ai-sdk-tester.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/secrets/ai-sdk-tester.ts"
+                ><code>src/main/secrets/ai-sdk-tester.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/secrets/api-key-storage.test.ts"
+                ><code>src/main/secrets/api-key-storage.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/secrets/api-key-storage.ts"
+                ><code>src/main/secrets/api-key-storage.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/secrets/tester.ts"><code>src/main/secrets/tester.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-stats">
+          <summary>src/main/stats <span class="muted">(12 tệp)</span></summary>
+          <p class="muted">Thời gian đọc, lượt đọc trang và chuỗi ngày.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/stats/aggregate.test.ts"
+                ><code>src/main/stats/aggregate.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/stats/aggregate.ts"><code>src/main/stats/aggregate.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/stats/clock-wiring.ts"
+                ><code>src/main/stats/clock-wiring.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/stats/clock.test.ts"><code>src/main/stats/clock.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/stats/clock.ts"><code>src/main/stats/clock.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/stats/day-key.test.ts"
+                ><code>src/main/stats/day-key.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/stats/day-key.ts"><code>src/main/stats/day-key.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/main/stats/page-streak-repository.test.ts"
+                ><code>src/main/stats/page-streak-repository.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/stats/page-streak.test.ts"
+                ><code>src/main/stats/page-streak.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/stats/page-streak.ts"
+                ><code>src/main/stats/page-streak.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/stats/reading-daily.test.ts"
+                ><code>src/main/stats/reading-daily.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/stats/reading-daily.ts"
+                ><code>src/main/stats/reading-daily.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-main-vocabulary">
+          <summary>src/main/vocabulary <span class="muted">(6 tệp)</span></summary>
+          <p class="muted">Từ điển offline, thuật ngữ kỹ thuật và từ vựng theo sách.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/main/vocabulary/dictionary-store.ts"
+                ><code>src/main/vocabulary/dictionary-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/vocabulary/local-dictionary.test.ts"
+                ><code>src/main/vocabulary/local-dictionary.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/vocabulary/local-dictionary.ts"
+                ><code>src/main/vocabulary/local-dictionary.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/vocabulary/repository.test.ts"
+                ><code>src/main/vocabulary/repository.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/main/vocabulary/repository.ts"
+                ><code>src/main/vocabulary/repository.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/main/vocabulary/technical-glossary.ts"
+                ><code>src/main/vocabulary/technical-glossary.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer">
+          <summary>src/renderer <span class="muted">(6 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/App.tsx"><code>src/renderer/App.tsx</code></a>
+            </li>
+            <li>
+              <a href="../src/renderer/ErrorBoundary.tsx"
+                ><code>src/renderer/ErrorBoundary.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/fontsource.d.ts"
+                ><code>src/renderer/fontsource.d.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/global.d.ts"><code>src/renderer/global.d.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/renderer/react-runtime-dedupe.test.ts"
+                ><code>src/renderer/react-runtime-dedupe.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/types.ts"><code>src/renderer/types.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-ai">
+          <summary>src/renderer/ai <span class="muted">(47 tệp)</span></summary>
+          <p class="muted">Panel chat, composer, lịch sử, context chips và IPC stream.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/ai/AIPanel.tsx"><code>src/renderer/ai/AIPanel.tsx</code></a>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/AssistantAvatar.tsx"
+                ><code>src/renderer/ai/AssistantAvatar.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/AvatarCropDialog.tsx"
+                ><code>src/renderer/ai/AvatarCropDialog.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/ChatPerfMonitor.tsx"
+                ><code>src/renderer/ai/ChatPerfMonitor.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/Composer.tsx"
+                ><code>src/renderer/ai/Composer.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/ContextPillBar.tsx"
+                ><code>src/renderer/ai/ContextPillBar.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/ConversationsTab.tsx"
+                ><code>src/renderer/ai/ConversationsTab.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/CopyButton.tsx"
+                ><code>src/renderer/ai/CopyButton.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/FloatingAssistant.tsx"
+                ><code>src/renderer/ai/FloatingAssistant.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/MessageEditor.tsx"
+                ><code>src/renderer/ai/MessageEditor.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/MessageList.tsx"
+                ><code>src/renderer/ai/MessageList.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/MessageTimestamp.tsx"
+                ><code>src/renderer/ai/MessageTimestamp.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/MessageToolbar.tsx"
+                ><code>src/renderer/ai/MessageToolbar.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/ai-action-draft.test.ts"
+                ><code>src/renderer/ai/ai-action-draft.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/ai-action-draft.ts"
+                ><code>src/renderer/ai/ai-action-draft.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/ai-consent.ts"
+                ><code>src/renderer/ai/ai-consent.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/assistant-activity.test.ts"
+                ><code>src/renderer/ai/assistant-activity.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/assistant-activity.ts"
+                ><code>src/renderer/ai/assistant-activity.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/chat-actions.test.ts"
+                ><code>src/renderer/ai/chat-actions.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/chat-actions.ts"
+                ><code>src/renderer/ai/chat-actions.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/chat-context.test.ts"
+                ><code>src/renderer/ai/chat-context.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/chat-context.ts"
+                ><code>src/renderer/ai/chat-context.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/chip-label.ts"
+                ><code>src/renderer/ai/chip-label.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/composer-focus.test.ts"
+                ><code>src/renderer/ai/composer-focus.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/composer-focus.ts"
+                ><code>src/renderer/ai/composer-focus.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/default-avatar.svg"
+                ><code>src/renderer/ai/default-avatar.svg</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/get-cropped-blob.ts"
+                ><code>src/renderer/ai/get-cropped-blob.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/ipc-chat-transport.test.ts"
+                ><code>src/renderer/ai/ipc-chat-transport.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/ipc-chat-transport.ts"
+                ><code>src/renderer/ai/ipc-chat-transport.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/message-history.test.ts"
+                ><code>src/renderer/ai/message-history.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/message-history.ts"
+                ><code>src/renderer/ai/message-history.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/message-text.test.ts"
+                ><code>src/renderer/ai/message-text.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/message-text.ts"
+                ><code>src/renderer/ai/message-text.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/message-time.test.ts"
+                ><code>src/renderer/ai/message-time.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/message-time.ts"
+                ><code>src/renderer/ai/message-time.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/scroll-follow.test.ts"
+                ><code>src/renderer/ai/scroll-follow.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/scroll-follow.ts"
+                ><code>src/renderer/ai/scroll-follow.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/segments.test.ts"
+                ><code>src/renderer/ai/segments.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/segments.ts"><code>src/renderer/ai/segments.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/selection-context.test.ts"
+                ><code>src/renderer/ai/selection-context.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/selection-context.ts"
+                ><code>src/renderer/ai/selection-context.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/tool-step-label.test.ts"
+                ><code>src/renderer/ai/tool-step-label.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/tool-step-label.ts"
+                ><code>src/renderer/ai/tool-step-label.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/types.ts"><code>src/renderer/ai/types.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/use-ai-actions.ts"
+                ><code>src/renderer/ai/use-ai-actions.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/ai/use-restore-conversation.test.ts"
+                ><code>src/renderer/ai/use-restore-conversation.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/ai/use-restore-conversation.ts"
+                ><code>src/renderer/ai/use-restore-conversation.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-book-notes">
+          <summary>src/renderer/book-notes <span class="muted">(2 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/book-notes/BookNoteEditor.tsx"
+                ><code>src/renderer/book-notes/BookNoteEditor.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/book-notes/BookNotesPanel.tsx"
+                ><code>src/renderer/book-notes/BookNotesPanel.tsx</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-components">
+          <summary>src/renderer/components <span class="muted">(5 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/components/LocalizedStreamdown.test.ts"
+                ><code>src/renderer/components/LocalizedStreamdown.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/components/LocalizedStreamdown.tsx"
+                ><code>src/renderer/components/LocalizedStreamdown.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/MarkdownEditor.test.ts"
+                ><code>src/renderer/components/MarkdownEditor.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/components/MarkdownEditor.tsx"
+                ><code>src/renderer/components/MarkdownEditor.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/markdown-math.ts"
+                ><code>src/renderer/components/markdown-math.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-components-ui">
+          <summary>src/renderer/components/ui <span class="muted">(20 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/components/ui/alert-dialog.tsx"
+                ><code>src/renderer/components/ui/alert-dialog.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/button.tsx"
+                ><code>src/renderer/components/ui/button.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/card.tsx"
+                ><code>src/renderer/components/ui/card.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/checkbox.tsx"
+                ><code>src/renderer/components/ui/checkbox.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/context-menu.tsx"
+                ><code>src/renderer/components/ui/context-menu.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/dialog.tsx"
+                ><code>src/renderer/components/ui/dialog.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/dropdown-menu.tsx"
+                ><code>src/renderer/components/ui/dropdown-menu.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/hover-card.tsx"
+                ><code>src/renderer/components/ui/hover-card.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/input.tsx"
+                ><code>src/renderer/components/ui/input.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/kbd.tsx"
+                ><code>src/renderer/components/ui/kbd.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/label.tsx"
+                ><code>src/renderer/components/ui/label.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/popover.tsx"
+                ><code>src/renderer/components/ui/popover.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/scroll-area.tsx"
+                ><code>src/renderer/components/ui/scroll-area.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/select.tsx"
+                ><code>src/renderer/components/ui/select.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/sonner.tsx"
+                ><code>src/renderer/components/ui/sonner.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/tabs.tsx"
+                ><code>src/renderer/components/ui/tabs.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/textarea.tsx"
+                ><code>src/renderer/components/ui/textarea.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/toggle-group.tsx"
+                ><code>src/renderer/components/ui/toggle-group.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/toggle.tsx"
+                ><code>src/renderer/components/ui/toggle.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/components/ui/tooltip.tsx"
+                ><code>src/renderer/components/ui/tooltip.tsx</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-i18n">
+          <summary>src/renderer/i18n <span class="muted">(2 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/i18n/LanguageSwitcher.tsx"
+                ><code>src/renderer/i18n/LanguageSwitcher.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/i18n/index.ts"><code>src/renderer/i18n/index.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-lib">
+          <summary>src/renderer/lib <span class="muted">(9 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/lib/keyboard.test.ts"
+                ><code>src/renderer/lib/keyboard.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/lib/keyboard.ts"
+                ><code>src/renderer/lib/keyboard.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/lib/platform.ts"
+                ><code>src/renderer/lib/platform.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/lib/relative-time.test.ts"
+                ><code>src/renderer/lib/relative-time.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/lib/relative-time.ts"
+                ><code>src/renderer/lib/relative-time.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/lib/use-drag-guard.test.ts"
+                ><code>src/renderer/lib/use-drag-guard.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/lib/use-drag-guard.ts"
+                ><code>src/renderer/lib/use-drag-guard.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/lib/utils.test.ts"
+                ><code>src/renderer/lib/utils.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/lib/utils.ts"><code>src/renderer/lib/utils.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-library">
+          <summary>src/renderer/library <span class="muted">(14 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/library/BookCover.tsx"
+                ><code>src/renderer/library/BookCover.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/library/CoverImage.tsx"
+                ><code>src/renderer/library/CoverImage.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/library/DropOverlay.tsx"
+                ><code>src/renderer/library/DropOverlay.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/library/LibraryView.tsx"
+                ><code>src/renderer/library/LibraryView.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/library/OnboardingCard.tsx"
+                ><code>src/renderer/library/OnboardingCard.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/library/RecentlyReadShelf.tsx"
+                ><code>src/renderer/library/RecentlyReadShelf.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/library/SortableBook.tsx"
+                ><code>src/renderer/library/SortableBook.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/library/book-drop.test.ts"
+                ><code>src/renderer/library/book-drop.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/library/book-drop.ts"
+                ><code>src/renderer/library/book-drop.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/library/cover-palette.test.ts"
+                ><code>src/renderer/library/cover-palette.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/library/cover-palette.ts"
+                ><code>src/renderer/library/cover-palette.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/library/onboarding-logic.test.ts"
+                ><code>src/renderer/library/onboarding-logic.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/library/onboarding-logic.ts"
+                ><code>src/renderer/library/onboarding-logic.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/library/use-epub-drop.ts"
+                ><code>src/renderer/library/use-epub-drop.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-logger">
+          <summary>src/renderer/logger <span class="muted">(2 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/logger/index.ts"
+                ><code>src/renderer/logger/index.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/logger/logger-service.ts"
+                ><code>src/renderer/logger/logger-service.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-notifications">
+          <summary>src/renderer/notifications <span class="muted">(2 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/notifications/app-notifications.test.ts"
+                ><code>src/renderer/notifications/app-notifications.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/notifications/app-notifications.ts"
+                ><code>src/renderer/notifications/app-notifications.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-query">
+          <summary>src/renderer/query <span class="muted">(7 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/query/book-note-queries.ts"
+                ><code>src/renderer/query/book-note-queries.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/query/client.test.ts"
+                ><code>src/renderer/query/client.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/query/client.ts"
+                ><code>src/renderer/query/client.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/query/conversation-queries.ts"
+                ><code>src/renderer/query/conversation-queries.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/query/keys.test.ts"
+                ><code>src/renderer/query/keys.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/query/keys.ts"><code>src/renderer/query/keys.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/renderer/query/reading-session-queries.ts"
+                ><code>src/renderer/query/reading-session-queries.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-reader">
+          <summary>src/renderer/reader <span class="muted">(92 tệp)</span></summary>
+          <p class="muted">Reader EPUB/PDF, search, zoom, vùng chọn, annotation, sidebar và TTS.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/reader/AnnotationsList.tsx"
+                ><code>src/renderer/reader/AnnotationsList.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/BookFileMissingPanel.tsx"
+                ><code>src/renderer/reader/BookFileMissingPanel.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/ChapterList.tsx"
+                ><code>src/renderer/reader/ChapterList.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/ClearBookCategoryButton.tsx"
+                ><code>src/renderer/reader/ClearBookCategoryButton.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/CollapsiblePane.tsx"
+                ><code>src/renderer/reader/CollapsiblePane.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/EpubReader.tsx"
+                ><code>src/renderer/reader/EpubReader.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/HighlightStyleBar.tsx"
+                ><code>src/renderer/reader/HighlightStyleBar.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/header-visibility.test.ts"
+                ><code>src/renderer/reader/header-visibility.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/header-visibility.ts"
+                ><code>src/renderer/reader/header-visibility.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/NoteHoverCard.tsx"
+                ><code>src/renderer/reader/NoteHoverCard.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/NoteModal.tsx"
+                ><code>src/renderer/reader/NoteModal.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/PdfBookmarksList.tsx"
+                ><code>src/renderer/reader/PdfBookmarksList.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/PdfPrefs.tsx"
+                ><code>src/renderer/reader/PdfPrefs.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/PdfReader.tsx"
+                ><code>src/renderer/reader/PdfReader.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/PdfSearchPanel.test.tsx"
+                ><code>src/renderer/reader/PdfSearchPanel.test.tsx</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/PdfSearchPanel.tsx"
+                ><code>src/renderer/reader/PdfSearchPanel.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/PdfTabsBar.tsx"
+                ><code>src/renderer/reader/PdfTabsBar.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/PdfThumbnailsPanel.tsx"
+                ><code>src/renderer/reader/PdfThumbnailsPanel.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/ReaderPanel.tsx"
+                ><code>src/renderer/reader/ReaderPanel.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/ReaderPrefs.tsx"
+                ><code>src/renderer/reader/ReaderPrefs.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/ReaderView.tsx"
+                ><code>src/renderer/reader/ReaderView.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/SelectionToolbar.test.tsx"
+                ><code>src/renderer/reader/SelectionToolbar.test.tsx</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/SelectionToolbar.tsx"
+                ><code>src/renderer/reader/SelectionToolbar.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/Sidebar.test.tsx"
+                ><code>src/renderer/reader/Sidebar.test.tsx</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/Sidebar.tsx"
+                ><code>src/renderer/reader/Sidebar.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/TtsControlBar.tsx"
+                ><code>src/renderer/reader/TtsControlBar.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/VocabularyList.test.tsx"
+                ><code>src/renderer/reader/VocabularyList.test.tsx</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/VocabularyList.tsx"
+                ><code>src/renderer/reader/VocabularyList.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/annotation-colors.test.ts"
+                ><code>src/renderer/reader/annotation-colors.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/annotation-colors.ts"
+                ><code>src/renderer/reader/annotation-colors.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/apply-annotations.ts"
+                ><code>src/renderer/reader/apply-annotations.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/chapter-id-at-cfi.test.ts"
+                ><code>src/renderer/reader/chapter-id-at-cfi.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/chapter-id-at-cfi.ts"
+                ><code>src/renderer/reader/chapter-id-at-cfi.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/chapter-id-by-href.test.ts"
+                ><code>src/renderer/reader/chapter-id-by-href.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/chapter-id-by-href.ts"
+                ><code>src/renderer/reader/chapter-id-by-href.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/current-anchor-chapter.test.ts"
+                ><code>src/renderer/reader/current-anchor-chapter.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/current-anchor-chapter.ts"
+                ><code>src/renderer/reader/current-anchor-chapter.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/epub-book.test.ts"
+                ><code>src/renderer/reader/epub-book.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/epub-book.ts"
+                ><code>src/renderer/reader/epub-book.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/epub-selection.ts"
+                ><code>src/renderer/reader/epub-selection.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/epub-session.tsx"
+                ><code>src/renderer/reader/epub-session.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/epub-text-position.test.ts"
+                ><code>src/renderer/reader/epub-text-position.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/epub-text-position.ts"
+                ><code>src/renderer/reader/epub-text-position.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/font-stacks.ts"
+                ><code>src/renderer/reader/font-stacks.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/highlight.test.ts"
+                ><code>src/renderer/reader/highlight.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/highlight.ts"
+                ><code>src/renderer/reader/highlight.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/note-hover-machine.test.ts"
+                ><code>src/renderer/reader/note-hover-machine.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/note-hover-machine.ts"
+                ><code>src/renderer/reader/note-hover-machine.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-annotation-export.test.ts"
+                ><code>src/renderer/reader/pdf-annotation-export.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-annotation-export.ts"
+                ><code>src/renderer/reader/pdf-annotation-export.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-annotations.test.ts"
+                ><code>src/renderer/reader/pdf-annotations.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-annotations.ts"
+                ><code>src/renderer/reader/pdf-annotations.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-autolink.test.ts"
+                ><code>src/renderer/reader/pdf-autolink.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-autolink.ts"
+                ><code>src/renderer/reader/pdf-autolink.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-book.ts"
+                ><code>src/renderer/reader/pdf-book.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-chapter-at-page.test.ts"
+                ><code>src/renderer/reader/pdf-chapter-at-page.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-chapter-at-page.ts"
+                ><code>src/renderer/reader/pdf-chapter-at-page.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-locator.test.ts"
+                ><code>src/renderer/reader/pdf-locator.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-locator.ts"
+                ><code>src/renderer/reader/pdf-locator.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-page-appearance.test.ts"
+                ><code>src/renderer/reader/pdf-page-appearance.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-page-appearance.ts"
+                ><code>src/renderer/reader/pdf-page-appearance.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-scroll.test.ts"
+                ><code>src/renderer/reader/pdf-scroll.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-scroll.ts"
+                ><code>src/renderer/reader/pdf-scroll.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-search.test.ts"
+                ><code>src/renderer/reader/pdf-search.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-search.ts"
+                ><code>src/renderer/reader/pdf-search.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-selection.test.ts"
+                ><code>src/renderer/reader/pdf-selection.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-selection.ts"
+                ><code>src/renderer/reader/pdf-selection.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-zoom.test.ts"
+                ><code>src/renderer/reader/pdf-zoom.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdf-zoom.ts"
+                ><code>src/renderer/reader/pdf-zoom.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdfjs-compatibility.test.ts"
+                ><code>src/renderer/reader/pdfjs-compatibility.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/pdfjs-runtime.test.ts"
+                ><code>src/renderer/reader/pdfjs-runtime.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/percent.test.ts"
+                ><code>src/renderer/reader/percent.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/percent.ts"
+                ><code>src/renderer/reader/percent.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/prefs-to-css.test.ts"
+                ><code>src/renderer/reader/prefs-to-css.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/prefs-to-css.ts"
+                ><code>src/renderer/reader/prefs-to-css.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/reader-fonts.ts"
+                ><code>src/renderer/reader/reader-fonts.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/reader-panel-accessibility.test.ts"
+                ><code>src/renderer/reader/reader-panel-accessibility.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/reader-panel-accessibility.ts"
+                ><code>src/renderer/reader/reader-panel-accessibility.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/reader-theme-css.test.ts"
+                ><code>src/renderer/reader/reader-theme-css.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/reader-theme-css.ts"
+                ><code>src/renderer/reader/reader-theme-css.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/reading-position-machine.test.ts"
+                ><code>src/renderer/reader/reading-position-machine.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/reading-position-machine.ts"
+                ><code>src/renderer/reader/reading-position-machine.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/use-pdf-highlights.ts"
+                ><code>src/renderer/reader/use-pdf-highlights.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/use-pdf-search-marks.ts"
+                ><code>src/renderer/reader/use-pdf-search-marks.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/use-pdf-vocabulary.test.ts"
+                ><code>src/renderer/reader/use-pdf-vocabulary.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/use-pdf-vocabulary.ts"
+                ><code>src/renderer/reader/use-pdf-vocabulary.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/use-reading-clock.test.ts"
+                ><code>src/renderer/reader/use-reading-clock.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/use-reading-clock.ts"
+                ><code>src/renderer/reader/use-reading-clock.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/use-reading-position.ts"
+                ><code>src/renderer/reader/use-reading-position.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/use-record-reading-page.ts"
+                ><code>src/renderer/reader/use-record-reading-page.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/vocabulary-result.test.ts"
+                ><code>src/renderer/reader/vocabulary-result.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/vocabulary-result.ts"
+                ><code>src/renderer/reader/vocabulary-result.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-reader-tts">
+          <summary>src/renderer/reader/tts <span class="muted">(15 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/reader/tts/PronunciationButton.tsx"
+                ><code>src/renderer/reader/tts/PronunciationButton.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/detect-lang.test.ts"
+                ><code>src/renderer/reader/tts/detect-lang.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/detect-lang.ts"
+                ><code>src/renderer/reader/tts/detect-lang.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/pick-voice.test.ts"
+                ><code>src/renderer/reader/tts/pick-voice.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/pick-voice.ts"
+                ><code>src/renderer/reader/tts/pick-voice.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/segment-paragraphs.test.ts"
+                ><code>src/renderer/reader/tts/segment-paragraphs.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/segment-paragraphs.ts"
+                ><code>src/renderer/reader/tts/segment-paragraphs.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/split-for-utterance.test.ts"
+                ><code>src/renderer/reader/tts/split-for-utterance.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/split-for-utterance.ts"
+                ><code>src/renderer/reader/tts/split-for-utterance.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/tts-controller.ts"
+                ><code>src/renderer/reader/tts/tts-controller.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/tts-css.ts"
+                ><code>src/renderer/reader/tts/tts-css.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/tts-engine.test.ts"
+                ><code>src/renderer/reader/tts/tts-engine.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/tts-engine.ts"
+                ><code>src/renderer/reader/tts/tts-engine.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/voices.test.ts"
+                ><code>src/renderer/reader/tts/voices.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reader/tts/voices.ts"
+                ><code>src/renderer/reader/tts/voices.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-reading">
+          <summary>src/renderer/reading <span class="muted">(15 tệp)</span></summary>
+          <p class="muted">Điều hướng theo trạng thái phiên đọc và báo cáo.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/reading/BookRoute.test.ts"
+                ><code>src/renderer/reading/BookRoute.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reading/BookRoute.tsx"
+                ><code>src/renderer/reading/BookRoute.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reading/CompleteReadingDialog.tsx"
+                ><code>src/renderer/reading/CompleteReadingDialog.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reading/PageStreakPill.tsx"
+                ><code>src/renderer/reading/PageStreakPill.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reading/ReadingReportView.test.ts"
+                ><code>src/renderer/reading/ReadingReportView.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reading/ReadingReportView.tsx"
+                ><code>src/renderer/reading/ReadingReportView.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reading/ReadingStartView.tsx"
+                ><code>src/renderer/reading/ReadingStartView.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reading/ReportEditor.test.ts"
+                ><code>src/renderer/reading/ReportEditor.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reading/ReportEditor.tsx"
+                ><code>src/renderer/reading/ReportEditor.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reading/ReportProgressTimeline.tsx"
+                ><code>src/renderer/reading/ReportProgressTimeline.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reading/reading-session-actions.test.ts"
+                ><code>src/renderer/reading/reading-session-actions.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reading/report-view-model.test.ts"
+                ><code>src/renderer/reading/report-view-model.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reading/report-view-model.ts"
+                ><code>src/renderer/reading/report-view-model.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/reading/route-state.test.ts"
+                ><code>src/renderer/reading/route-state.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/reading/route-state.ts"
+                ><code>src/renderer/reading/route-state.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-settings">
+          <summary>src/renderer/settings <span class="muted">(21 tệp)</span></summary>
+          <p class="muted">Giao diện cài đặt, provider, giao diện, sao lưu và tìm kiếm web.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/settings/AdvancedSettings.tsx"
+                ><code>src/renderer/settings/AdvancedSettings.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/AgentSettings.tsx"
+                ><code>src/renderer/settings/AgentSettings.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/AnnotationPaletteSettings.tsx"
+                ><code>src/renderer/settings/AnnotationPaletteSettings.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/AppearanceSettings.tsx"
+                ><code>src/renderer/settings/AppearanceSettings.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/AssistantModelPicker.tsx"
+                ><code>src/renderer/settings/AssistantModelPicker.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/BackupExportButton.test.ts"
+                ><code>src/renderer/settings/BackupExportButton.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/settings/BackupExportButton.tsx"
+                ><code>src/renderer/settings/BackupExportButton.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/MemorySettings.tsx"
+                ><code>src/renderer/settings/MemorySettings.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/ModelEditor.tsx"
+                ><code>src/renderer/settings/ModelEditor.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/ModelPickerSection.tsx"
+                ><code>src/renderer/settings/ModelPickerSection.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/ModelsSettings.tsx"
+                ><code>src/renderer/settings/ModelsSettings.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/ProviderCard.tsx"
+                ><code>src/renderer/settings/ProviderCard.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/ProviderForm.tsx"
+                ><code>src/renderer/settings/ProviderForm.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/ReadingSettings.tsx"
+                ><code>src/renderer/settings/ReadingSettings.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/SettingsShell.tsx"
+                ><code>src/renderer/settings/SettingsShell.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/SummaryModelPicker.tsx"
+                ><code>src/renderer/settings/SummaryModelPicker.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/WebSearchSettings.tsx"
+                ><code>src/renderer/settings/WebSearchSettings.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/restore-confirmation.test.ts"
+                ><code>src/renderer/settings/restore-confirmation.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/settings/restore-confirmation.ts"
+                ><code>src/renderer/settings/restore-confirmation.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/settings/settings-logic.test.ts"
+                ><code>src/renderer/settings/settings-logic.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/settings/settings-logic.ts"
+                ><code>src/renderer/settings/settings-logic.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-shell">
+          <summary>src/renderer/shell <span class="muted">(3 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/shell/AppShell.tsx"
+                ><code>src/renderer/shell/AppShell.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/shell/SettingsMenuButton.tsx"
+                ><code>src/renderer/shell/SettingsMenuButton.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/shell/ShellHeader.tsx"
+                ><code>src/renderer/shell/ShellHeader.tsx</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-stats">
+          <summary>src/renderer/stats <span class="muted">(9 tệp)</span></summary>
+          <p class="muted">Lịch tháng, biểu đồ, thời gian và streak.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/stats/BookRanking.tsx"
+                ><code>src/renderer/stats/BookRanking.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/stats/DailyBarChart.tsx"
+                ><code>src/renderer/stats/DailyBarChart.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/stats/StatOverview.tsx"
+                ><code>src/renderer/stats/StatOverview.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/stats/StatsView.tsx"
+                ><code>src/renderer/stats/StatsView.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/stats/StreakCard.tsx"
+                ><code>src/renderer/stats/StreakCard.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/stats/format-duration.test.ts"
+                ><code>src/renderer/stats/format-duration.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/stats/format-duration.ts"
+                ><code>src/renderer/stats/format-duration.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/stats/month-calendar.test.ts"
+                ><code>src/renderer/stats/month-calendar.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/stats/month-calendar.ts"
+                ><code>src/renderer/stats/month-calendar.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-store">
+          <summary>src/renderer/store <span class="muted">(19 tệp)</span></summary>
+          <p class="muted">Zustand store: điều hướng, cài đặt, layout, chat, tab PDF và TTS.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/store/annotation-store.test.ts"
+                ><code>src/renderer/store/annotation-store.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/store/annotation-store.ts"
+                ><code>src/renderer/store/annotation-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/chat-store.test.ts"
+                ><code>src/renderer/store/chat-store.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/store/chat-store.ts"
+                ><code>src/renderer/store/chat-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/hydrate-preferences.ts"
+                ><code>src/renderer/store/hydrate-preferences.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/lazy-storage.ts"
+                ><code>src/renderer/store/lazy-storage.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/navigation-store.test.ts"
+                ><code>src/renderer/store/navigation-store.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/store/navigation-store.ts"
+                ><code>src/renderer/store/navigation-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/note-hover-store.ts"
+                ><code>src/renderer/store/note-hover-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/pane-size-store.test.ts"
+                ><code>src/renderer/store/pane-size-store.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/store/pane-size-store.ts"
+                ><code>src/renderer/store/pane-size-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/pdf-tabs-store.ts"
+                ><code>src/renderer/store/pdf-tabs-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/persist-preference.ts"
+                ><code>src/renderer/store/persist-preference.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/prefs-store.test.ts"
+                ><code>src/renderer/store/prefs-store.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/store/prefs-store.ts"
+                ><code>src/renderer/store/prefs-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/settings-store.ts"
+                ><code>src/renderer/store/settings-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/theme-store.test.ts"
+                ><code>src/renderer/store/theme-store.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/store/theme-store.ts"
+                ><code>src/renderer/store/theme-store.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/store/tts-store.ts"
+                ><code>src/renderer/store/tts-store.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-theme">
+          <summary>src/renderer/theme <span class="muted">(7 tệp)</span></summary>
+          <p class="muted">Theme, nền ứng dụng, màu trang và độ sáng PDF.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/theme/ApplicationBackground.tsx"
+                ><code>src/renderer/theme/ApplicationBackground.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/theme/ApplicationBackgroundControls.tsx"
+                ><code>src/renderer/theme/ApplicationBackgroundControls.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/theme/PageColorModeControl.tsx"
+                ><code>src/renderer/theme/PageColorModeControl.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/theme/PdfBrightnessControl.tsx"
+                ><code>src/renderer/theme/PdfBrightnessControl.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/theme/ThemeController.tsx"
+                ><code>src/renderer/theme/ThemeController.tsx</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/renderer/theme/application-background-state.test.ts"
+                ><code>src/renderer/theme/application-background-state.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/renderer/theme/application-background-state.ts"
+                ><code>src/renderer/theme/application-background-state.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-renderer-update">
+          <summary>src/renderer/update <span class="muted">(1 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/renderer/update/useStartupUpdateCheck.ts"
+                ><code>src/renderer/update/useStartupUpdateCheck.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-shared">
+          <summary>src/shared <span class="muted">(31 tệp)</span></summary>
+          <p class="muted">Schema Zod, kiểu chung và hợp đồng IPC.</p>
+          <ul class="file-list">
+            <li>
+              <a href="../src/shared/agent.ts"><code>src/shared/agent.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/annotations.ts"><code>src/shared/annotations.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/app-background.ts"
+                ><code>src/shared/app-background.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/shared/backup.test.ts"><code>src/shared/backup.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/backup.ts"><code>src/shared/backup.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/book-notes.test.ts"
+                ><code>src/shared/book-notes.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/book-notes.ts"><code>src/shared/book-notes.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/chat.test.ts"><code>src/shared/chat.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/chat.ts"><code>src/shared/chat.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/ipc.test.ts"><code>src/shared/ipc.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/ipc.ts"><code>src/shared/ipc.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/library.test.ts"><code>src/shared/library.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/library.ts"><code>src/shared/library.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/memory.ts"><code>src/shared/memory.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/pdf-bookmarks.test.ts"
+                ><code>src/shared/pdf-bookmarks.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/pdf-bookmarks.ts"><code>src/shared/pdf-bookmarks.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/preferences.test.ts"
+                ><code>src/shared/preferences.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/preferences.ts"><code>src/shared/preferences.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/providers.test.ts"><code>src/shared/providers.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/providers.ts"><code>src/shared/providers.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/reading-sessions.ts"
+                ><code>src/shared/reading-sessions.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/shared/stats.ts"><code>src/shared/stats.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/theme.test.ts"><code>src/shared/theme.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/theme.ts"><code>src/shared/theme.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/tokens.test.ts"><code>src/shared/tokens.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/tokens.ts"><code>src/shared/tokens.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/types.ts"><code>src/shared/types.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/vocabulary.test.ts"
+                ><code>src/shared/vocabulary.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/vocabulary.ts"><code>src/shared/vocabulary.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/web-search.test.ts"
+                ><code>src/shared/web-search.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/web-search.ts"><code>src/shared/web-search.ts</code></a>
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-shared-i18n">
+          <summary>src/shared/i18n <span class="muted">(6 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/shared/i18n/i18next.d.ts"
+                ><code>src/shared/i18n/i18next.d.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/shared/i18n/index.ts"><code>src/shared/i18n/index.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/i18n/language.test.ts"
+                ><code>src/shared/i18n/language.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/i18n/language.ts"><code>src/shared/i18n/language.ts</code></a>
+            </li>
+            <li>
+              <a href="../src/shared/i18n/locales.test.ts"
+                ><code>src/shared/i18n/locales.test.ts</code></a
+              ><span class="badge">test</span>
+            </li>
+            <li>
+              <a href="../src/shared/i18n/resources.ts"
+                ><code>src/shared/i18n/resources.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <details id="dir-src-shared-i18n-locales">
+          <summary>src/shared/i18n/locales <span class="muted">(2 tệp)</span></summary>
+          <ul class="file-list">
+            <li>
+              <a href="../src/shared/i18n/locales/en.ts"
+                ><code>src/shared/i18n/locales/en.ts</code></a
+              >
+            </li>
+            <li>
+              <a href="../src/shared/i18n/locales/vi.ts"
+                ><code>src/shared/i18n/locales/vi.ts</code></a
+              >
+            </li>
+          </ul>
+        </details>
+        <h2 id="reading-order">Lộ trình review</h2>
+        <ol>
+          <li>Đọc entry point và <a href="architecture.html">kiến trúc</a>.</li>
+          <li>
+            Chọn một thao tác tại <a href="runtime-flows.html">luồng chạy</a> rồi đi theo các file
+            liên kết.
+          </li>
+          <li>Mở test đặt cạnh file nghiệp vụ để xem trường hợp biên.</li>
+          <li>
+            Dùng <a href="run-from-source.html">hướng dẫn chạy</a> và
+            <a href="build-windows-exe.html">hướng dẫn EXE</a> để kiểm chứng trên ứng dụng.
+          </li>
+        </ol>
+      </main>
+      <aside class="toc">
+        <strong>Đi tới</strong><a href="#entry">Điểm vào</a><a href="#areas">Các miền code</a
+        ><a href="#inventory">Toàn bộ tệp</a><a href="#reading-order">Lộ trình review</a>
+      </aside>
+    </div>
+    <footer class="footer">
+      Mục lục được sinh từ cây source tại thời điểm viết. Khi thêm hoặc xóa file, cập nhật danh mục.
+    </footer>
+  </body>
+</html>

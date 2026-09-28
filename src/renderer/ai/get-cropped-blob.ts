@@ -1,4 +1,4 @@
-/** 裁剪区（react-easy-crop 的 croppedAreaPixels：源图像素坐标）。 */
+/** Vùng cắt croppedAreaPixels của react-easy-crop theo tọa độ pixel ảnh gốc. */
 export interface CropArea {
   x: number;
   y: number;
@@ -6,7 +6,7 @@ export interface CropArea {
   height: number;
 }
 
-/** 头像输出最长边上限（px），控制 blob 体积。 */
+/** Cạnh dài tối đa của ảnh đại diện đầu ra theo px để giới hạn dung lượng blob. */
 export const AVATAR_OUTPUT_MAX = 512;
 
 function loadImage(src: string): Promise<HTMLImageElement> {
@@ -18,7 +18,7 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   });
 }
 
-/** 按裁剪区从 dataURL 出图，缩放到最长边 ≤ AVATAR_OUTPUT_MAX，返回 png 字节。 */
+/** Cắt ảnh từ dataURL, thu nhỏ để cạnh dài không vượt AVATAR_OUTPUT_MAX rồi trả byte PNG. */
 export async function getCroppedBlob(
   imageSrc: string,
   area: CropArea,

@@ -1,14 +1,14 @@
-/** 深处冷启动时，尚未走到的前置 section 保持轻量占位，避免其迟到测高推走目标。 */
+/** Khi mở sách ở vị trí sâu, giữ placeholder nhẹ cho section phía trên để số đo muộn không đẩy lệch đích. */
 export function deferBeforeLoadedIndex(loadedFromIndex: number, index: number): boolean {
   return index < loadedFromIndex;
 }
 
-/** 命令式跳转只开放目标及其后的 section；已开放的 section 不重新收回。 */
+/** Nhảy bằng lệnh chỉ mở section đích và phía sau; section đã mở không bị đóng lại. */
 export function loadedFromIndexAfterNavigation(current: number, target: number): number {
   return Math.min(current, target);
 }
 
-/** 只有确认出现滚动意图后，才随真实可视顶部向前逐步开放 section。 */
+/** Chỉ mở dần section theo đầu viewport thực tế sau khi xác nhận có thao tác cuộn. */
 export function loadedFromIndexAfterVisibleTop(
   current: number,
   visibleTop: number,
@@ -26,9 +26,9 @@ export function estimateHeight(
 }
 
 /**
- * 带校准的估高：缓存命中直接用；未测量时用「已测 section 的 px/权重比」乘以目标权重外推
- * （权重 = 消费方提供的相对体量，如章节字符数）。无权重函数 / 无有效样本 / 目标权重为 0
- * 时退回 defaultEstimate。校准样本须排除权重 0 的 section（封面图等会污染比率）。
+ * Ước tính chiều cao có hiệu chỉnh: dùng cache nếu có; nếu chưa đo, nhân trọng số đích
+ * (do bên dùng cung cấp, chẳng hạn số ký tự chương) với tỷ lệ px/trọng số của section đã đo.
+ * Dùng defaultEstimate nếu không có hàm trọng số, mẫu hợp lệ hoặc trọng số đích; bỏ mẫu trọng số 0.
  */
 export function calibratedEstimate(
   cache: ReadonlyMap<number, number>,
@@ -59,8 +59,8 @@ export function calibratedEstimate(
 }
 
 /**
- * 距 active range 超过 keepDistance 的 section 索引（应 unload 的集合）。
- * 保留区间 = [startIndex - keepDistance, endIndex + keepDistance]，区间外全部淘汰。
+ * Các chỉ số section cần gỡ tải vì cách active range quá keepDistance.
+ * Giữ đoạn [startIndex - keepDistance, endIndex + keepDistance] và loại mọi phần tử bên ngoài.
  */
 export function sectionsToUnload(
   range: { startIndex: number; endIndex: number },
@@ -77,10 +77,9 @@ export function sectionsToUnload(
 }
 
 /**
- * 给定各 section 在视口坐标的 top/bottom 与视口顶线 viewportTop，挑真实视口顶 section 的索引。
- * 规则：① 优先选「跨越视口顶线」者（top<=vt<bottom；多个取 top 最大、最贴线下方）；
- *       ② 间隙无命中时取 top>=vt 中 top 最小者（视口下方最近）；
- *       ③ 全在上方时取 bottom 最大者（最靠下）。空输入返回 null。
+ * Chọn section ở đầu viewport từ tọa độ top/bottom của các section và đường viewportTop.
+ * Ưu tiên section cắt qua đường này; nếu không có, chọn section gần nhất phía dưới,
+ * hoặc section gần nhất phía trên nếu tất cả đều nằm trên đường. Danh sách rỗng trả về null.
  */
 export function topVisibleIndex(
   sections: ReadonlyArray<{ index: number; top: number; bottom: number }>,

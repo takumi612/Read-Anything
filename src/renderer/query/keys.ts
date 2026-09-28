@@ -1,4 +1,4 @@
-/** 查询键工厂——与 spec §6.3 约定一致。 */
+/** Hàm tạo khóa truy vấn theo quy ước trong spec §6.3. */
 export const qk = {
   library: ["library"] as const,
   toc: (bookId: string) => ["toc", bookId] as const,
@@ -6,11 +6,11 @@ export const qk = {
   bookBytes: (bookId: string) => ["book-bytes", bookId] as const,
   progress: (bookId: string) => ["progress", bookId] as const,
   annotations: (bookId: string) => ["annotations", bookId] as const,
+  vocabulary: (bookId: string) => ["vocabulary", bookId] as const,
+  vocabularyOccurrences: (bookId: string) => ["vocabulary-occurrences", bookId] as const,
+  pdfBookmarks: (bookId: string) => ["pdf-bookmarks", bookId] as const,
   bookNotes: (bookId: string) => ["book-notes", bookId] as const,
-  chapterSummary: (bookId: string, chapterId: string) =>
-    ["chapter-summary", bookId, chapterId] as const,
   book: (bookId: string) => ["book", bookId] as const,
-  bookSummary: (bookId: string) => ["book-summary", bookId] as const,
   readingSessions: (bookId: string) => ["reading-sessions", bookId] as const,
   readingSession: (sessionId: string) => ["reading-session", sessionId] as const,
   recentlyRead: ["recently-read"] as const,
@@ -18,5 +18,6 @@ export const qk = {
   conversations: (bookId: string) => ["conversations", bookId] as const,
   messages: (conversationId: string) => ["messages", conversationId] as const,
   stats: (dailyDays: number) => ["stats", dailyDays] as const,
+  pageStreak: ["page-streak"] as const,
   memories: ["memories"] as const,
 };

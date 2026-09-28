@@ -17,7 +17,7 @@ import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 
-/** 居中笔记 modal：create 来自选区（默认 yellow），edit 来自已有标注。 */
+/** Hộp ghi chú ở giữa: tạo từ vùng chọn với màu vàng mặc định hoặc sửa chú thích có sẵn. */
 export function NoteModal() {
   const { t } = useTranslation();
   const noteModal = useAnnotationStore((s) => s.noteModal);
@@ -37,12 +37,12 @@ export function NoteModal() {
 
   const editing = noteModal?.target.type === "edit" ? noteModal.target.annotationId : null;
   const current = editing ? annos.data?.find((a) => a.id === editing) : undefined;
-  // modal 内显示被标注/选中的原文引用（create 取打开时的锚点快照，edit 取标注快照）。
+  // Hiện đoạn gốc trong hộp: khi tạo dùng ảnh chụp điểm neo lúc mở, khi sửa dùng dữ liệu chú thích.
   const quote = editing ? current?.selectedText : noteModal?.anchor?.selectedText;
 
-  // 打开时初始化文本（edit 取现笔记，create 空）+ 聚焦。
-  // 仅依赖 [noteModal, editing]：openNoteModal 每次都 set 全新对象，故每次打开 noteModal 引用必变、
-  // effect 必重跑、文本必重置——不必把 current/text 列入依赖（列了反会因 current 变化覆盖用户输入）。
+  // Khi mở, nạp ghi chú cũ nếu sửa, để trống nếu tạo, rồi focus.
+  // Chỉ phụ thuộc noteModal và editing vì mỗi lần mở tạo object noteModal mới nên effect luôn chạy lại.
+  // Thêm current hoặc text vào dependency có thể ghi đè nội dung người dùng đang nhập.
   useEffect(() => {
     if (!noteModal) return;
     setText(editing ? (current?.note ?? "") : "");
@@ -56,7 +56,7 @@ export function NoteModal() {
 
   if (!noteModal || bookId == null) return null;
 
-  // 改①：放弃（取消 / 点遮罩）时一并清选区，否则关 modal 后主工具栏会因 store.selection 仍在而重现。
+  // Khi hủy hoặc nhấn nền, xóa cả vùng chọn để thanh công cụ không hiện lại sau khi đóng hộp.
   const dismiss = () => {
     closeNoteModal();
     setSelection(null);
@@ -64,7 +64,7 @@ export function NoteModal() {
 
   const save = () => {
     if (noteModal.target.type === "create") {
-      // 用打开时的选区锚点快照（而非易失的 store.selection），缺锚点则不建——防静默丢笔记。
+      // Dùng điểm neo chụp lúc mở thay cho store.selection có thể đổi; thiếu neo thì không tạo ghi chú.
       const anchor = noteModal.anchor;
       if (!anchor) return;
       createM.mutate({
@@ -85,7 +85,7 @@ export function NoteModal() {
     <Dialog
       open
       onOpenChange={(open) => {
-        // ESC / 点遮罩 / X 关闭 → 同 dismiss（关 modal + 清选区）
+        // Esc, nhấn nền hoặc nút X đều đóng hộp và xóa vùng chọn.
         if (!open) dismiss();
       }}
     >
@@ -93,8 +93,8 @@ export function NoteModal() {
         <DialogHeader>
           <DialogTitle>
             {editing
-              ? t("reader.note.editTitle", "编辑笔记")
-              : t("reader.note.addTitle", "添加笔记")}
+              ? t("reader.note.editTitle", "Sửa ghi chú")
+              : t("reader.note.addTitle", "Thêm ghi chú")}
           </DialogTitle>
         </DialogHeader>
         {quote && (
@@ -107,21 +107,21 @@ export function NoteModal() {
           value={text}
           onChange={(e) => setText(e.target.value)}
           onKeyDown={(e) => {
-            // Cmd(macOS)/Ctrl(Win/Linux)+Enter 保存
+            // Cmd trên macOS hoặc Ctrl trên Windows/Linux cùng Enter để lưu.
             if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
               e.preventDefault();
               save();
             }
           }}
-          placeholder={t("reader.note.placeholder", "写点想法…")}
+          placeholder={t("reader.note.placeholder", "Viết suy nghĩ của bạn…")}
           className="no-scrollbar min-h-40 resize-none leading-relaxed"
         />
         <DialogFooter>
           <Button variant="ghost" onClick={dismiss}>
-            {t("common.cancel", "取消")}
+            {t("common.cancel", "Hủy")}
           </Button>
           <Button onClick={save}>
-            {t("common.save", "保存")}
+            {t("common.save", "Lưu")}
             <KbdGroup>
               <ModKey className="border-transparent bg-primary-foreground/20 text-primary-foreground" />
               <Kbd className="border-transparent bg-primary-foreground/20 text-primary-foreground">

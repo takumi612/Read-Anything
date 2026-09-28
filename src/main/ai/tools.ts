@@ -5,32 +5,31 @@ import { and, eq } from "drizzle-orm";
 import type { DB } from "@main/db/client";
 import { chapters } from "@main/db/schema";
 import { listChapters, readChapterText } from "@main/library/content";
-import { getChapterSummaryView, getBookSummaryView } from "@main/ai/summary";
 import { getBook, resolveChapterByHref } from "@main/library/repository";
 import { extractPdfText, renderPageImage } from "@marginalia/pdf-parser";
 import { createLogger } from "@main/logger";
+import { retrievePdfEvidence } from "@main/ai/pdf-retrieval";
 
 const log = createLogger("tools");
 
-/** 取某书原始字节（生产实现读 app 自有派生路径；测试注入 fixture 字节）。 */
+/** Lấy bytes sách gốc; bản thật đọc từ thư mục ứng dụng, kiểm thử truyền bytes mẫu. */
 export type LoadBytes = (bookId: string) => Promise<Uint8Array>;
 
 export interface ReadingToolsDeps {
   db: DB;
   bookId: string;
   loadBytes: LoadBytes;
-  /** provider 是否支持图像 tool result（readPage image 模式门控；spec §7）。缺省按不支持。 */
+  /** Provider có hỗ trợ kết quả công cụ dạng ảnh không; mặc định là không. */
   imageToolResults?: boolean;
 }
 
-/** 给模型看的页面图像渲染宽度（px）：兼顾排版可读与 token 成本。 */
+/** Chiều rộng ảnh trang gửi model, cân bằng khả năng đọc và chi phí token. */
 const READ_PAGE_IMAGE_WIDTH = 1280;
 
 /**
- * 把模型给的章节引用解析成规范 chapterId。既接受代理 uuid（chapters.id），
- * 也接受 getToc 返回的 href，还容忍唯一命中的章节标题（大小写不敏感）——
- * 模型偶发把目录里的 href 或标题（如 "Preface"）当 id 传，宽容解析吸收这类偏差。
- * 解析失败的错误信息附带真实章节清单（自愈数据：tool result 透传后模型可据此重试）。
+ * Chuyển tham chiếu chương từ model thành chapterId chuẩn. Chấp nhận UUID, href từ getToc
+ * hoặc tiêu đề khớp duy nhất không phân biệt hoa thường; model đôi khi gửi href/tiêu đề thay ID.
+ * Nếu không tìm thấy, lỗi kèm danh sách chương thật để model có thể thử lại.
  */
 export function resolveChapterRef(db: DB, bookId: string, ref: string): string {
   const byId = db
@@ -59,9 +58,8 @@ export function resolveChapterRef(db: DB, bookId: string, ref: string): string {
 }
 
 /**
- * tool 执行错误不抛、转 `{ error }` result：AI SDK v6 中 execute 抛错会中断整条流式
- * 回复（onError → 该轮 status=error），模型没有自我纠正的机会；转 result 后错误进入
- * 对话流，模型可据错误信息（如 resolveChapterRef 的章节清单）换参重试。
+ * Lỗi công cụ được trả thành `{ error }` thay vì ném ra để không ngắt luồng trả lời.
+ * Model nhìn thấy lỗi và có thể đổi tham số rồi gọi lại công cụ.
  */
 export async function runTool<T>(
   name: string,
@@ -75,31 +73,16 @@ export async function runTool<T>(
   }
 }
 
-/** 当前书的只读阅读工具集（设计文档 §8）；全部在 main 执行，喂 streamText({ tools })。 */
+/** Công cụ đọc sách hiện tại, chỉ đọc và chạy ở main trước khi đưa vào streamText. */
 export function createReadingTools(deps: ReadingToolsDeps) {
   const { db, bookId, loadBytes } = deps;
 
   const base = {
     getToc: tool({
       description:
-        "List the book's chapters with their ids and titles. Use the returned `id` field as the chapterId for readChapterText and getChapterSummary.",
+        "List the book's chapters with their ids and titles. Use the returned `id` field as the chapterId for readChapterText.",
       inputSchema: z.object({}),
       execute: async () => listChapters(db, bookId),
-    }),
-    getChapterSummary: tool({
-      description:
-        "Get the cached AI summary (and its status) of a chapter by its id (from getToc).",
-      inputSchema: z.object({ chapterId: z.string().min(1) }),
-      execute: async ({ chapterId }) =>
-        runTool("getChapterSummary", () =>
-          getChapterSummaryView(db, bookId, resolveChapterRef(db, bookId, chapterId)),
-        ),
-    }),
-    getBookSummary: tool({
-      description:
-        "Get the AI-generated whole-book summary (and its status) for the book you're reading. No arguments — it always targets the current book.",
-      inputSchema: z.object({}),
-      execute: async () => runTool("getBookSummary", () => getBookSummaryView(db, bookId)),
     }),
     readChapterText: tool({
       description:
@@ -124,12 +107,23 @@ export function createReadingTools(deps: ReadingToolsDeps) {
   const pageCount = book.pageCount ?? 0;
   const hasTextLayer = Boolean(book.hasTextLayer);
   const imageOk = deps.imageToolResults ?? false;
-  // 运行时按门控收窄 enum；类型断言为全集使 execute 的 mode 覆盖两种值。
-  // spec §7：不支持图像 tool result 的 provider 不在 schema 中声明 image，避免模型调用后失败。
+  // Chỉ khai báo mode image trong schema nếu provider hỗ trợ kết quả ảnh.
+  // Kiểu đầy đủ cho execute vẫn bao gồm cả hai mode.
   const modes = (imageOk ? ["text", "image"] : ["text"]) as ["text", "image"];
 
   return {
     ...base,
+    ...(hasTextLayer
+      ? {
+          searchPdf: tool({
+            description:
+              "Search the entire current PDF locally for relevant passages. Returns short excerpts with 1-based page numbers. Use when a question needs evidence beyond the selected sentence or current page.",
+            inputSchema: z.object({ query: z.string().trim().min(2).max(500) }),
+            execute: async ({ query }) =>
+              runTool("searchPdf", () => retrievePdfEvidence(bookId, loadBytes, "", query)),
+          }),
+        }
+      : {}),
     readPage: tool({
       description: imageOk
         ? 'Read one page of this PDF by 1-based page number. mode "text" returns the page text; mode "image" returns a rendered image of the page — use it for figures, tables, complex layouts, or scanned pages.'
@@ -158,8 +152,8 @@ export function createReadingTools(deps: ReadingToolsDeps) {
           const slice = await extractPdfText(bytes, { startPage: page, endPage: page });
           return { kind: "text" as const, page, text: slice.text };
         }),
-      // 图像必须以 content part 回传模型（默认 JSON 序列化只会把 base64 变成一坨文本）；
-      // text 维持 JSON 形状；runTool 的 { error } 形状原样 JSON 透传。
+      // Trả ảnh qua content part; JSON thông thường chỉ biến base64 thành văn bản dài.
+      // Kết quả text và lỗi `{ error }` vẫn đi qua JSON.
       toModelOutput: ({ output }) =>
         "kind" in output && output.kind === "image"
           ? {

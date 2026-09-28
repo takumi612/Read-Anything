@@ -16,26 +16,26 @@ import { providerModelOptions } from "./settings-logic";
 
 export interface ModelPickerSectionProps {
   title: string;
-  /** 区块说明（可选；摘要模型用）。 */
+  /** Mô tả tùy chọn cho khối, dùng với mô hình tóm tắt. */
   description?: string;
-  /** "" = 未选。 */
+  /** Chuỗi rỗng nghĩa là chưa chọn. */
   providerId: string;
-  /** "" = 未选。 */
+  /** Chuỗi rỗng nghĩa là chưa chọn. */
   model: string;
-  /** 切 provider；调用方应同时弃旧 model（非法 (provider, model) 对防呆）。 */
+  /** Khi đổi provider, bên gọi cần bỏ model cũ để tránh cặp provider/model không hợp lệ. */
   onProviderChange: (id: string) => void;
   onModelChange: (model: string) => void;
-  /** 推理强度当前值；undefined = 未设置（默认档）。 */
+  /** Mức suy luận hiện tại; undefined nghĩa là dùng mặc định. */
   reasoningEffort?: ReasoningEffort;
-  /** 未选定模型 / 切换中禁用（无处可挂）。 */
+  /** Tắt khi chưa chọn mô hình hoặc đang chuyển mô hình. */
   reasoningEffortDisabled?: boolean;
-  /** 传入即渲染推理强度行；undefined = 设回默认档（不下发）。 */
+  /** Khi có callback thì hiển thị hàng mức suy luận; undefined đặt lại mặc định. */
   onReasoningEffortChange?: (effort: ReasoningEffort | undefined) => void;
 }
 
 /**
- * provider/model 双 Select + 测试连接的共享基件（对话模型 / 摘要模型两区块共用）。
- * 测试结果是基件本地状态（ProviderCard 同款取向）——两个区块天然隔离、互不覆盖。
+ * Thành phần chọn provider/model và kiểm tra kết nối dùng chung cho chat và tóm tắt.
+ * Kết quả kiểm tra nằm trong state cục bộ nên hai khối không ghi đè nhau.
  */
 export function ModelPickerSection({
   title,
@@ -51,14 +51,14 @@ export function ModelPickerSection({
   const { t } = useTranslation();
   const effortLabel = (v: string) =>
     v === "none"
-      ? t("settings.reasoningEffort.none", "关闭")
+      ? t("settings.reasoningEffort.none", "Tắt")
       : v === "low"
-        ? t("settings.reasoningEffort.low", "低")
+        ? t("settings.reasoningEffort.low", "Thấp")
         : v === "medium"
-          ? t("settings.reasoningEffort.medium", "中")
+          ? t("settings.reasoningEffort.medium", "Vừa")
           : v === "high"
-            ? t("settings.reasoningEffort.high", "高")
-            : t("settings.reasoningEffort.default", "默认");
+            ? t("settings.reasoningEffort.high", "Cao")
+            : t("settings.reasoningEffort.default", "Mặc định");
   const providers = useQuery({
     queryKey: qk.providers,
     queryFn: () => window.api.settings.providers.list(),
@@ -74,7 +74,7 @@ export function ModelPickerSection({
     onError: (e) => setTestResult({ ok: false, message: (e as Error).message }),
   });
 
-  const unnamed = t("settings.provider.unnamed", "（未命名）");
+  const unnamed = t("settings.provider.unnamed", "(chưa đặt tên)");
 
   return (
     <section className="space-y-3">
@@ -85,7 +85,7 @@ export function ModelPickerSection({
         <Select
           value={providerId || null}
           onValueChange={(id) => {
-            // 切 provider 同时由调用方清 model（旧 model 多半不属于新 provider）：显 placeholder 强制重选，避免残留非法 (provider, model) 对；换选后旧测试结果作废。
+            // Đổi provider sẽ xóa model cũ, hiện placeholder để người dùng chọn lại và bỏ kết quả kiểm tra trước.
             if (id) {
               onProviderChange(id);
               setTestResult(null);
@@ -93,12 +93,12 @@ export function ModelPickerSection({
           }}
         >
           <SelectTrigger className="h-9 w-full">
-            {/* value 是 provider id（uuid）；Base UI Select.Value 默认渲染裸 value，故用函数 child 映射成名字。 */}
-            <SelectValue placeholder={t("settings.provider.select", "选择$t(terms.provider)")}>
+            {/* Value là id provider; dùng hàm child để Base UI hiển thị tên thay cho UUID. */}
+            <SelectValue placeholder={t("settings.provider.select", "Chọn $t(terms.provider)")}>
               {(value) =>
                 typeof value === "string"
                   ? (providers.data?.find((p) => p.id === value)?.label ?? unnamed)
-                  : t("settings.provider.select", "选择$t(terms.provider)")
+                  : t("settings.provider.select", "Chọn $t(terms.provider)")
               }
             </SelectValue>
           </SelectTrigger>
@@ -110,7 +110,7 @@ export function ModelPickerSection({
             ))}
           </SelectContent>
         </Select>
-        <span className="text-xs text-muted-foreground">{t("settings.model", "模型")}</span>
+        <span className="text-xs text-muted-foreground">{t("settings.model", "Model")}</span>
         <Select
           value={model || null}
           disabled={!providerId}
@@ -122,7 +122,7 @@ export function ModelPickerSection({
           }}
         >
           <SelectTrigger className="h-9 w-full">
-            <SelectValue placeholder={t("settings.model.select", "选择模型")} />
+            <SelectValue placeholder={t("settings.model.select", "Chọn model")} />
           </SelectTrigger>
           <SelectContent>
             {modelOptions.map((m) => (
@@ -135,13 +135,13 @@ export function ModelPickerSection({
         {onReasoningEffortChange && (
           <>
             <span className="text-xs text-muted-foreground">
-              {t("settings.reasoningEffort", "推理强度")}
+              {t("settings.reasoningEffort", "Mức độ suy luận")}
             </span>
             <Select
               value={reasoningEffort ?? "default"}
               disabled={reasoningEffortDisabled}
               onValueChange={(v) => {
-                // "default" = 未设置（不下发）；其余为具体档位。切换时作废旧测试结果。
+                // "default" nghĩa là không gửi mức riêng; đổi mức sẽ bỏ kết quả kiểm tra trước.
                 if (v) {
                   onReasoningEffortChange(v === "default" ? undefined : (v as ReasoningEffort));
                   setTestResult(null);
@@ -149,19 +149,19 @@ export function ModelPickerSection({
               }}
             >
               <SelectTrigger className="h-9 w-full">
-                {/* Base UI Select.Value 默认渲染裸 value，故用函数 child 映射成本地化标签。 */}
+                {/* Dùng hàm child để Base UI Select.Value hiển thị nhãn đã dịch thay cho giá trị gốc. */}
                 <SelectValue>
                   {(value) => effortLabel(typeof value === "string" ? value : "default")}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="default">
-                  {t("settings.reasoningEffort.default", "默认")}
+                  {t("settings.reasoningEffort.default", "Mặc định")}
                 </SelectItem>
-                <SelectItem value="none">{t("settings.reasoningEffort.none", "关闭")}</SelectItem>
-                <SelectItem value="low">{t("settings.reasoningEffort.low", "低")}</SelectItem>
-                <SelectItem value="medium">{t("settings.reasoningEffort.medium", "中")}</SelectItem>
-                <SelectItem value="high">{t("settings.reasoningEffort.high", "高")}</SelectItem>
+                <SelectItem value="none">{t("settings.reasoningEffort.none", "Tắt")}</SelectItem>
+                <SelectItem value="low">{t("settings.reasoningEffort.low", "Thấp")}</SelectItem>
+                <SelectItem value="medium">{t("settings.reasoningEffort.medium", "Vừa")}</SelectItem>
+                <SelectItem value="high">{t("settings.reasoningEffort.high", "Cao")}</SelectItem>
               </SelectContent>
             </Select>
           </>
@@ -175,8 +175,8 @@ export function ModelPickerSection({
           onClick={() => test.mutate()}
         >
           {test.isPending
-            ? t("settings.provider.testing", "测试中…")
-            : t("settings.provider.test", "测试连接")}
+            ? t("settings.provider.testing", "Đang kiểm tra…")
+            : t("settings.provider.test", "Kiểm tra kết nối")}
         </Button>
         {testResult && (
           <span
@@ -188,8 +188,8 @@ export function ModelPickerSection({
           >
             {testResult.ok ? <Check className="size-4" /> : <X className="size-4" />}
             {testResult.ok
-              ? t("settings.provider.testOk", "连接成功")
-              : t("settings.provider.testFail", "失败：{{message}}", {
+              ? t("settings.provider.testOk", "Kết nối thành công")
+              : t("settings.provider.testFail", "Thất bại: {{message}}", {
                   message: testResult.message ?? "",
                 })}
           </span>

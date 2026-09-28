@@ -8,6 +8,20 @@ describe("detectParagraphLang", () => {
   it("detects English paragraphs", () => {
     expect(detectParagraphLang("This is a plain English paragraph about reading.")).toBe("en");
   });
+  it("detects Vietnamese paragraphs from Vietnamese diacritics", () => {
+    expect(detectParagraphLang("Trường hợp này cần giữ nguyên ngữ cảnh của người đọc.")).toBe("vi");
+  });
+  it("detects a short Vietnamese phrase that has no uniquely Vietnamese letter", () => {
+    expect(detectParagraphLang("Tôi rất vui.")).toBe("vi");
+  });
+  it("detects Vietnamese text when diacritics are decomposed", () => {
+    expect(detectParagraphLang("Tôi rất vui.".normalize("NFD"))).toBe("vi");
+  });
+  it("does not mistake occasional accents in English for Vietnamese", () => {
+    expect(
+      detectParagraphLang("A café table with décor items in an otherwise English paragraph."),
+    ).toBe("en");
+  });
   it("detects Japanese via kana even with heavy kanji", () => {
     expect(detectParagraphLang("吾輩は猫である。名前はまだ無い。")).toBe("ja");
   });

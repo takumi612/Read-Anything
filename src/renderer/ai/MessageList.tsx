@@ -7,7 +7,6 @@ import { BookOpen, FileText, List, ScrollText, Sparkles, Wrench } from "lucide-r
 import { useTranslation } from "react-i18next";
 import { AssistantAvatar } from "@renderer/ai/AssistantAvatar";
 import { assistantActivity, type AssistantActivity } from "@renderer/ai/assistant-activity";
-import { chipLabel } from "@renderer/ai/chip-label";
 import { useChatActions } from "@renderer/ai/chat-actions";
 import { MessageEditor } from "@renderer/ai/MessageEditor";
 import { textOf } from "@renderer/ai/message-text";
@@ -21,14 +20,74 @@ import { LocalizedStreamdown } from "@renderer/components/LocalizedStreamdown";
 import { cn } from "@renderer/lib/utils";
 import { qk } from "@renderer/query/keys";
 import { usePrefsStore } from "@renderer/store/prefs-store";
+import { useNavigationStore } from "@renderer/store/navigation-store";
+import { useAnnotationStore } from "@renderer/store/annotation-store";
+import { makePdfLocator } from "@renderer/reader/pdf-locator";
 import type { ChapterRefDto } from "@shared/library";
 
+function linkPdfCitations(text: string): string {
+  return text.replace(
+    /(?<!!)\[p\.(\d{1,5})\](?!\()/gu,
+    (_match, page: string, offset: number, source: string) => {
+      const preceding = source.slice(Math.max(0, offset - 140), offset);
+      const quote = /["“]([^"”\n]{4,100})["”]\s*$/u.exec(preceding)?.[1];
+      const fragment = quote ? `?quote=${encodeURIComponent(quote)}` : "";
+      return `[p.${page}](#pdf-page-${page}${fragment})`;
+    },
+  );
+}
+
+function PdfCitationAnchor(rawProps: unknown) {
+  const { href, children, ...props } = rawProps as React.ComponentProps<"a">;
+  const requestScroll = useAnnotationStore((s) => s.requestScroll);
+  const currentBookId = useNavigationStore((s) => s.currentBookId);
+  const isPdf = useNavigationStore((s) => s.readingContext?.format === "pdf");
+  const pageCount = useNavigationStore((s) =>
+    s.readingContext?.format === "pdf" ? s.readingContext.pageCount : null,
+  );
+  const citation = /^#pdf-page-(\d{1,5})(?:\?quote=(.+))?$/u.exec(href ?? "");
+  const page = citation?.[1];
+  let quote: string | undefined;
+  try {
+    quote = citation?.[2] ? decodeURIComponent(citation[2]).slice(0, 100) : undefined;
+  } catch {
+    quote = undefined;
+  }
+  return (
+    <a
+      {...props}
+      href={href}
+      onClick={(event) => {
+        if (
+          !page ||
+          Number(page) < 1 ||
+          !isPdf ||
+          !currentBookId ||
+          (pageCount != null && Number(page) > pageCount)
+        ) {
+          props.onClick?.(event);
+          return;
+        }
+        event.preventDefault();
+        requestScroll(
+          makePdfLocator({ page: Number(page), scrollRatio: 0 }),
+          true,
+          currentBookId,
+          quote,
+        );
+      }}
+    >
+      {children}
+    </a>
+  );
+}
+
 /**
- * 流式正文逐字淡入（Streamdown 内置 animate 插件，仅 isAnimating 时注入 span，已显示的字不重播）。
- * sep 用 char：默认 word 按空白切分，中文无空格会整段一起淡入。
- * stagger 必须为 0：每批字到达即渲染（useChat 50ms 合批，快模型一批一二十字），批内错开会拖过下一批到达，
- * 前批末尾比后批开头更透明，形成多道此起彼伏的波。为 0 时透明度沿文本单调递增，只有一道拖尾；
- * duration 决定拖尾长短（约最近 duration 毫秒内到达的字仍在淡入）。
+ * Nội dung stream mờ dần vào theo từng ký tự bằng plugin animate của Streamdown.
+ * Chỉ ký tự mới được bọc span khi isAnimating; ký tự đã hiện không chạy lại.
+ * Chọn sep=char vì tách theo từ sẽ gộp cả đoạn văn không có dấu cách.
+ * stagger phải bằng 0 để mỗi lô ký tự hiện ngay, không tạo nhiều đợt mờ chồng lên nhau.
+ * duration quyết định độ dài phần đuôi đang mờ dần.
  */
 const STREAM_ANIMATION = { animation: "fadeIn", sep: "char", duration: 500, stagger: 0 } as const;
 
@@ -46,7 +105,7 @@ export function MessageList({
   loadingMore?: boolean;
 }) {
   const { t } = useTranslation();
-  // 章节列表给步骤行解析人话标题（chapterId → 章节名）；静态数据，与 ChapterList 共享缓存。
+  // Danh sách chương giúp bước công cụ đổi chapterId thành tên dễ đọc; dùng chung cache với ChapterList.
   const chaptersQuery = useQuery({
     queryKey: qk.chapters(bookId ?? ""),
     queryFn: () => window.api.content.chapters({ bookId: bookId ?? "" }),
@@ -55,21 +114,22 @@ export function MessageList({
   const chapters = chaptersQuery.data ?? [];
   const showAvatar = usePrefsStore((s) => s.showAgentAvatar);
   const agentName = usePrefsStore((s) => s.soul.name);
+  const pdfCitations = useNavigationStore((s) => s.readingContext?.format === "pdf");
   if (messages.length === 0) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 px-8 text-center text-sm text-muted-foreground">
         <Sparkles className="size-7 text-primary/50" />
         <p className="leading-relaxed">
           {bookId
-            ? t("ai.emptyHint", "划选正文后点「AI 问」，或直接在下方提问。")
-            : t("ai.emptyHintLibrary", "直接在下方向 {{name}} 提问吧～", { name: agentName })}
+            ? t("ai.emptyHint", "Chọn một đoạn rồi nhấn Hỏi AI, hoặc nhập câu hỏi bên dưới.")
+            : t("ai.emptyHintLibrary", "Hãy hỏi {{name}} bất cứ điều gì bên dưới.", { name: agentName })}
         </p>
       </div>
     );
   }
   const lastMessage = messages.at(-1);
   const lastId = lastMessage?.id;
-  // live 消息（本轮发送/流式产出）尚未回读落库时间，统一以本次渲染时刻兜底。
+  // Tin đang gửi hoặc stream chưa có thời gian từ DB, tạm dùng thời điểm render hiện tại.
   const nowMs = Temporal.Now.instant().epochMilliseconds;
   const timeZone = Temporal.Now.timeZoneId();
   const activity = assistantActivity(
@@ -81,8 +141,8 @@ export function MessageList({
       {(hasMore || loadingMore) && (
         <div className="py-2 text-center text-xs text-muted-foreground">
           {loadingMore
-            ? t("ai.loadingOlder", "加载更早消息…")
-            : t("ai.scrollToLoadOlder", "上滑加载更早消息")}
+            ? t("ai.loadingOlder", "Đang tải tin nhắn cũ hơn…")
+            : t("ai.scrollToLoadOlder", "Cuộn lên để tải tin nhắn cũ hơn")}
         </div>
       )}
       {messages.map((m, i) => {
@@ -103,6 +163,7 @@ export function MessageList({
                 streaming={status === "streaming" && m.id === lastId}
                 activity={m.id === lastId ? activity : null}
                 chapters={chapters}
+                pdfCitations={pdfCitations}
                 showAvatar={showAvatar}
                 groupHead={i === 0 || messages[i - 1].role !== "assistant"}
               />
@@ -115,15 +176,15 @@ export function MessageList({
   );
 }
 
-/** 跨自然日时插入的日期分隔行：今天/昨天用人话，更早给绝对日期。 */
+/** Dòng ngăn cách theo ngày: hôm nay và hôm qua dùng nhãn quen thuộc, ngày cũ dùng ngày tuyệt đối. */
 function DayDivider({ at, nowMs, timeZone }: { at: number; nowMs: number; timeZone: string }) {
   const { t, i18n } = useTranslation();
   const kind = dayKind(at, nowMs, timeZone);
   const label =
     kind === "today"
-      ? t("ai.day.today", "今天")
+      ? t("ai.day.today", "Hôm nay")
       : kind === "yesterday"
-        ? t("ai.day.yesterday", "昨天")
+        ? t("ai.day.yesterday", "Hôm qua")
         : new Intl.DateTimeFormat(i18n.language, { dateStyle: "long", timeZone }).format(at);
   return (
     <div className="flex items-center gap-3" role="separator" aria-label={label}>
@@ -138,8 +199,8 @@ function AssistantActivityIndicator({ activity }: { activity: Exclude<AssistantA
   const { t } = useTranslation();
   const label =
     activity === "preparing"
-      ? t("ai.activity.preparing", "正在准备回答…")
-      : t("ai.activity.reasoning", "正在思考…");
+      ? t("ai.activity.preparing", "Đang chuẩn bị câu trả lời…")
+      : t("ai.activity.reasoning", "Đang suy nghĩ…");
 
   return (
     <div
@@ -179,7 +240,6 @@ function UserBubble({
   const { t } = useTranslation();
   const actions = useChatActions();
   const [editing, setEditing] = useState(false);
-  const chips = m.metadata?.contextChips ?? [];
 
   if (editing) {
     return (
@@ -203,23 +263,6 @@ function UserBubble({
     <div className="group relative flex flex-col items-end" data-message-id={m.id}>
       <MessageTimestamp at={createdAt} timeZone={timeZone} align="end" />
       <div className="max-w-[88%] rounded-2xl rounded-br-sm bg-primary px-3 py-2.5 text-primary-foreground">
-        {chips.length > 0 && (
-          <div className="mb-2 space-y-1.5 border-b border-primary-foreground/20 pb-2">
-            {chips.map((c) => (
-              <div key={c.id} className="rounded-md bg-primary-foreground/10 px-2 py-1.5">
-                <div className="mb-0.5 flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-wide text-primary-foreground/70">
-                  <span>{chipLabel(c)}</span>
-                  <span className="tabular-nums">
-                    ≈{c.tokenCount} {t("ai.tokUnit", "tok")}
-                  </span>
-                </div>
-                <p className="line-clamp-3 whitespace-pre-wrap text-[12px] leading-snug text-primary-foreground/90">
-                  {c.content}
-                </p>
-              </div>
-            ))}
-          </div>
-        )}
         <div className="whitespace-pre-wrap text-sm leading-relaxed">{textOf(m)}</div>
       </div>
       <MessageToolbar m={m} onEdit={() => setEditing(true)} />
@@ -235,7 +278,7 @@ function AssistantShell({
   messageId,
 }: {
   children: ReactNode;
-  /** 气泡上方的 hover 浮层（原先此处常驻 agent 名字）。 */
+  /** Lớp nổi khi rê chuột trên bong bóng tin nhắn. */
   timestamp?: ReactNode;
   showAvatar: boolean;
   groupHead: boolean;
@@ -271,6 +314,7 @@ function AssistantBubble({
   streaming,
   activity,
   chapters,
+  pdfCitations,
   showAvatar,
   groupHead,
 }: {
@@ -280,6 +324,7 @@ function AssistantBubble({
   streaming: boolean;
   activity: AssistantActivity;
   chapters: ChapterRefDto[];
+  pdfCitations: boolean;
   showAvatar: boolean;
   groupHead: boolean;
 }) {
@@ -292,7 +337,7 @@ function AssistantBubble({
       groupHead={groupHead}
       messageId={m.id}
       timestamp={
-        // 流式途中不亮时间：那一刻的「现在」还在走，等落库时刻定下来再显示。
+        // Trong lúc stream chưa hiện thời gian; chờ timestamp được lưu để có giá trị ổn định.
         streaming ? undefined : (
           <MessageTimestamp at={createdAt} timeZone={timeZone} align="start" />
         )
@@ -301,9 +346,14 @@ function AssistantBubble({
       <div className="max-w-full space-y-2 rounded-2xl rounded-bl-sm bg-muted px-3.5 py-2 text-sm leading-relaxed text-foreground">
         {segs.map((s, i) =>
           s.kind === "text" ? (
-            // Streamdown 自带 markdown 排版（经 @source 由 Tailwind 生成其类）；不叠 prose 以免边距打架
-            <LocalizedStreamdown key={i} animated={STREAM_ANIMATION} isAnimating={streaming}>
-              {s.text}
+            // Streamdown đã định dạng Markdown; không thêm prose để tránh xung đột khoảng cách.
+            <LocalizedStreamdown
+              key={i}
+              animated={STREAM_ANIMATION}
+              isAnimating={streaming}
+              components={{ a: PdfCitationAnchor }}
+            >
+              {pdfCitations ? linkPdfCitations(s.text) : s.text}
             </LocalizedStreamdown>
           ) : (
             <ToolStepRow key={i} part={s.part} chapters={chapters} />
@@ -316,12 +366,13 @@ function AssistantBubble({
   );
 }
 
-/** 步骤行图标：lucide 按工具映射，未知工具兜底扳手。 */
+/** Icon bước công cụ lấy từ lucide theo tên công cụ; công cụ lạ dùng icon cờ lê. */
 const TOOL_ICONS: Record<string, LucideIcon> = {
   getToc: List,
   getChapterSummary: ScrollText,
   readChapterText: BookOpen,
   readPage: FileText,
+  searchPdf: FileText,
 };
 
 function ToolStepRow({ part, chapters }: { part: ToolPart; chapters: ChapterRefDto[] }) {
@@ -342,10 +393,10 @@ function ToolStepRow({ part, chapters }: { part: ToolPart; chapters: ChapterRefD
         )}
       >
         {status === "failed"
-          ? t("ai.toolStep.failed", "失败")
+          ? t("ai.toolStep.failed", "Thất bại")
           : status === "done"
-            ? t("ai.toolStep.done", "完成")
-            : t("ai.toolStep.loading", "读取中…")}
+            ? t("ai.toolStep.done", "Hoàn tất")
+            : t("ai.toolStep.loading", "Đang tải…")}
       </span>
     </div>
   );

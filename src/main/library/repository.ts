@@ -3,14 +3,20 @@ import { and, asc, desc, eq, isNull, sql } from "drizzle-orm";
 import { parseEpub, type TocNode } from "@marginalia/epub-parser";
 import { parsePdf, renderPageImage } from "@marginalia/pdf-parser";
 import type { DB } from "@main/db/client";
-import { books, chapters, progress, readingSessions } from "@main/db/schema";
+import {
+  books,
+  chapters,
+  confirmedReadingProgress,
+  progress,
+  readingSessions,
+} from "@main/db/schema";
 import { deleteBookFile } from "@main/library/book-files";
 import { createLogger } from "@main/logger";
 import { getBookReadingState } from "@main/reading-sessions/repository";
 
 const log = createLogger("library");
 
-/** 解析器/索引结构版本。结构变更（如锚点级章节）时 +1，触发存量书惰性重建。 */
+/** Phiên bản parser/chỉ mục; tăng khi cấu trúc đổi để sách cũ được dựng lại khi mở. */
 export const CURRENT_PARSER_VERSION = 1;
 
 interface ChapterSeed {
@@ -19,7 +25,7 @@ interface ChapterSeed {
   title: string | null;
 }
 
-/** 扁平化 TOC（DFS 保序）为章节种子；按 (href, anchor) 去重保首个（防 TOC 重复条目撞唯一约束）。 */
+/** Trải phẳng mục lục theo DFS, giữ thứ tự và bỏ mục trùng theo href/anchor. */
 function chapterSeedsFromToc(toc: TocNode[]): ChapterSeed[] {
   const seeds: ChapterSeed[] = [];
   const seen = new Set<string>();
@@ -38,7 +44,7 @@ function chapterSeedsFromToc(toc: TocNode[]): ChapterSeed[] {
   return seeds;
 }
 
-/** 章节种子：优先 TOC 条目（锚点级）；无 TOC 退回 spine 文件顺序（anchor=null, title=null）。 */
+/** Tạo danh sách chương từ mục lục; nếu không có thì dùng thứ tự spine với anchor/title null. */
 function chapterSeedsFor(parsed: { toc: TocNode[]; spine: { href: string }[] }): ChapterSeed[] {
   const fromToc = chapterSeedsFromToc(parsed.toc);
   if (fromToc.length > 0) return fromToc;
@@ -47,13 +53,13 @@ function chapterSeedsFor(parsed: { toc: TocNode[]; spine: { href: string }[] }):
 
 export interface ImportInput {
   bytes: Uint8Array;
-  /** 原始文件名（不含路径）。PDF 元数据缺 Title 时回退为书名（去扩展名）。 */
+  /** Tên tệp gốc; dùng làm tên sách nếu metadata PDF không có Title. */
   fileName?: string;
 }
 export type BookRow = typeof books.$inferSelect;
 export type ChapterRow = typeof chapters.$inferSelect;
 
-/** 魔数嗅探（不信文件后缀）：%PDF- → pdf；PK（zip 头）→ epub；其余诚实报错。 */
+/** Nhận diện định dạng từ magic bytes thay vì đuôi tệp: %PDF- là PDF, PK là EPUB. */
 export function detectFormat(bytes: Uint8Array): "epub" | "pdf" {
   if (
     bytes[0] === 0x25 &&
@@ -74,15 +80,15 @@ export async function importBook(db: DB, input: ImportInput): Promise<BookRow> {
     : importEpubBook(db, input.bytes);
 }
 
-/** 原 importBook 函数体原样改名为 importEpubBook（保持同步实现；async 包装由 importBook 承担）。 */
+/** Hàm import EPUB đồng bộ; importBook bọc bằng async và phân luồng theo định dạng. */
 function importEpubBook(db: DB, bytes: Uint8Array): BookRow {
   const parsed = parseEpub(bytes);
-  // 身份＝内容哈希（与 PDF 一致）。epub 的 dc:identifier 现实中并不唯一——z-library 等转换源会给
-  // 不同的书盖同一个写死的 boilerplate uid，若用它当主键，第二本会撞主键被误判「已存在」而丢失。
+  // ID là hash nội dung như PDF. dc:identifier của EPUB có thể trùng giữa nhiều sách;
+  // dùng nó làm khóa chính sẽ khiến sách khác bị nhận nhầm là đã import.
   const id = createHash("sha256").update(bytes).digest("hex");
 
-  // 幂等：同字节流（即同一文件重导）已在库则直接返回，不写入 books/chapters（零 DB churn）。
-  // "显式刷新/重新导入"留后续里程碑（按 (book_id, href) 稳定 upsert 保 chapter id）。
+  // Nếu nội dung tệp đã có, trả sách hiện tại và không ghi lại DB.
+  // Chức năng nhập lại để cập nhật dữ liệu cần giữ ID chương ổn định sẽ xử lý riêng.
   const existing = db.select().from(books).where(eq(books.id, id)).get();
   if (existing) return existing;
 
@@ -94,7 +100,7 @@ function importEpubBook(db: DB, bytes: Uint8Array): BookRow {
         author: parsed.author ?? null,
         cover: parsed.cover ? Buffer.from(parsed.cover) : null,
         toc: parsed.toc,
-        // 新导入排最前（spec §3）：自引用标量子查询，空库 coalesce(NULL,1)-1 = 0。
+        // Sách mới đứng đầu; khi thư viện trống, vị trí đầu là 0.
         position: sql`(coalesce((select min(position) from books), 1) - 1)`,
         parserVersion: CURRENT_PARSER_VERSION,
       })
@@ -120,20 +126,25 @@ function importEpubBook(db: DB, bytes: Uint8Array): BookRow {
 
 async function importPdfBook(db: DB, bytes: Uint8Array, fileName?: string): Promise<BookRow> {
   const parsed = await parsePdf(bytes);
-  const id = createHash("sha256").update(bytes).digest("hex"); // PDF 无自然键，统一文件哈希
+  const id = createHash("sha256").update(bytes).digest("hex"); // PDF dùng hash tệp làm ID.
 
   const existing = db.select().from(books).where(eq(books.id, id)).get();
   if (existing) return existing;
 
-  // 封面 = 首页缩略图；渲染失败不阻塞导入（书库走兜底 tile）。
+  // Bìa là ảnh trang đầu; lỗi vẽ bìa không chặn import, thư viện dùng ô dự phòng.
   const cover = await renderPageImage(bytes, 1, { targetWidth: 600 }).catch((err: unknown) => {
     log.warn("pdf cover render failed", err);
     return null;
   });
 
-  // PDF 元数据缺 Title 时回退文件名（去扩展名）；trim 后为空串视同缺失。
+  // Dùng tên tệp được chọn nếu Title thiếu hoặc chỉ lặp lại tên tệp kèm phần mở rộng.
   const fallbackTitle = fileName?.replace(/\.[^.]+$/, "").trim() || undefined;
-  const title = parsed.title ?? fallbackTitle ?? null;
+  const metadataTitle = parsed.title?.trim() || undefined;
+  const filenameLikeExtension = /\.(?:pdf|docx?|odt|rtf|epub|mobi|azw3?|html?|txt|pptx?|xlsx?)$/iu;
+  const title =
+    metadataTitle && filenameLikeExtension.test(metadataTitle)
+      ? (fallbackTitle ?? (metadataTitle.replace(filenameLikeExtension, "").trim() || null))
+      : (metadataTitle ?? fallbackTitle ?? null);
 
   return db.transaction((tx) => {
     tx.insert(books)
@@ -146,7 +157,7 @@ async function importPdfBook(db: DB, bytes: Uint8Array, fileName?: string): Prom
         format: "pdf",
         pageCount: parsed.pageCount,
         hasTextLayer: parsed.hasTextLayer,
-        // 新导入排最前（spec §3）：自引用标量子查询，空库 coalesce(NULL,1)-1 = 0。
+        // Sách mới đứng đầu; khi thư viện trống, vị trí đầu là 0.
         position: sql`(coalesce((select min(position) from books), 1) - 1)`,
         parserVersion: CURRENT_PARSER_VERSION,
       })
@@ -158,7 +169,7 @@ async function importPdfBook(db: DB, bytes: Uint8Array, fileName?: string): Prom
           bookId: id,
           href: `pdf-ch:${index}`,
           orderIndex: index,
-          // 有 outline：toc 同序号的 label；单章退化：取书名（spec §2——避免 title:null 困惑模型）
+          // Có outline thì dùng nhãn TOC; nếu chỉ một chương thì lấy tên sách làm nhãn.
           title: parsed.toc[index]?.label ?? title,
           startPage: range.startPage,
           endPage: range.endPage,
@@ -172,7 +183,7 @@ async function importPdfBook(db: DB, bytes: Uint8Array, fileName?: string): Prom
   });
 }
 
-/** 「继续阅读」shelf 容量（spec §4）。 */
+/** Số sách tối đa trên kệ "Đọc tiếp". */
 export const RECENT_SHELF_LIMIT = 3;
 
 export function listBooks(db: DB) {
@@ -193,12 +204,12 @@ export function listBooks(db: DB) {
 }
 
 /**
- * 「继续阅读」shelf 数据（#48）：JOIN progress 按最近阅读排序。未读过的书（无 progress 行）
- * 天然不出现；percent 为 null（老数据）由渲染层降级。不解析 locator——黑盒保持。
- * 已读完的书（isFinished）从 shelf 排除（#70）——读完即不该再出现在「继续阅读」，
- * 标记/取消标记后 renderer 失效 qk.recentlyRead 重拉即生效。
+ * Dữ liệu kệ "Đọc tiếp" (#48): JOIN tiến độ và sắp theo lần đọc gần nhất.
+ * Sách chưa từng đọc không xuất hiện; renderer xử lý percent null của dữ liệu cũ.
+ * Không phân tích locator. Sách đã đánh dấu đọc xong bị loại khỏi kệ (#70).
  */
 export function listRecentlyRead(db: DB, limit = RECENT_SHELF_LIMIT) {
+  const lastReadAt = sql<number>`max(${progress.updatedAt}, coalesce(${confirmedReadingProgress.updatedAt}, 0))`;
   return db
     .select({
       id: books.id,
@@ -208,22 +219,27 @@ export function listRecentlyRead(db: DB, limit = RECENT_SHELF_LIMIT) {
       format: books.format,
       pageCount: books.pageCount,
       hasTextLayer: books.hasTextLayer,
-      percent: progress.percent,
-      lastReadAt: progress.updatedAt,
+      percent: sql<number | null>`case
+        when ${progress.percent} is null then ${confirmedReadingProgress.percent}
+        when ${confirmedReadingProgress.percent} is null then ${progress.percent}
+        else max(${progress.percent}, ${confirmedReadingProgress.percent})
+      end`,
+      lastReadAt,
     })
     .from(books)
     .innerJoin(progress, eq(progress.bookId, books.id))
+    .leftJoin(confirmedReadingProgress, eq(confirmedReadingProgress.bookId, books.id))
     .innerJoin(
       readingSessions,
       and(eq(readingSessions.bookId, books.id), isNull(readingSessions.completedAt)),
     )
-    .orderBy(desc(progress.updatedAt))
+    .orderBy(desc(lastReadAt))
     .limit(limit)
     .all()
     .map((book) => ({ ...book, readingState: "reading" as const }));
 }
 
-/** 手动排序全量重写（#48）：position = orderedIds 下标。未知 id 的 UPDATE 是 no-op，无害。 */
+/** Sắp xếp thủ công: ghi lại position theo thứ tự orderedIds; ID lạ không gây thay đổi. */
 export function reorderBooks(db: DB, orderedIds: string[]): void {
   db.transaction((tx) => {
     orderedIds.forEach((id, index) => {
@@ -236,8 +252,8 @@ export function getBook(db: DB, id: string): BookRow | undefined {
 }
 
 /**
- * 更新书名/作者（#29）。put 语义：author=null 显式清空。
- * 注：导入幂等是 early return（见 importBook），重导同一文件不会触碰已有行——手动修改不会被解析元数据冲掉。
+ * Cập nhật tên sách và tác giả (#29); author=null nghĩa là xóa tên tác giả.
+ * Import lại cùng nội dung trả về sớm nên không ghi đè thông tin đã sửa thủ công.
  */
 export function updateBook(
   db: DB,
@@ -261,7 +277,7 @@ export function resolveChapterByHref(db: DB, bookId: string, href: string): Chap
     .get();
 }
 
-/** 按 (href, anchor) 精确解析章节行；anchor 为 null 时匹配 anchor IS NULL 行。 */
+/** Tìm chương chính xác theo href và anchor; anchor null khớp dòng có anchor IS NULL. */
 export function resolveChapter(
   db: DB,
   bookId: string,
@@ -282,9 +298,9 @@ export function resolveChapter(
 }
 
 /**
- * 存量书惰性升级：若 book.parserVersion < CURRENT_PARSER_VERSION，从字节重解析并事务内重建
- * chapters + toc + parserVersion。返回是否实际重建。幂等；版本已最新 / 非 epub / 解析失败 → false。
- * 安全性：annotations/progress/conversations 均 FK 挂 books.id（非 chapters.id），DELETE chapters 不级联误删。
+ * Khi sách EPUB có parserVersion cũ, phân tích lại bytes và dựng chapters/TOC trong transaction.
+ * Trả true nếu đã dựng lại; bản mới, sách khác EPUB hoặc lỗi phân tích trả false.
+ * Annotation, tiến độ và hội thoại liên kết books.id nên xóa chapters cũ không làm mất chúng.
  */
 export function reindexBookIfStale(db: DB, bytes: Uint8Array, bookId: string): boolean {
   const book = getBook(db, bookId);
@@ -320,12 +336,12 @@ export function reindexBookIfStale(db: DB, bytes: Uint8Array, bookId: string): b
 }
 
 /**
- * 删书：先删 DB 行（真相源；依赖行靠 FK ON DELETE CASCADE 自动清，P3a），再 best-effort 删自有副本文件。
- * 顺序不可反——指向已删文件的 DB 行 = 打不开的鬼书，比无主文件（可 GC）更糟（DD-§1.3）。
- * 幂等：删不存在的书是 no-op（DELETE 命中 0 行；行不存在读不到 format 则直接跳过 unlink），不抛——契合删书 UI 的重复点击 / 乐观删除竞态。
+ * Xóa sách: xóa dòng DB trước (các dòng phụ thuộc dùng ON DELETE CASCADE), rồi cố xóa tệp bản sao.
+ * Nếu xóa tệp trước mà DB vẫn còn, thư viện sẽ chứa sách không mở được.
+ * Sách không tồn tại là no-op để thao tác xóa lặp hoặc đua nhau không gây lỗi.
  */
 export async function deleteBook(db: DB, booksDir: string, bookId: string): Promise<void> {
-  const book = getBook(db, bookId); // 删行前取 format（行删后取不到）
+  const book = getBook(db, bookId); // Lấy định dạng trước khi xóa dòng DB.
   db.delete(books).where(eq(books.id, bookId)).run();
   if (book) await deleteBookFile(booksDir, bookId, book.format);
 }

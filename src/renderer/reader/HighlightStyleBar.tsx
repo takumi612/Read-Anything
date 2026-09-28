@@ -9,9 +9,9 @@ import { qk } from "@renderer/query/keys";
 import { useNavigationStore } from "@renderer/store/navigation-store";
 import { useAnnotationStore } from "@renderer/store/annotation-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
-import { FILL_COLORS, FILL_SWATCH } from "./highlight";
+import { annotationColorHex } from "./annotation-colors";
 
-/** 二级样式工具栏：5 色 + 下划线；点已有高亮打开（改样式 / 笔记 / 删除）。高亮已由「高亮标记」即时创建，故只在 edit 模式打开。 */
+/** Thanh chỉnh màu đang bật và gạch dưới; mở từ vùng tô sáng có sẵn để sửa, ghi chú hoặc xóa. */
 export function HighlightStyleBar() {
   const { t } = useTranslation();
   const styleBar = useAnnotationStore((s) => s.styleBar);
@@ -19,6 +19,7 @@ export function HighlightStyleBar() {
   const openNoteModal = useAnnotationStore((s) => s.openNoteModal);
   const setSelection = useAnnotationStore((s) => s.setSelection);
   const setLastHighlightStyle = usePrefsStore((s) => s.setLastHighlightStyle);
+  const palette = usePrefsStore((s) => s.annotationPalette);
   const bookId = useNavigationStore((s) => s.currentBookId);
   const qc = useQueryClient();
   const ref = useRef<HTMLDivElement | null>(null);
@@ -43,8 +44,8 @@ export function HighlightStyleBar() {
     if (!styleBar) return;
     const onDown = (e: MouseEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
-        // 点栏外即放弃：关栏并清选区，否则主文档点击不会 collapse iframe 选区，
-        // 关栏后 store.selection 仍在 → 主工具栏重现。
+        // Nhấn ngoài thanh thì đóng và xóa vùng chọn; nhấn ở tài liệu chính không tự thu vùng chọn trong iframe.
+        // Nếu store.selection còn, thanh công cụ chính sẽ hiện lại.
         closeStyleBar();
         setSelection(null);
       }
@@ -58,9 +59,9 @@ export function HighlightStyleBar() {
   const current = editing ? annos.data?.find((a) => a.id === editing) : undefined;
 
   const pickStyle = (style: AnnotationStyle) => {
-    // 样式栏只在 edit 模式打开（高亮由「高亮标记」即时创建后才弹此栏）。
+    // Chỉ mở thanh kiểu ở chế độ sửa vì công cụ tô sáng tạo chú thích ngay trước đó.
     if (styleBar.target.type !== "edit") return;
-    setLastHighlightStyle(style); // 记住本次选择，供下次「高亮标记」直接套用
+    setLastHighlightStyle(style); // Nhớ kiểu này để áp dụng ngay cho lần tô sáng sau.
     updateM.mutate({ id: styleBar.target.annotationId, patch: { style } });
     closeStyleBar();
   };
@@ -76,15 +77,15 @@ export function HighlightStyleBar() {
       style={{ position: "fixed", left, top, transform: "translate(-50%, -100%)", zIndex: 55 }}
       className="flex w-max items-center gap-1.5 rounded-xl border border-border bg-popover p-1.5 shadow-xl"
     >
-      {FILL_COLORS.map((c) => (
+      {palette.map((c) => (
         <button
           key={c}
           type="button"
-          aria-label={t("reader.highlight.colorLabel", "高亮 {{color}}", { color: c })}
+          aria-label={t("reader.highlight.colorLabel", "Đánh dấu {{color}}", { color: c })}
           onClick={() => pickStyle(c)}
+          style={{ backgroundColor: annotationColorHex(c) }}
           className={cn(
             "size-5 rounded-full ring-offset-1 ring-offset-popover transition",
-            FILL_SWATCH[c],
             current?.style === c ? "ring-2 ring-foreground/60" : "hover:scale-110",
           )}
         />
@@ -92,7 +93,7 @@ export function HighlightStyleBar() {
       <Button
         variant="ghost"
         size="icon-xs"
-        aria-label={t("reader.highlight.underline", "下划线")}
+        aria-label={t("reader.highlight.underline", "Gạch chân")}
         onClick={() => pickStyle("underline")}
         className={cn(current?.style === "underline" && "bg-muted ring-1 ring-foreground/40")}
       >
@@ -104,7 +105,7 @@ export function HighlightStyleBar() {
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={t("reader.note.label", "笔记")}
+            aria-label={t("reader.note.label", "Ghi chú")}
             onClick={() => {
               openNoteModal({ target: { type: "edit", annotationId: editing } });
               closeStyleBar();
@@ -116,7 +117,7 @@ export function HighlightStyleBar() {
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={t("reader.annotation.delete", "删除")}
+            aria-label={t("reader.annotation.delete", "Xóa")}
             onClick={() => {
               deleteM.mutate({ id: editing });
               closeStyleBar();

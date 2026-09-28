@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Chạy Read-Anything từ mã nguồn</title>
+    <link rel="stylesheet" href="source-guide.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="code-map.html">Read-Anything · hướng dẫn mã nguồn</a>
+      <nav class="site-nav" aria-label="Tài liệu">
+        <a href="code-map.html">Bản đồ code</a><a href="architecture.html">Kiến trúc</a
+        ><a href="runtime-flows.html">Luồng chạy</a
+        ><a href="run-from-source.html" aria-current="page">Chạy từ source</a
+        ><a href="build-windows-exe.html">Tạo EXE</a>
+      </nav>
+    </header>
+    <div class="layout">
+      <main class="content">
+        <div class="eyebrow">Hướng dẫn · Windows PowerShell</div>
+        <h1>Cài và chạy từ đầu</h1>
+        <p class="lead">
+          Các lệnh dưới đây chạy tại thư mục gốc chứa <code>package.json</code> của Read-Anything.
+          Chúng dùng Corepack để lấy đúng pnpm mà dự án khóa, biên dịch parser EPUB và chạy Electron
+          ở chế độ phát triển.
+        </p>
+        <h2 id="prepare">1. Chuẩn bị máy</h2>
+        <ul>
+          <li>Windows 10 hoặc mới hơn, bản 64-bit.</li>
+          <li>
+            Node.js 24 và Corepack đi cùng Node. Kiểm tra bằng <code>node --version</code> và
+            <code>corepack --version</code>.
+          </li>
+          <li>Git nếu cần tải repository hoặc xem thay đổi.</li>
+          <li>
+            Kết nối mạng cho lần cài dependency đầu tiên. AI là tùy chọn; tra từ địa phương dùng DB
+            đi cùng source.
+          </li>
+        </ul>
+        <p>
+          <a href="../package.json"><code>package.json</code></a> khai báo
+          <code>pnpm@11.5.0</code> và <code>electron@41.7.1</code>.
+          <a href="../pnpm-workspace.yaml"><code>pnpm-workspace.yaml</code></a> yêu cầu
+          <code>nodeLinker: hoisted</code>; đừng đổi sang linker khác khi cài dự án này.
+        </p>
+        <h2 id="clone">2. Lấy mã và vào đúng thư mục</h2>
+        <p>
+          Nếu đã có thư mục dự án, bỏ qua bước clone và mở PowerShell tại thư mục chứa
+          <code>package.json</code>. Từ bản Git công khai:
+        </p>
+        <pre><code>git clone https://github.com/takumi612/Read-Anything.git
+cd Read-Anything</code></pre>
+        <pre><code>Test-Path package.json</code></pre>
+        <p>
+          <code>Test-Path</code> phải in <code>True</code>. Tất cả lệnh tiếp theo chạy từ thư mục
+          đó.
+        </p>
+        <h2 id="install">3. Cài thư viện</h2>
+        <pre><code>node --version
+corepack pnpm --version
+corepack pnpm install --frozen-lockfile</code></pre>
+        <p>
+          Lệnh pnpm nên báo <code>11.5.0</code>. <code>install</code> chạy
+          <code>postinstall</code> trong <a href="../package.json"><code>package.json</code></a
+          >: build package EPUB và rebuild <code>better-sqlite3</code> cho ABI của Electron. Đây là
+          phần cần thiết để ứng dụng và Vitest mở cùng SQLite native module. Lần đầu sẽ tải Electron
+          và nhiều thư viện; đợi lệnh kết thúc không có lỗi.
+        </p>
+        <div class="callout">
+          Dự án có <code>packages/ui-prototype/</code> nhưng <code>pnpm-workspace.yaml</code> loại
+          nó khỏi workspace. Không cần cài prototype để chạy ứng dụng.
+        </div>
+        <h2 id="dev">4. Khởi động ứng dụng phát triển</h2>
+        <pre><code>corepack pnpm dev</code></pre>
+        <p>
+          Script chạy <code>build:packages</code>, watcher của EPUB parser và
+          <code>electron-forge start</code> đồng thời. Cửa sổ Read-Anything mở khi Forge/Vite và main
+          process sẵn sàng. DevTools có thể mở sẵn trong chế độ phát triển. Giữ PowerShell đang
+          chạy; dùng <code>Ctrl+C</code> để dừng.
+        </p>
+        <p>
+          Ở lần mở đầu, main process tạo DB, chạy migration và có thể thêm sách mẫu. Dữ liệu của ứng
+          dụng nằm trong <code>app.getPath('userData')</code>; mã nguồn không phải nơi lưu sách đang
+          đọc. Đường dẫn cụ thể được tạo tại
+          <a href="../src/main/app/app-service.ts"><code>src/main/app/app-service.ts</code></a
+          >.
+        </p>
+        <h2 id="use">5. Kiểm tra một lượt đọc</h2>
+        <ol>
+          <li>Trong Library, nhập một tệp EPUB hoặc PDF từ máy.</li>
+          <li>Mở sách, sang trang rồi quay lại Library. Mở lại sách để kiểm tra tiến độ.</li>
+          <li>
+            Chọn một từ tiếng Anh và dùng <strong>Look up</strong>. Từ điển địa phương không cần AI
+            key.
+          </li>
+          <li>
+            Nếu muốn hỏi AI, mở Settings, thêm provider và API key của chính bạn, chọn model rồi
+            dùng <strong>Ask AI</strong> trên đoạn chọn.
+          </li>
+        </ol>
+        <p>
+          Muốn hiểu từng lời gọi phía sau các thao tác này, xem
+          <a href="runtime-flows.html#import">luồng nhập</a>,
+          <a href="runtime-flows.html#read">luồng đọc</a> và
+          <a href="runtime-flows.html#ai">luồng AI</a>.
+        </p>
+        <h2 id="checks">6. Các lệnh kiểm tra mã</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Lệnh</th>
+                <th>Việc thực hiện</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><code>corepack pnpm typecheck</code></td>
+                <td>Build EPUB parser và chạy TypeScript <code>tsc --noEmit</code>.</td>
+              </tr>
+              <tr>
+                <td><code>corepack pnpm lint</code></td>
+                <td>Chạy oxlint, không tự sửa.</td>
+              </tr>
+              <tr>
+                <td><code>corepack pnpm format:check</code></td>
+                <td>Kiểm tra định dạng với oxfmt, không tự sửa.</td>
+              </tr>
+              <tr>
+                <td><code>corepack pnpm test</code></td>
+                <td>
+                  Build EPUB parser và chạy Vitest qua Electron runtime để đúng ABI của
+                  <code>better-sqlite3</code>.
+                </td>
+              </tr>
+              <tr>
+                <td><code>corepack pnpm e2e:packaged:build</code></td>
+                <td>
+                  Đóng gói rồi kiểm thử EXE thật với PDF mẫu; xem điều kiện ở
+                  <a href="build-windows-exe.html#e2e">trang EXE</a>.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Không dùng <code>node node_modules/vitest/vitest.mjs</code> thay cho script dự án: Node
+          thường và Electron có thể dùng ABI khác nhau cho SQLite native module.
+        </p>
+        <h2 id="issues">Nếu lệnh thất bại</h2>
+        <details>
+          <summary><code>pnpm</code> không được nhận diện</summary>
+          <p>
+            Dùng <code>corepack pnpm ...</code> như hướng dẫn. Kiểm tra Node và Corepack đã có trong
+            PATH của PowerShell mới.
+          </p>
+        </details>
+        <details>
+          <summary>Lỗi tải hoặc dựng Electron/native module khi <code>install</code></summary>
+          <p>
+            Kiểm tra mạng và log của <code>corepack pnpm install</code>. Khi chỉ bước rebuild SQLite
+            bị gián đoạn, chạy <code>corepack pnpm db:rebuild:electron</code>. Đừng đổi phiên bản
+            Electron chỉ để vượt lỗi ABI.
+          </p>
+        </details>
+        <details>
+          <summary>
+            Ứng dụng đã chạy nhưng build báo <code>EPERM</code> hoặc <code>Access denied</code>
+          </summary>
+          <p>
+            Đóng mọi cửa sổ Read-Anything và tiến trình Electron liên quan. Thử lại từ PowerShell có
+            quyền ghi trong repository. Bản đang mở có thể giữ
+            <code>out/.../resources/app.asar</code> hoặc <code>.vite/build</code>. Xem
+            <a href="build-windows-exe.html#locked">cách kiểm tra bản EXE gốc</a>.
+          </p>
+        </details>
+        <details>
+          <summary>PDF mở ra trắng hoặc worker lỗi</summary>
+          <p>
+            Kiểm tra lỗi trong DevTools và log của app. Renderer cần worker, CMaps, fonts và WASM
+            của pdfjs từ <code>vite.renderer.config.ts</code>. So sánh chế độ dev với bản đóng gói;
+            <a href="runtime-flows.html#read">luồng đọc PDF</a> chỉ ra điểm parse và render.
+          </p>
+        </details>
+      </main>
+      <aside class="toc">
+        <strong>Các bước</strong><a href="#prepare">Chuẩn bị</a><a href="#clone">Lấy mã</a
+        ><a href="#install">Cài thư viện</a><a href="#dev">Chạy dev</a
+        ><a href="#use">Kiểm tra đọc</a><a href="#checks">Lệnh kiểm tra</a
+        ><a href="#issues">Gỡ lỗi thường gặp</a>
+      </aside>
+    </div>
+    <footer class="footer">
+      Lệnh lấy trực tiếp từ package.json của working tree; kiểm tra file đó khi nâng phiên bản.
+    </footer>
+  </body>
+</html>

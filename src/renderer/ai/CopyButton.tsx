@@ -12,7 +12,7 @@ export function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // 命令式 effect 清理仍手写（React Compiler 不接管）：卸载时清未触发的复位定时器。
+  // Dọn timer chưa chạy khi tháo component; React Compiler không xử lý cleanup của effect.
   useEffect(
     () => () => {
       if (timer.current) clearTimeout(timer.current);
@@ -24,8 +24,8 @@ export function CopyButton({ text }: { text: string }) {
     try {
       await navigator.clipboard.writeText(text);
     } catch (err) {
-      log.warn("copy to clipboard failed", err); // 优雅吞错处留 warn
-      return; // 失败不进「已复制」态
+      log.warn("copy to clipboard failed", err); // Ghi cảnh báo dù đã xử lý lỗi nhẹ nhàng.
+      return; // Thất bại thì không chuyển sang trạng thái đã sao chép.
     }
     setCopied(true);
     if (timer.current) clearTimeout(timer.current);
@@ -36,7 +36,7 @@ export function CopyButton({ text }: { text: string }) {
     <Button
       variant="ghost"
       size="icon-xs"
-      aria-label={copied ? t("ai.copied", "已复制") : t("ai.copy", "复制")}
+      aria-label={copied ? t("ai.copied", "Đã sao chép") : t("ai.copy", "Sao chép")}
       onClick={onCopy}
       className="text-muted-foreground hover:text-foreground"
     >

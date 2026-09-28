@@ -15,43 +15,44 @@ const log = createLogger("summary");
 export const SUMMARY_SYSTEM =
   "You summarize a single book chapter for a reading assistant. Produce a concise, faithful summary (a few sentences) capturing the chapter's key events, ideas, and terms. Output only the summary, no preamble.";
 
-const SUMMARY_INPUT_MAX_CHARS = 180_000; // 章节摘要输入预算（适配 200k 上下文摘要模型；超长章前载截断）
+const SUMMARY_INPUT_MAX_CHARS = 180_000; // Giới hạn đầu vào tóm tắt chương; chương quá dài bỏ phần đầu.
 
 export interface SummaryDeps {
   db: DB;
   loadBytes: LoadBytes;
   resolveModel: () => ResolvedModel;
-  /** 后台并发限流端口：包住「加载 + 模型调用」，受全局上限约束。 */
+  /** Giới hạn đồng thời cho cả bước tải nội dung và gọi model. */
   runBackground: RunBackground;
 }
 
 /**
- * 手动生成入口的预检（镜像聊天的发送前拦截）：模型未配置时抛带 reason 的错误，
- * 使 generate handler reject、渲染层 toast 透传真实原因（如「Provider 未设置密钥」）。
- * 没有它，ensure* 的 `!resolved.ok → return` 静默保持 pending——点击零反馈、零日志，无从排查。
- * 自动触发（开章）共用同一 handler，渲染层以 catch 静默消化，不弹窗。
+ * Kiểm tra trước khi người dùng yêu cầu tạo tóm tắt. Nếu chưa có model, ném lỗi kèm lý do
+ * để handler từ chối và renderer hiển thị thông báo cụ thể, ví dụ thiếu API key.
+ * Nếu bỏ bước này, ensure* chỉ trả về và trạng thái pending không giải thích nguyên nhân.
+ * Tác vụ tự chạy khi mở chương dùng cùng handler nhưng renderer không hiện toast khi lỗi.
  */
 export function assertSummaryModelReady(resolveModel: () => ResolvedModel): void {
   const resolved = resolveModel();
   if (!resolved.ok) throw new Error(resolved.reason);
 }
 
-// 章节摘要的进程内运行时状态（不持久化；重启清空，镜像全书摘要）：
-// 有效 summary=ready，inFlightChapters=generating，failedChapters=unavailable，否则 pending。
+// Trạng thái tóm tắt chương chỉ ở bộ nhớ tiến trình, khởi động lại sẽ xóa.
+// Có summary hợp lệ: ready; đang chạy: generating; lỗi: unavailable; còn lại: pending.
 const inFlightChapters = new Set<string>();
 const failedChapters = new Set<string>();
 
 /**
- * 空/全空白文本不算有效摘要。provider 异常（content-filter、空 completion）可能不抛错而返回空文本，
- * 历史版本曾把它落库 → 派生 ready 永不重试；读取/skip 一律用本谓词，使既有脏行派生回 pending 自愈。
+ * Tóm tắt rỗng hoặc toàn khoảng trắng không hợp lệ. Provider có thể trả rỗng mà không ném lỗi.
+ * Phiên bản cũ từng lưu giá trị đó, làm trạng thái luôn là ready; dùng điều kiện này để
+ * dữ liệu cũ trở lại pending và được tạo lại.
  */
 function hasText(s: string | null | undefined): s is string {
   return s != null && s.trim() !== "";
 }
 
 /**
- * 读某章摘要正文 + 派生状态（状态不入 DB，镜像 getBookSummaryView）。
- * 章节摘要非流式，故 generating 无 partial（summary: null）。
+ * Đọc nội dung tóm tắt chương và suy ra trạng thái, không lưu trạng thái vào DB.
+ * Tóm tắt chương không stream nên khi generating chưa có nội dung tạm.
  */
 export function getChapterSummaryView(
   db: DB,
@@ -71,16 +72,16 @@ export function getChapterSummaryView(
   return { status, summary };
 }
 
-/** 仅供测试：清空章节摘要的进程内运行时态，保证用例隔离（chapter.id 由 fixture 确定、跨用例相同）。 */
+/** Chỉ dùng trong kiểm thử: xóa trạng thái tóm tắt chương để các ca không ảnh hưởng nhau. */
 export function __resetChapterSummaryRuntime(): void {
   inFlightChapters.clear();
   failedChapters.clear();
 }
 
 /**
- * 懒生成某章摘要（设计文档 §11；状态派生，不入 DB）。非阻塞调用方 fire-and-forget。
- * 失败章节下次触发会自动重试（开头清 failedChapters），重启后进程内集清空亦自愈——故无需 resetStuckSummaries。
- * `force=true`（pill「重新生成」）跳过 ready-skip、覆盖旧摘要；自动触发（开章）不传 force。
+ * Tạo tóm tắt chương khi cần (thiết kế §11) trong tác vụ nền, không chặn bên gọi.
+ * Chương lỗi sẽ thử lại ở lần sau; khởi động lại cũng xóa trạng thái lỗi tạm.
+ * force=true bỏ qua trạng thái ready để tạo lại; mở chương tự động không truyền force.
  */
 export async function ensureChapterSummary(
   deps: SummaryDeps,
@@ -91,19 +92,19 @@ export async function ensureChapterSummary(
   const { db, loadBytes, resolveModel, runBackground } = deps;
   let claimed = false;
   try {
-    if (inFlightChapters.has(chapterId)) return; // 并发去重
+    if (inFlightChapters.has(chapterId)) return; // Tránh chạy trùng.
     const stored = db
       .select({ summary: chapters.summary })
       .from(chapters)
       .where(and(eq(chapters.bookId, bookId), eq(chapters.id, chapterId)))
       .get();
-    if (!stored) return; // 章不存在
-    if (!force && hasText(stored.summary)) return; // 已 ready，非强制跳过（空文本脏行不算，自愈重生成）
+    if (!stored) return; // Chương không tồn tại.
+    if (!force && hasText(stored.summary)) return; // Đã có tóm tắt hợp lệ.
     const resolved = resolveModel();
-    if (!resolved.ok) return; // 模型未配置 → 保持 pending，配置后重试
+    if (!resolved.ok) return; // Chưa có model: giữ pending để thử lại sau.
 
-    failedChapters.delete(chapterId); // 清前次失败标记 → 可重试
-    inFlightChapters.add(chapterId); // 同步前缀：使 generate handler 即时派生 generating
+    failedChapters.delete(chapterId); // Xóa dấu lỗi cũ để thử lại.
+    inFlightChapters.add(chapterId); // Đánh dấu ngay để handler thấy trạng thái generating.
     claimed = true;
     const text = await runBackground(async () => {
       const bytes = await loadBytes(bookId);
@@ -112,7 +113,7 @@ export async function ensureChapterSummary(
       });
       const generated = await generateText({
         model: resolved.model,
-        reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
+        reasoning: resolved.reasoningEffort, // undefined dùng mặc định của provider.
         instructions: SUMMARY_SYSTEM,
         prompt: slice.text,
         maxOutputTokens: 512,
@@ -121,14 +122,14 @@ export async function ensureChapterSummary(
       return generated.text;
     });
     if (!hasText(text)) {
-      // provider 不抛错但产出空文本 → 视为失败：不落库（否则派生 ready 永不重试），标 unavailable 可重试
+      // Kết quả rỗng vẫn là lỗi: không lưu DB, đánh dấu unavailable để có thể thử lại.
       log.warn(`chapter ${chapterId} generated empty text, treated as failure`);
       failedChapters.add(chapterId);
       return;
     }
     db.update(chapters).set({ summary: text }).where(eq(chapters.id, chapterId)).run();
   } catch (err) {
-    // 自含全部 reject（fire-and-forget 端口为 => void）。已 claim 的标记 failed（派生 unavailable）。
+    // Xử lý mọi lỗi trong tác vụ nền; chương đã nhận xử lý được đánh dấu thất bại.
     log.warn(`chapter ${chapterId} ensure failed`, err);
     if (claimed) failedChapters.add(chapterId);
   } finally {
@@ -139,17 +140,17 @@ export async function ensureChapterSummary(
 export const BOOK_SUMMARY_SYSTEM =
   "You summarize an entire book for a reading assistant. Produce a faithful, multi-paragraph summary covering the book's core themes, main characters, and overall structure/arc. Output only the summary, no preamble.";
 
-const BOOK_SUMMARY_INPUT_MAX_CHARS = 180_000; // 喂模型的全书正文上限（适配 200k 上下文摘要模型；超长书前载截断）
+const BOOK_SUMMARY_INPUT_MAX_CHARS = 180_000; // Giới hạn nội dung sách gửi cho model; sách dài bỏ phần đầu.
 
-// 全书摘要的运行时状态（不持久化；重启清空）：summary!=null=ready，inFlight=generating，failed=unavailable，否则 pending。
+// Trạng thái tóm tắt sách chỉ ở bộ nhớ: có nội dung là ready; đang chạy là generating; lỗi là unavailable.
 const inFlightBooks = new Set<string>();
 const failedBooks = new Set<string>();
-const streamingBookSummaries = new Map<string, string>(); // 生成中累积的 partial 文本（供流式渲染）
+const streamingBookSummaries = new Map<string, string>(); // Văn bản tạm tích lũy khi đang stream.
 
 /**
- * 读全书摘要正文 + 派生状态（状态不入 DB）。
- * 生成中（inFlight）返回累积的 partial（供 BookCard 用 Streamdown 流式渲染），状态 generating——
- * inFlight 优先于 summary 存在性，故重新生成（旧 summary 还在）也显示 generating + 流式新文本。
+ * Đọc tóm tắt sách và suy ra trạng thái mà không lưu trạng thái vào DB.
+ * Khi đang tạo, trả văn bản tạm cho BookCard hiển thị qua Streamdown.
+ * inFlight được ưu tiên hơn bản tóm tắt cũ để thao tác tạo lại hiện generating.
  */
 export function getBookSummaryView(
   db: DB,
@@ -166,7 +167,7 @@ export function getBookSummaryView(
   return { status, summary };
 }
 
-/** 仅供测试：清空全书摘要的进程内运行时态，保证用例隔离（book.id 由 fixture 确定、跨用例相同）。 */
+/** Chỉ dùng trong kiểm thử: xóa trạng thái tóm tắt sách để các ca không ảnh hưởng nhau. */
 export function __resetBookSummaryRuntime(): void {
   inFlightBooks.clear();
   failedBooks.clear();
@@ -174,8 +175,8 @@ export function __resetBookSummaryRuntime(): void {
 }
 
 /**
- * 懒生成全书摘要（用户决策「直接喂整本书」），**流式**累积 partial 供渲染。
- * `force=true`（书卡「重新生成」）跳过 ready-skip、覆盖旧摘要。非阻塞调用方 fire-and-forget。
+ * Tạo tóm tắt toàn sách khi cần, tích lũy từng phần nội dung để renderer hiển thị.
+ * force=true tạo lại ngay cả khi đã ready; tác vụ chạy nền và không chặn bên gọi.
  */
 export async function ensureBookSummary(
   deps: SummaryDeps,
@@ -185,33 +186,33 @@ export async function ensureBookSummary(
   const { db, loadBytes, resolveModel, runBackground } = deps;
   let claimed = false;
   try {
-    if (inFlightBooks.has(bookId)) return; // 并发去重
+    if (inFlightBooks.has(bookId)) return; // Tránh chạy trùng.
     const stored = db
       .select({ summary: books.summary })
       .from(books)
       .where(eq(books.id, bookId))
       .get();
-    if (!force && hasText(stored?.summary)) return; // 已 ready，非强制跳过（空文本脏行不算，自愈重生成）
+    if (!force && hasText(stored?.summary)) return; // Đã có tóm tắt hợp lệ.
     const resolved = resolveModel();
-    if (!resolved.ok) return; // 模型未配置 → 保持 pending，配置后重试
+    if (!resolved.ok) return; // Chưa có model: giữ pending để thử lại sau.
 
     failedBooks.delete(bookId);
     streamingBookSummaries.delete(bookId);
-    inFlightBooks.add(bookId); // 同步前缀：使 generate handler 即时派生出 generating
+    inFlightBooks.add(bookId); // Đánh dấu ngay để handler thấy generating.
     claimed = true;
     const produced = await runBackground(async () => {
       const bytes = await loadBytes(bookId);
       const { text } = await readBookText(db, bytes, bookId, {
         maxChars: BOOK_SUMMARY_INPUT_MAX_CHARS,
       });
-      // streamText 遇错发 error chunk 并正常关流（textStream 不 throw），故用 onError 标志兜——否则会把半截落库。
+      // textStream có thể đóng bình thường sau chunk lỗi; onError giúp tránh lưu nội dung dở dang.
       let hadError = false;
       const result = streamText({
         model: resolved.model,
-        reasoning: resolved.reasoningEffort, // v7 顶层 reasoning；undefined = provider 默认
+        reasoning: resolved.reasoningEffort, // undefined dùng mặc định của provider.
         instructions: BOOK_SUMMARY_SYSTEM,
         prompt: text,
-        maxOutputTokens: 4096, // 全书摘要（主题/人物/结构、多段）比单章长，给足额度避免输出截断
+        maxOutputTokens: 4096, // Tóm tắt cả sách cần đủ chỗ cho chủ đề, nhân vật và cấu trúc.
         maxRetries: 1,
         onError: ({ error }) => {
           hadError = true;
@@ -221,12 +222,12 @@ export async function ensureBookSummary(
       let acc = "";
       for await (const delta of result.textStream) {
         acc += delta;
-        streamingBookSummaries.set(bookId, acc); // partial 供 getBookSummaryView 轮询读取
+        streamingBookSummaries.set(bookId, acc); // getBookSummaryView đọc nội dung tạm.
       }
       return { acc, hadError };
     });
     if (produced.hadError || !hasText(produced.acc)) {
-      // 流错误或空产出（provider 不报错但 0 字符）均不落库（保留旧 summary 不变），标 failed 可重试
+      // Lỗi stream hoặc kết quả rỗng: giữ tóm tắt cũ, không lưu mới, cho phép thử lại.
       if (!produced.hadError) log.warn(`book ${bookId} generated empty text, treated as failure`);
       failedBooks.add(bookId);
     } else db.update(books).set({ summary: produced.acc }).where(eq(books.id, bookId)).run();
@@ -236,7 +237,7 @@ export async function ensureBookSummary(
   } finally {
     if (claimed) {
       inFlightBooks.delete(bookId);
-      streamingBookSummaries.delete(bookId); // partial 已落库或丢弃
+      streamingBookSummaries.delete(bookId); // Nội dung tạm đã được lưu hoặc bỏ.
     }
   }
 }

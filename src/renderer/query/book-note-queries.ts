@@ -2,7 +2,7 @@
 import type { BookNoteDto } from "@shared/book-notes";
 import { qk } from "@renderer/query/keys";
 
-/** 书籍笔记列表 query（侧栏 tab 与书库 Dialog 共用）。无主进程后台推进，默认 staleTime 即可。 */
+/** Truy vấn ghi chú sách dùng chung cho tab thanh bên và hộp thoại thư viện; dùng staleTime mặc định. */
 export function bookNotesQuery(bookId: string) {
   return {
     queryKey: qk.bookNotes(bookId),

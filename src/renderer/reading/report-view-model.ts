@@ -7,9 +7,9 @@ export interface ReportViewModel {
   canEdit: boolean;
   canCancel: boolean;
   error: "generation-failed" | "regeneration-failed" | null;
-  /** 本次生成的工具活动时间线；非生成/非失败态为空。 */
+  /** Dòng thời gian công cụ của lần tạo này; rỗng ngoài trạng thái đang tạo hoặc lỗi. */
   progress: readonly ReadingReportProgressStep[];
-  /** 生成开始时刻（epoch ms），仅生成中非 null —— 渲染层据此自行计时。 */
+  /** Thời điểm bắt đầu theo epoch ms; chỉ khác null khi đang tạo để renderer tự đếm thời gian. */
   startedAt: number | null;
 }
 

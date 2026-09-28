@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Đóng gói Read-Anything cho Windows</title>
+    <link rel="stylesheet" href="source-guide.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="code-map.html">Read-Anything · hướng dẫn mã nguồn</a>
+      <nav class="site-nav" aria-label="Tài liệu">
+        <a href="code-map.html">Bản đồ code</a><a href="architecture.html">Kiến trúc</a
+        ><a href="runtime-flows.html">Luồng chạy</a><a href="run-from-source.html">Chạy từ source</a
+        ><a href="build-windows-exe.html" aria-current="page">Tạo EXE</a>
+      </nav>
+    </header>
+    <div class="layout">
+      <main class="content">
+        <div class="eyebrow">Hướng dẫn · Windows PowerShell</div>
+        <h1>Chuyển mã nguồn thành EXE</h1>
+        <p class="lead">
+          <code>package</code> tạo ứng dụng có thể chạy trực tiếp trong một thư mục.
+          <code>make:win</code> tạo trình cài đặt Windows từ bản build. Cả hai lệnh phải chạy trong
+          thư mục có <code>package.json</code> của Read-Anything.
+        </p>
+        <h2 id="before">1. Chuẩn bị bản build</h2>
+        <p>
+          Nếu chưa cài dependency, làm theo
+          <a href="run-from-source.html#install">hướng dẫn chạy từ source</a>. Đóng cửa sổ
+          Read-Anything đang mở trước khi ghi đè thư mục <code>out</code>; Windows có thể giữ
+          <code>app.asar</code> hoặc EXE.
+        </p>
+        <pre><code>Set-Location 'D:\Project\pdf-reading-assistant\app'
+corepack pnpm --version
+corepack pnpm typecheck</code></pre>
+        <p>
+          <code>typecheck</code> kiểm tra mã TypeScript và build parser EPUB. Nếu muốn phát hành cho
+          người khác, xem thêm <code>corepack pnpm test</code> và <code>corepack pnpm lint</code>.
+          Đây là kiểm tra source; kiểm tra EXE chạy thật nằm ở bước 3.
+        </p>
+        <h2 id="package">2. Tạo thư mục ứng dụng chạy trực tiếp</h2>
+        <pre><code>corepack pnpm package</code></pre>
+        <p>
+          Electron Forge dùng cấu hình <a href="../forge.config.ts"><code>forge.config.ts</code></a
+          >. Vite build main, preload và renderer; Forge tạo <code>out/Read-Anything-win32-x64/</code>.
+          Chạy bản mới từ đúng đường dẫn:
+        </p>
+        <pre><code>.\out\Read-Anything-win32-x64\Read-Anything.exe</code></pre>
+        <p>
+          Tệp <code>Read-Anything.exe</code> cần các tệp cạnh nó trong cùng thư mục, đặc biệt
+          <code>resources/app.asar</code>, native module, migrations và từ điển. Sao chép riêng mỗi
+          EXE sang chỗ khác sẽ không tạo bản chạy đầy đủ. Sau mỗi lần sửa source, chạy lại
+          <code>package</code> để cập nhật thư mục này.
+        </p>
+        <h2 id="e2e">3. Kiểm tra chính bản EXE đã đóng gói</h2>
+        <p>Để chạy kịch bản PDF E2E trên EXE trong thư mục gốc:</p>
+        <pre><code>corepack pnpm e2e:packaged</code></pre>
+        <p>
+          Script
+          <a href="../scripts/e2e-packaged-pdf.mjs"><code>scripts/e2e-packaged-pdf.mjs</code></a>
+          mặc định lấy mẫu <code>D:\Book will read\coders-at-work.pdf</code>. Nếu máy khác không có
+          tệp đó, chỉ định PDF của bạn:
+        </p>
+        <pre><code>node scripts/e2e-packaged-pdf.mjs --sample="D:\Books\sample.pdf"</code></pre>
+        <p>
+          Muốn build và kiểm tra liền một lần, dùng <code>corepack pnpm e2e:packaged:build</code>.
+          Script có tùy chọn <code>--exe="D:\...\Read-Anything.exe"</code> để trỏ vào một bản package
+          cụ thể. Nó dùng profile thử nghiệm tạm, nên kết quả không dựa trên thư viện sách thường
+          ngày. Kiểm tra các dòng <code>PASS</code> và dòng kết luận cuối. Một build thành công chưa
+          chứng minh PDF render và các thao tác reader chạy trong EXE.
+        </p>
+        <h2 id="installer">4. Tạo trình cài đặt Windows</h2>
+        <pre><code>corepack pnpm make:win</code></pre>
+        <p>
+          <code>make:win</code> gọi <code>electron-forge make --platform=win32</code>. Forge dùng
+          MakerSquirrel trong <code>forge.config.ts</code>; tệp cài đặt có dạng:
+        </p>
+        <pre><code>out\make\squirrel.windows\x64\*Setup.exe</code></pre>
+        <p>
+          Phiên bản <code>0.1.0</code> được lấy từ <code>package.json</code>; khi
+          đổi phiên bản, tên tệp đổi theo. Mở Setup để cài, sau đó chạy từ Start Menu. Nếu bạn chỉ
+          cần tự thử code mới, bước 2 đã đủ; Setup có ích khi muốn cài vào Windows. Đặt Read-Anything
+          làm trình đọc PDF mặc định qua Windows Settings → Apps → Default apps → <code>.pdf</code>.
+        </p>
+        <h2 id="contents">Forge đưa gì vào bản đóng gói</h2>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Nguồn</th>
+                <th>Đích hoặc mục đích</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td>
+                  <code>src/main.ts</code>, <code>src/preload.ts</code>,
+                  <code>src/renderer.tsx</code>
+                </td>
+                <td>Vite build thành main, preload và renderer trong <code>.vite/</code>.</td>
+              </tr>
+              <tr>
+                <td><code>src/main/db/migrations/</code></td>
+                <td><code>resources/migrations/</code>; main đọc khi mở DB bản package.</td>
+              </tr>
+              <tr>
+                <td><code>assets/dictionary/</code></td>
+                <td>
+                  <code>resources/dictionary/</code>; ứng dụng cài bản DB từ điển địa phương vào
+                  userData.
+                </td>
+              </tr>
+              <tr>
+                <td>
+                  <code>better-sqlite3</code>, <code>pdfjs-dist</code>, <code>@napi-rs/canvas</code>
+                </td>
+                <td>
+                  Được giữ như runtime dependencies; native <code>.node</code> được giải nén ngoài
+                  ASAR.
+                </td>
+              </tr>
+              <tr>
+                <td>pdfjs CMaps, standard fonts và WASM</td>
+                <td>
+                  <code>vite.renderer.config.ts</code> copy vào đầu ra renderer để đọc PDF đặc biệt.
+                </td>
+              </tr>
+              <tr>
+                <td><code>assets/icons/icon.ico</code></td>
+                <td>
+                  Biểu tượng Windows do Forge chọn từ basename <code>assets/icons/icon</code>.
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p>
+          Ứng dụng đóng gói có <code>resources/app.asar</code>. Khi chạy, main phục vụ renderer qua
+          loopback <code>127.0.0.1</code> bằng
+          <a href="../src/main/app/renderer-server.ts"><code>renderer-server.ts</code></a
+          >. Việc này cho worker và tài nguyên PDF dùng URL ổn định trong Electron.
+        </p>
+        <h2 id="locked">Khi Windows từ chối ghi đè <code>app.asar</code></h2>
+        <ol>
+          <li>
+            Đóng Read-Anything, kể cả cửa sổ bản cài đặt và bản trong <code>out</code>. Kiểm tra Task
+            Manager không còn tiến trình <code>Read-Anything.exe</code> của chính ứng dụng.
+          </li>
+          <li>
+            Chạy lại <code>corepack pnpm package</code> tại project root. Không cần xóa source,
+            database hoặc thư mục sách người dùng.
+          </li>
+          <li>
+            Nếu công cụ đang chạy trong môi trường chỉ đọc/giới hạn quyền, build vào vị trí được
+            phép ghi rồi chép toàn bộ thư mục package về <code>out/Read-Anything-win32-x64</code>. Đảm
+            bảo đã đóng ứng dụng trước khi chép.
+          </li>
+          <li>
+            Chạy EXE ở <code>out</code> và E2E chỉ rõ <code>--exe</code> nếu có nhiều bản. Kiểm tra
+            thời gian sửa đổi của <code>resources/app.asar</code>; EXE riêng lẻ có thể giữ nguyên dù
+            mã mới đã nằm trong ASAR.
+          </li>
+        </ol>
+        <p>
+          Lỗi <code>EPERM</code> nêu đường dẫn bị chặn, nhưng tự nó chưa chỉ ra nguyên nhân. Tiến
+          trình giữ file và quyền ghi thư mục đều cần kiểm tra.
+        </p>
+        <h2 id="release">Trước khi đưa cho người khác</h2>
+        <p>
+          Kiểm tra Setup trên máy sạch hoặc user profile mới, đặc biệt migration, nhập sách, hiển
+          thị PDF, từ điển offline và quyền đọc tệp. Trình cài đặt Windows trong repo là Squirrel;
+          việc build không đồng nghĩa với ký mã hoặc vượt cảnh báo của Windows. Phiên bản và giấy
+          phép nằm trong <a href="../package.json"><code>package.json</code></a> và
+          <a href="../LICENSE"><code>LICENSE</code></a
+          >.
+        </p>
+      </main>
+      <aside class="toc">
+        <strong>Các bước</strong><a href="#before">Chuẩn bị</a><a href="#package">Tạo EXE</a
+        ><a href="#e2e">E2E bản EXE</a><a href="#installer">Tạo Setup</a
+        ><a href="#contents">Nội dung package</a><a href="#locked">Lỗi ghi đè</a
+        ><a href="#release">Trước khi chia sẻ</a>
+      </aside>
+    </div>
+    <footer class="footer">
+      Đường dẫn đầu ra và phiên bản theo cấu hình tại thời điểm viết; xác nhận lại sau mỗi lần đổi
+      package.json hoặc Forge config.
+    </footer>
+  </body>
+</html>

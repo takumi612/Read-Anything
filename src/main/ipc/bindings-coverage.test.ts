@@ -14,6 +14,7 @@ import { backupBindings } from "@main/ipc/backup-handlers";
 import { memoryBindings } from "@main/ipc/memory-handlers";
 import { agentBindings } from "@main/ipc/agent-handlers";
 import { readingSessionBindings } from "@main/ipc/reading-sessions-handlers";
+import { vocabularyBindings } from "@main/ipc/vocabulary-handlers";
 
 const allBindings = [
   ...appBindings,
@@ -30,6 +31,7 @@ const allBindings = [
   ...memoryBindings,
   ...agentBindings,
   ...readingSessionBindings,
+  ...vocabularyBindings,
 ];
 
 describe("ipc bindings coverage", () => {

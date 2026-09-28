@@ -1,26 +1,26 @@
 import { PDFDocument, PDFHexString, PDFName, PDFObject, StandardFonts } from "pdf-lib";
 
-/** 每页正文模板：page N 的文本（fixture 断言用，足够长以通过文本层检测阈值）。 */
+/** Văn bản mẫu cho từng trang, đủ dài để vượt ngưỡng phát hiện lớp chữ. */
 export function fixturePageText(page: number): string {
   return `This is the body text of page ${page}. `.repeat(4).trim();
 }
 
 interface TextPdfOptions {
-  /** 是否带 outline（两章：Chapter One → p1，Chapter Two → p3）。 */
+  /** Có mục lục hai chương: Chapter One ở trang 1, Chapter Two ở trang 3. */
   outline: boolean;
   title?: string;
   author?: string;
-  pages?: number; // 默认 3
-  /** 测试用：第二个 outline 条目的 Dest 指向未注册的 ref（坏 dest，应被解析端跳过）。 */
+  pages?: number; // Mặc định 3 trang.
+  /** Mục TOC thứ hai trỏ tới ref không tồn tại để kiểm tra parser bỏ qua đích lỗi. */
   brokenDest?: boolean;
-  /** 测试用：两个 outline 条目都指向第 1 页（同页起章）。 */
+  /** Hai mục TOC cùng bắt đầu ở trang 1. */
   samePageChapters?: boolean;
 }
 
 /**
- * 文字版 fixture：每页 drawText（有文本层）。
- * outline=true 时写入低层 /Outlines 字典（pdf-lib 无高层 API）：
- * Dest 数组首元素为页 ref，pdfjs 经 getPageIndex(ref) 解析回页号。
+ * PDF mẫu có lớp văn bản trên từng trang.
+ * Khi có TOC, ghi từ điển /Outlines cấp thấp vì pdf-lib không có API cấp cao.
+ * Dest chứa ref của trang; pdfjs dùng getPageIndex để tìm số trang.
  */
 export async function makeTextPdf(opts: TextPdfOptions): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
@@ -69,7 +69,7 @@ export async function makeTextPdf(opts: TextPdfOptions): Promise<Uint8Array> {
   return doc.save({ useObjectStreams: false });
 }
 
-/** 扫描版 fixture：3 张空页（无任何文本绘制 → getTextContent 为空 → hasTextLayer=false）。 */
+/** PDF scan mẫu gồm ba trang trống; không có lớp chữ nên hasTextLayer=false. */
 export async function makeScannedPdf(): Promise<Uint8Array> {
   const doc = await PDFDocument.create();
   for (let i = 0; i < 3; i++) doc.addPage([400, 600]);

@@ -13,6 +13,7 @@ interface SettingsState {
   open: boolean;
   activeCategory: SettingsCategory;
 }
+
 interface SettingsActions {
   setOpen: (open: boolean) => void;
   setActiveCategory: (c: SettingsCategory) => void;

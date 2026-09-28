@@ -253,10 +253,10 @@ pre code {
   margin-inline: auto;
 }
 
-/* Apple 图书式：完全隐藏滚动条但保留滚动能力 */
+/* Kiểu Apple Books: ẩn hoàn toàn thanh cuộn nhưng vẫn cho phép cuộn */
 .no-scrollbar {
   scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* 旧 Edge / IE */
+  -ms-overflow-style: none; /* Edge / IE đời cũ */
 }
 .no-scrollbar::-webkit-scrollbar {
   display: none; /* WebKit */

@@ -5,14 +5,15 @@ import type { ProviderTester } from "@main/secrets/tester";
 import { maskKey } from "@main/providers/mask";
 import { createProvider, type Provider } from "@main/providers/provider-factory";
 import { t } from "@main/i18n";
+import { encryptApiKey, isEncryptedApiKey, decryptApiKey } from "@main/secrets/api-key-storage";
 import type { ProviderDto, TestResult, UpsertProviderInput } from "@shared/providers";
 
 export type ProviderRow = typeof providers.$inferSelect;
 
 /**
- * Provider → DTO（明文仅在 main；DTO 只携掩码）。入参经工厂解析，故 baseUrl 已按 type 派生。
- * apiKey 两态：省略=保留既有，提供=替换（明文直存，见 2026-06-04 spec）。
- * label / baseUrl 同理：省略=保留，显式 null=清空（两态；新建时 ?? null 回退正确）。
+ * Chuyển provider thành DTO cho renderer; khóa gốc chỉ ở main, DTO chỉ có bản đã che.
+ * baseUrl đã được factory suy ra theo type. Bỏ qua apiKey để giữ khóa cũ, truyền để thay khóa.
+ * Với label/baseUrl, bỏ qua là giữ nguyên; null tường minh là xóa giá trị.
  */
 function toDto(provider: Provider): ProviderDto {
   return {
@@ -20,7 +21,7 @@ function toDto(provider: Provider): ProviderDto {
     type: provider.type,
     compatibleApis: provider.compatibleApis ?? [provider.type],
     label: provider.label ?? null,
-    baseUrl: provider.baseUrl, // 工厂已派生（DeepSeek 等内置不再是 db 里的 null）
+    baseUrl: provider.baseUrl, // URL đã được factory suy ra, kể cả DeepSeek tích hợp.
     keyMask: provider.apiKey == null ? null : maskKey(provider.apiKey),
     models: provider.models ?? [],
     isBuiltin: provider.isBuiltin,
@@ -32,7 +33,7 @@ export function getProviderRow(db: DB, id: string): ProviderRow | undefined {
   return db.select().from(providers).where(eq(providers.id, id)).get();
 }
 
-/** 取 provider 并经工厂解析为下游可消费的 {@link Provider}（baseUrl 已按 type 派生）。 */
+/** Lấy provider qua factory để có baseUrl hiệu lực theo type. */
 export function loadProvider(db: DB, id: string): Provider | undefined {
   const row = getProviderRow(db, id);
   return row ? createProvider(row) : undefined;
@@ -48,13 +49,14 @@ export function listProviders(db: DB): ProviderDto[] {
 }
 
 /**
- * 用户自建（非内置）provider 必须显式提供 baseUrl——内置才走默认端点 / 工厂派生免填
- * （OpenAI/Anthropic/Gemini 用各 type 官方端点，DeepSeek 按 type 派生）。
- * 该规则依赖 isBuiltin，故在仓储而非 Zod input schema 中强制。
+ * Provider tự thêm phải có baseUrl; chỉ provider tích hợp mới dùng endpoint mặc định
+ * hoặc URL suy ra từ type. Vì phụ thuộc isBuiltin, quy tắc này được kiểm tra trong repository.
  */
 function assertUsableBaseUrl(p: { isBuiltin: boolean; baseUrl: string | null }): void {
   if (!p.isBuiltin && p.baseUrl == null) {
-    throw new Error(t("errors.baseUrlRequiredCustom", "自建$t(terms.provider)必须填写 baseUrl"));
+    throw new Error(
+      t("errors.baseUrlRequiredCustom", "$t(terms.provider) tùy chỉnh phải có baseUrl"),
+    );
   }
 }
 
@@ -63,27 +65,35 @@ export function upsertProvider(db: DB, input: UpsertProviderInput): ProviderDto 
     const existing = getProviderRow(db, input.id);
     if (!existing)
       throw new Error(
-        t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id: input.id }),
+        t("errors.providerNotFound", "Không tìm thấy $t(terms.provider) {{id}}", { id: input.id }),
       );
-    // 内置 provider：label / baseUrl 不可改；type 仅可在 compatibleApis 内切换。main 侧防御非法改动。
+    // Provider tích hợp không cho sửa tên/URL; type phải thuộc compatibleApis.
     if (existing.isBuiltin) {
       const compat = existing.compatibleApis ?? [existing.type];
       if (input.type !== existing.type && !compat.includes(input.type)) {
         throw new Error(
-          t("errors.builtinTypeOutsideCompat", "内置$t(terms.provider)的类型只能在兼容 API 内切换"),
+          t(
+            "errors.builtinTypeOutsideCompat",
+            "Chỉ có thể đổi loại $t(terms.provider) tích hợp sẵn trong API tương thích",
+          ),
         );
       }
       if (input.label != null && input.label !== existing.label) {
-        throw new Error(t("errors.builtinLabelLocked", "内置$t(terms.provider)的名称不可修改"));
+        throw new Error(
+          t("errors.builtinLabelLocked", "Không thể đổi tên $t(terms.provider) tích hợp sẵn"),
+        );
       }
       if (input.baseUrl != null && input.baseUrl !== existing.baseUrl) {
         throw new Error(
-          t("errors.builtinBaseUrlLocked", "内置$t(terms.provider)的 baseUrl 不可修改"),
+          t(
+            "errors.builtinBaseUrlLocked",
+            "Không thể đổi baseUrl của $t(terms.provider) tích hợp sẵn",
+          ),
         );
       }
     }
-    const lockedMeta = existing.isBuiltin; // label / baseUrl 锁定
-    // 按更新后的最终态校验（内置豁免；非内置 baseUrl：省略=沿用 existing，显式=用新值——清空会被此拦下）。
+    const lockedMeta = existing.isBuiltin; // Khóa tên và URL của provider tích hợp.
+    // Kiểm tra trạng thái sau cập nhật; provider tự thêm không được có baseUrl rỗng.
     const finalBaseUrl = lockedMeta
       ? existing.baseUrl
       : input.baseUrl !== undefined
@@ -93,12 +103,12 @@ export function upsertProvider(db: DB, input: UpsertProviderInput): ProviderDto 
     const row = db
       .update(providers)
       .set({
-        type: input.type, // type 已校验（内置限 compatibleApis；非内置自由）
+        type: input.type, // type đã được kiểm tra theo compatibleApis khi cần.
         ...(!lockedMeta && input.label !== undefined ? { label: input.label } : {}),
         ...(!lockedMeta && input.baseUrl !== undefined ? { baseUrl: input.baseUrl } : {}),
-        ...(input.apiKey !== undefined ? { apiKey: input.apiKey } : {}),
+        ...(input.apiKey !== undefined ? { apiKey: encryptApiKey(input.apiKey) } : {}),
         ...(input.models !== undefined ? { models: input.models } : {}),
-        // 非内置：compatibleApis 跟随当前 type（内置 compatibleApis 由 config 固定，不动）。
+        // Provider tự thêm có compatibleApis theo type hiện tại; provider tích hợp giữ cấu hình gốc.
         ...(!existing.isBuiltin ? { compatibleApis: [input.type] } : {}),
       })
       .where(eq(providers.id, input.id))
@@ -106,21 +116,21 @@ export function upsertProvider(db: DB, input: UpsertProviderInput): ProviderDto 
       .get();
     if (!row)
       throw new Error(
-        t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id: input.id }),
+        t("errors.providerNotFound", "Không tìm thấy $t(terms.provider) {{id}}", { id: input.id }),
       );
     return toDto(createProvider(row));
   }
 
-  // 用户自建（非内置）：必须显式给 baseUrl（无默认端点 / 工厂派生豁免）。
+  // Provider tự thêm phải truyền baseUrl vì không có endpoint mặc định.
   assertUsableBaseUrl({ isBuiltin: false, baseUrl: input.baseUrl ?? null });
   const inserted = db
     .insert(providers)
     .values({
       type: input.type,
-      compatibleApis: [input.type], // 用户自建：单一当前 type
+      compatibleApis: [input.type], // Provider tự thêm chỉ có type hiện tại.
       label: input.label ?? null,
       baseUrl: input.baseUrl ?? null,
-      apiKey: input.apiKey ?? null,
+      apiKey: input.apiKey == null ? null : encryptApiKey(input.apiKey),
       models: input.models ?? [],
     })
     .returning()
@@ -131,23 +141,47 @@ export function upsertProvider(db: DB, input: UpsertProviderInput): ProviderDto 
 export function removeProvider(db: DB, id: string): void {
   const row = getProviderRow(db, id);
   if (!row)
-    throw new Error(t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id }));
+    throw new Error(
+      t("errors.providerNotFound", "Không tìm thấy $t(terms.provider) {{id}}", { id }),
+    );
   if (row.isBuiltin)
-    throw new Error(t("errors.builtinUndeletable", "内置$t(terms.provider)不可删除"));
-  // chatModel / summaryModel 偏好按 providerId 引用（无 FK，存 JSON）：删 provider 后留作悬空引用，
-  // 由 resolveChatModel / resolveSummaryModel 在解析时报「未找到 provider」优雅降级，无需在此清理。
+    throw new Error(
+      t("errors.builtinUndeletable", "Không thể xóa $t(terms.provider) tích hợp sẵn"),
+    );
+  // chatModel và summaryModel lưu providerId trong JSON, không có khóa ngoại.
+  // Nếu provider bị xóa, bước resolve sẽ báo không tìm thấy; không cần sửa tùy chọn ở đây.
   db.delete(providers).where(eq(providers.id, id)).run();
 }
 
 export function revealProviderKey(db: DB, id: string): string {
   const row = getProviderRow(db, id);
   if (!row)
-    throw new Error(t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id }));
+    throw new Error(
+      t("errors.providerNotFound", "Không tìm thấy $t(terms.provider) {{id}}", { id }),
+    );
   if (row.apiKey == null)
     throw new Error(
-      t("errors.providerHasNoApiKey", "$t(terms.provider) {{id}} 未配置密钥", { id }),
+      t("errors.providerHasNoApiKey", "$t(terms.provider) {{id}} chưa có API key", { id }),
     );
-  return row.apiKey;
+  return decryptApiKey(row.apiKey)!;
+}
+
+/** Upgrade keys written by older versions from plaintext to OS-protected values. */
+export function migrateProviderApiKeys(db: DB): void {
+  const rows = db.select().from(providers).all();
+  for (const row of rows) {
+    if (row.apiKey == null || isEncryptedApiKey(row.apiKey)) continue;
+    try {
+      db.update(providers)
+        .set({ apiKey: encryptApiKey(row.apiKey) })
+        .where(eq(providers.id, row.id))
+        .run();
+    } catch {
+      // Do not prevent the app from opening on systems without an OS key store.
+      // New keys are refused by encryptApiKey until secure storage is available.
+      return;
+    }
+  }
 }
 
 export async function testProvider(
@@ -158,11 +192,16 @@ export async function testProvider(
 ): Promise<TestResult> {
   const provider = loadProvider(db, id);
   if (!provider)
-    throw new Error(t("errors.providerNotFound", "未找到$t(terms.provider) {{id}}", { id }));
+    throw new Error(
+      t("errors.providerNotFound", "Không tìm thấy $t(terms.provider) {{id}}", { id }),
+    );
   if (provider.apiKey == null) {
-    return { ok: false, message: t("errors.noApiKeySet", "该$t(terms.provider)未配置密钥") };
+    return {
+      ok: false,
+      message: t("errors.noApiKeySet", "$t(terms.provider) này chưa có API key"),
+    };
   }
-  // provider.baseUrl 已由工厂按 type 派生（DeepSeek 特判集中在此一处）。
+  // Factory đã suy ra baseUrl theo type; trường hợp DeepSeek được xử lý tập trung.
   return tester.test({
     type: provider.type,
     baseUrl: provider.baseUrl,

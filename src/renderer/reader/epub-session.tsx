@@ -12,11 +12,11 @@ const log = createLogger("epub");
 
 export interface EpubSession {
   book: EpubBook | null;
-  /** spine 物理顺序的 href（book 就绪后派生）；book 未就绪 / 非 epub 时为空数组。 */
+  /** Các href theo thứ tự vật lý của spine; rỗng khi sách chưa sẵn sàng hoặc không phải ePub. */
   spineHrefs: string[];
   anchorBoundaries: AnchorBoundary[];
   parseError: string | null;
-  /** app 自有副本缺失（safe-return ok:false）——EpubReader 据此挂缺失面板。 */
+  /** Bản sao tệp của ứng dụng bị thiếu; EpubReader dựa vào đó để hiện bảng báo thiếu tệp. */
   bytesMissing: boolean;
   bytesError: boolean;
 }
@@ -30,8 +30,8 @@ export function useEpubSession(): EpubSession {
 }
 
 /**
- * book 实例归 ReaderView 范围状态：EpubReader 与 AnnotationsList 都从这里消费。
- * 仅 ePub 书创建 book（enabled=false 时 PDF：book=null、spineHrefs=[]，PdfReader 不消费本 context）。
+ * Instance sách thuộc state trong phạm vi ReaderView; EpubReader và AnnotationsList cùng sử dụng.
+ * Chỉ tạo instance cho ePub. Với PDF, book=null và spineHrefs rỗng; PdfReader không dùng context này.
  */
 export function EpubSessionProvider({
   bookId,
@@ -60,10 +60,10 @@ export function EpubSessionProvider({
   });
 
   useEffect(() => {
-    // enabled 守卫：非 epub 书（pdf）时本 Provider enabled=false。但 bytes query 与 PdfReader 共享
-    // 同一 qk.bookBytes，disabled observer 仍从共享缓存读到 pdf 字节——若不守卫，会对 pdf 字节误调
-    // createEpubBook：epubjs 解非 zip 字节卡死，且与 PdfReader 的 createPdfBook 争抢同一 ArrayBuffer
-    // （pdf.js 把 data transfer 到 worker 会 detach buffer），导致 pdf 永远卡「加载中」。故仅 epub 建 book。
+    // Khi xem PDF, Provider bị tắt nhưng truy vấn bytes chia sẻ qk.bookBytes với PdfReader.
+    // Observer tắt vẫn có thể đọc byte PDF từ cache; phải chặn createEpubBook với dữ liệu này.
+    // epubjs có thể treo khi phân tích byte không phải ZIP, còn PDF.js chuyển buffer sang worker
+    // làm nó bị detach. Vì vậy chỉ tạo book cho ePub.
     if (!enabled || !bytes.data?.ok) return;
     const fileBytes = bytes.data.data;
     let alive = true;
@@ -88,12 +88,13 @@ export function EpubSessionProvider({
       alive = false;
       created?.destroy();
       setBook(null);
-      setParseError(null); // 换书/重解析时清旧错误，避免新书加载前短暂残留上一本的 parseError
+      setParseError(null); // Xóa lỗi cũ khi đổi hoặc phân tích lại sách.
     };
   }, [enabled, bytes.data]);
 
-  // 共享 href（锚点切章）的章节需 anchor 级边界 CFI 才能归属标注。开书后异步预计算：
-  // 渲染相关 section、为每个锚点章生成起点 CFI，按 CFI 升序存。未就绪时侧栏退化 href 级。
+  // Các chương chung href cần CFI ở từng neo để xác định chú thích thuộc chương nào.
+  // Sau khi mở sách, vẽ section liên quan, tính CFI đầu mỗi chương có neo rồi sắp theo CFI.
+  // Trước khi xong, thanh bên tạm ghép theo href.
   useEffect(() => {
     if (!book || !chapters.data) {
       setAnchorBoundaries([]);

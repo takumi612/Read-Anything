@@ -12,9 +12,9 @@ function ScrollArea({
   children,
   ...props
 }: ScrollAreaPrimitive.Root.Props & {
-  /** 透传给 Viewport（滚动元素）。max-height 等限高场景传这里（如 `max-h-40`）。 */
+  /** Class chuyển tới Viewport là phần tử cuộn; đặt giới hạn chiều cao như max-h-40 tại đây. */
   viewportClassName?: string;
-  /** 透传给 Viewport DOM 的 ref，供程序化滚动（如 AIPanel 滚底）。 */
+  /** Ref tới DOM của Viewport để cuộn bằng mã, chẳng hạn xuống cuối AIPanel. */
   viewportRef?: React.Ref<HTMLDivElement>;
 }) {
   return (
@@ -28,8 +28,8 @@ function ScrollArea({
         data-slot="scroll-area-viewport"
         className={cn("size-full", viewportClassName)}
       >
-        {/* Base UI Content 自带内联 min-width: fit-content（为横向增长内容设计），会被 truncate/nowrap
-            的固有宽度撑爆致横向溢出；本仓库 ScrollArea 全部为纵向滚动场景，故用 ! 盖过内联样式压回 0。 */}
+        {/* Base UI Content đặt min-width: fit-content nội tuyến, có thể gây tràn ngang với truncate/nowrap.
+            Các ScrollArea ở đây chỉ cuộn dọc nên ghi đè min-width về 0. */}
         <ScrollAreaPrimitive.Content className="min-w-0!">{children}</ScrollAreaPrimitive.Content>
       </ScrollAreaPrimitive.Viewport>
       <ScrollBar />
@@ -48,7 +48,7 @@ function ScrollBar({
       data-slot="scroll-area-scrollbar"
       orientation={orientation}
       className={cn(
-        // macOS 式：滚动时（data-scrolling 瞬现）或指针移到滚动条轨道（hover 条本身、非整区）时显示，停手/移开后经 duration-300 渐隐；不认整区 data-hovering。
+        // Hiện thanh cuộn khi đang cuộn hoặc rê lên rãnh, rồi mờ dần sau khi dừng hoặc rời chuột.
         "z-10 flex touch-none select-none opacity-0 transition-opacity duration-300 hover:opacity-100 data-[scrolling]:opacity-100 data-[scrolling]:duration-0",
         orientation === "vertical" && "h-full w-2.5 justify-center",
         orientation === "horizontal" && "h-2.5 w-full flex-col items-center",

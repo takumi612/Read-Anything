@@ -9,9 +9,9 @@ import { HoverCard, HoverCardContent } from "@renderer/components/ui/hover-card"
 import { Button } from "@renderer/components/ui/button";
 
 /**
- * 悬停带笔记高亮时的卡片。受控开合由 note-hover-store 驱动；用虚拟锚点（视口坐标 +
- * positionMethod="fixed"）定位到命中的高亮矩形。卡片本身可移入（onMouseEnter/Leave →
- * store 取消/重起关闭窗口），便于读长笔记与点「编辑」。
+ * Thẻ hiện khi rê lên vùng tô sáng có ghi chú; note-hover-store quản lý đóng mở.
+ * Neo ảo với tọa độ khung nhìn và positionMethod="fixed" đặt thẻ cạnh vùng tô sáng.
+ * Người dùng có thể đưa chuột vào thẻ để đọc ghi chú dài hoặc chọn sửa; store quản lý timer đóng.
  */
 export function NoteHoverCard() {
   const { t } = useTranslation();
@@ -31,7 +31,7 @@ export function NoteHoverCard() {
   });
   const anno = annoId ? annos.data?.find((a) => a.id === annoId) : undefined;
 
-  // 虚拟锚点：把视口坐标 rect 包成 floating-ui VirtualElement（getBoundingClientRect 返回视口坐标）。
+  // Bọc rect theo tọa độ khung nhìn thành VirtualElement cho floating-ui.
   const anchor = anchorRect
     ? {
         getBoundingClientRect: () => {
@@ -85,7 +85,7 @@ export function NoteHoverCard() {
             }}
           >
             <Pencil className="size-3.5" />
-            {t("reader.note.edit", "编辑")}
+            {t("reader.note.edit", "Sửa")}
           </Button>
         </div>
       </HoverCardContent>

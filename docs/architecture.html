@@ -1,0 +1,212 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Kiến trúc Read-Anything</title>
+    <link rel="stylesheet" href="source-guide.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="code-map.html">Read-Anything · hướng dẫn mã nguồn</a>
+      <nav class="site-nav" aria-label="Tài liệu">
+        <a href="code-map.html">Bản đồ code</a
+        ><a href="architecture.html" aria-current="page">Kiến trúc</a
+        ><a href="runtime-flows.html">Luồng chạy</a><a href="run-from-source.html">Chạy từ source</a
+        ><a href="build-windows-exe.html">Tạo EXE</a>
+      </nav>
+    </header>
+    <div class="layout">
+      <main class="content">
+        <div class="eyebrow">Giải thích · bản làm việc hiện tại</div>
+        <h1>Kiến trúc ứng dụng</h1>
+        <p class="lead">
+          Read-Anything là ứng dụng Electron đọc EPUB và PDF. Mã được chia theo tiến trình Electron,
+          hợp đồng IPC và miền chức năng. Trang này giải thích nơi dữ liệu được xử lý, lưu, và hiển
+          thị.
+        </p>
+        <div class="callout">
+          Đọc cùng <a href="code-map.html">bản đồ mã nguồn</a> để đi tới từng tệp.
+          <a href="runtime-flows.html">Luồng chạy</a> nối các lớp dưới đây thành thao tác cụ thể.
+        </div>
+        <h2 id="processes">Ba môi trường chạy</h2>
+        <div class="diagram">
+          <span>Renderer: React UI</span><b>→</b><span>Preload: <code>window.api</code></span
+          ><b>→</b><span>Main: IPC, nghiệp vụ, SQLite và tệp</span>
+        </div>
+        <p>
+          <a href="../src/main.ts"><code>src/main.ts</code></a> khởi tạo cửa sổ Electron, cơ sở dữ
+          liệu, giao thức ảnh và media, IPC handlers, dịch vụ đồng hồ đọc và máy chủ nội bộ cho
+          renderer đã đóng gói. <a href="../src/preload.ts"><code>src/preload.ts</code></a> dùng
+          <code>contextBridge.exposeInMainWorld</code>.
+          <a href="../src/preload-api.ts"><code>src/preload-api.ts</code></a> xây API có kiểu từ hợp
+          đồng; UI gọi <code>window.api</code> thay vì đọc Node hoặc SQLite trực tiếp.
+        </p>
+        <p>
+          <a href="../src/renderer.tsx"><code>src/renderer.tsx</code></a> gắn React vào
+          <code>#root</code>, nạp i18n, CSS, theme và React Query.
+          <a href="../src/renderer/App.tsx"><code>App.tsx</code></a> chọn màn sách hay khung ứng
+          dụng theo Zustand navigation store. Main giữ quyền truy cập đĩa và API key. Renderer tập
+          trung vào hành vi và trạng thái giao diện.
+        </p>
+        <h2 id="contracts">Hợp đồng IPC và ranh giới tin cậy</h2>
+        <p>
+          <a href="../src/shared/ipc.ts"><code>src/shared/ipc.ts</code></a> định nghĩa channel và
+          schema Zod đầu vào. Các kiểu miền nằm trong <code>src/shared/*.ts</code>, chẳng hạn
+          <a href="../src/shared/library.ts">library</a>, <a href="../src/shared/chat.ts">chat</a>,
+          <a href="../src/shared/preferences.ts">preferences</a> và
+          <a href="../src/shared/vocabulary.ts">vocabulary</a>.
+          <a href="../src/main/ipc/registry.ts"><code>registry.ts</code></a> gắn hợp đồng với hàm xử
+          lý. <a href="../src/main/ipc/validate.ts"><code>validate.ts</code></a> kiểm tra dữ liệu
+          trước khi chạy nghiệp vụ; registry ghi lỗi nếu handler thất bại.
+        </p>
+        <p>
+          Preload chuyển lời gọi bằng <code>ipcRenderer.invoke</code>; hầu hết handlers dùng
+          <code>bind(C.channel, fn)</code>. Dòng AI là ngoại lệ quan trọng: main trả ACK qua invoke,
+          sau đó gửi từng chunk qua sự kiện <code>ai:chunk</code>. API đồng bộ chỉ phục vụ ảnh chụp
+          cài đặt ban đầu và lưu tiến độ khi cần.
+        </p>
+        <h2 id="data">Dữ liệu tại máy</h2>
+        <p>
+          <a href="../src/main/app/app-service.ts"><code>app-service.ts</code></a> tập trung đường
+          dẫn trong <code>app.getPath('userData')</code>.
+          <a href="../src/main/db/instance.ts"><code>db/instance.ts</code></a> mở một kết nối SQLite
+          và chạy migration. <a href="../src/main/db/client.ts"><code>db/client.ts</code></a> cấu
+          hình better-sqlite3 và Drizzle. Bảng được định nghĩa ở
+          <a href="../src/main/db/schema.ts"><code>db/schema.ts</code></a
+          >. Migrations là các thư mục chứa <code>migration.sql</code> và
+          <code>snapshot.json</code> dưới <code>src/main/db/migrations/</code>.
+        </p>
+        <p>
+          Tệp sách được sao chép vào thư mục ứng dụng bằng
+          <a href="../src/main/library/book-files.ts"><code>book-files.ts</code></a
+          >; DB lưu metadata, chỉ mục, tiến độ, annotation, từ vựng, bookmark, hội thoại và số liệu
+          đọc. Sao lưu nằm tại <code>src/main/backup/</code>. Dịch vụ ghi log ở
+          <code>src/main/logger/</code>; renderer chuyển log bằng IPC. Từ điển đóng gói ở
+          <code>assets/dictionary/</code> được sao chép vào vùng dữ liệu người dùng và mở cục bộ.
+        </p>
+        <h2 id="books">Đọc EPUB và PDF</h2>
+        <p>
+          Import đi từ
+          <a href="../src/main/ipc/library-handlers.ts"><code>library-handlers.ts</code></a> tới
+          <a href="../src/main/library/repository.ts"><code>library/repository.ts</code></a
+          >. EPUB dùng
+          <a href="../packages/epub-parser/src/index.ts"><code>@marginalia/epub-parser</code></a> để
+          lấy metadata và cấu trúc; renderer hiển thị qua
+          <a href="../src/renderer/reader/EpubReader.tsx"><code>EpubReader.tsx</code></a> và epubjs.
+          PDF có parser phía main tại
+          <a href="../packages/pdf-parser/src/index.ts"><code>@marginalia/pdf-parser</code></a> để
+          lấy thông tin/chỉ mục; renderer dùng pdfjs trong
+          <a href="../src/renderer/reader/pdf-book.ts"><code>pdf-book.ts</code></a> và
+          <a href="../src/renderer/reader/PdfReader.tsx"><code>PdfReader.tsx</code></a> để vẽ trang
+          và text layer. Trang PDF dài được ảo hóa bằng react-virtuoso.
+        </p>
+        <p>
+          <a href="../src/renderer/reading/BookRoute.tsx"><code>BookRoute.tsx</code></a> phân nhánh
+          theo trạng thái phiên đọc: bắt đầu, đang đọc, xem lại, báo cáo.
+          <a href="../src/renderer/reader/ReaderView.tsx"><code>ReaderView.tsx</code></a> gắn đầu
+          đọc, sidebar, công cụ theo sách và AI. Các locator trong
+          <code>src/renderer/reader/</code> là cầu nối giữa vị trí trên trang và DB. Search PDF xử
+          lý text trong <a href="../src/renderer/reader/pdf-search.ts"><code>pdf-search.ts</code></a
+          >, hiển thị kết quả trong
+          <a href="../src/renderer/reader/PdfSearchPanel.tsx"><code>PdfSearchPanel.tsx</code></a
+          >, và tô trên text layer bằng hook
+          <a href="../src/renderer/reader/use-pdf-search-marks.ts"
+            ><code>use-pdf-search-marks.ts</code></a
+          >.
+        </p>
+        <h2 id="assistant">Từ điển và trợ lý AI</h2>
+        <p>
+          Tra từ mặc định dùng
+          <a href="../src/main/vocabulary/local-dictionary.ts"><code>local-dictionary.ts</code></a>
+          và
+          <a href="../src/main/vocabulary/technical-glossary.ts"
+            ><code>technical-glossary.ts</code></a
+          >.
+          <a href="../src/renderer/reader/SelectionToolbar.tsx"
+            ><code>SelectionToolbar.tsx</code></a
+          >
+          hiển thị kết quả. Tính năng phát âm dùng Web Speech qua
+          <code>src/renderer/reader/tts/</code>. Tra từ ngoại tuyến không cần provider AI.
+        </p>
+        <p>
+          AI được cấu hình ở <code>src/main/providers/</code>, <code>src/main/secrets/</code> và
+          giao diện <code>src/renderer/settings/</code>.
+          <a href="../src/main/ai/send.ts"><code>ai/send.ts</code></a> lấy câu hỏi, nội dung chọn,
+          lịch sử và bằng chứng PDF.
+          <a href="../src/main/ai/prompt.ts"><code>prompt.ts</code></a> dựng thông điệp.
+          <a href="../src/main/ai/stream-assistant.ts"><code>stream-assistant.ts</code></a> gọi AI
+          SDK và công cụ ngữ cảnh, sau đó stream kết quả về panel React. Tìm kiếm mạng chỉ tham gia
+          khi đã cấu hình và bật cho lượt hỏi. Các công cụ đọc sách, memory và phiên đọc nằm cùng
+          miền <code>src/main/ai/</code>.
+        </p>
+        <h2 id="state">Trạng thái UI và cài đặt</h2>
+        <p>
+          <a href="../src/renderer/store/navigation-store.ts"><code>navigation-store.ts</code></a>
+          giữ màn hiện tại;
+          <a href="../src/renderer/store/pdf-tabs-store.ts"><code>pdf-tabs-store.ts</code></a> giữ
+          các tab PDF;
+          <a href="../src/renderer/store/prefs-store.ts"><code>prefs-store.ts</code></a> và
+          <a href="../src/renderer/store/theme-store.ts"><code>theme-store.ts</code></a> giữ lựa
+          chọn hiển thị.
+          <a href="../src/renderer/query/client.ts"><code>query/client.ts</code></a> tạo React Query
+          cache cho dữ liệu đọc từ main; mutation phải làm mới query liên quan. Thay đổi cấu hình
+          được lưu qua <code>window.api.preferences.set</code>.
+        </p>
+        <p>
+          Theme ứng dụng, nền thư viện, tông trang EPUB, nền quanh PDF và độ sáng PDF là các lựa
+          chọn khác nhau. UI điều khiển nằm trong <code>src/renderer/theme/</code>,
+          <code>src/renderer/settings/AppearanceSettings.tsx</code> và
+          <code>src/renderer/shell/SettingsMenuButton.tsx</code>. Bộ lọc độ sáng PDF tác động trang
+          PDF đang hiển thị; nó không sửa bytes của sách gốc.
+        </p>
+        <h2 id="build">Cấu trúc build</h2>
+        <p>
+          <a href="../forge.config.ts"><code>forge.config.ts</code></a> ghép ba entry: main, preload
+          và renderer. Các config Vite riêng là
+          <a href="../vite.main.config.ts"><code>vite.main.config.ts</code></a
+          >, <a href="../vite.preload.config.ts"><code>vite.preload.config.ts</code></a> và
+          <a href="../vite.renderer.config.ts"><code>vite.renderer.config.ts</code></a
+          >. Main để native <code>better-sqlite3</code>, <code>pdfjs-dist</code> và
+          <code>@napi-rs/canvas</code> ở ngoài bundle. Forge giữ chúng trong package, giải nén tệp
+          <code>.node</code>, và kèm migrations/từ điển trong <code>resources</code>. Renderer copy
+          CMaps, font chuẩn và WASM của pdfjs.
+        </p>
+        <p>
+          Bản đóng gói phục vụ tài nguyên renderer qua HTTP trên <code>127.0.0.1</code> với đường
+          dẫn ngẫu nhiên do
+          <a href="../src/main/app/renderer-server.ts"><code>renderer-server.ts</code></a> tạo. Đây
+          là máy chủ cục bộ trong ứng dụng; phát triển dùng Vite dev server. Xem
+          <a href="build-windows-exe.html">cách tạo EXE</a> để phân biệt <code>package</code> và
+          <code>make:win</code>.
+        </p>
+        <h2 id="limits">Ranh giới cần nhớ khi review</h2>
+        <ul>
+          <li>
+            Tài liệu phản ánh mã trong working tree tại thời điểm viết. <code>CLAUDE.md</code> có
+            một số câu về lệnh phát hành và phiên bản cũ; kiểm tra <code>package.json</code> và
+            config hiện tại trước khi dùng.
+          </li>
+          <li>
+            PDF scan không có text layer thì tìm kiếm/chọn từ theo văn bản có thể không khả dụng;
+            phần vẽ trang vẫn dùng ảnh PDF.
+          </li>
+          <li>
+            API key và dữ liệu sách ở máy người dùng. Hỏi AI gửi nội dung câu hỏi/ngữ cảnh tới
+            provider do người dùng cấu hình; các luồng ngoại tuyến không cần mạng.
+          </li>
+        </ul>
+      </main>
+      <aside class="toc">
+        <strong>Trong trang</strong><a href="#processes">Ba môi trường chạy</a
+        ><a href="#contracts">Hợp đồng IPC</a><a href="#data">Dữ liệu tại máy</a
+        ><a href="#books">Đọc sách</a><a href="#assistant">Từ điển và AI</a
+        ><a href="#state">Trạng thái UI</a><a href="#build">Build</a
+        ><a href="#limits">Ranh giới review</a>
+      </aside>
+    </div>
+    <footer class="footer">
+      Đọc offline · Các liên kết source mở tệp tương ứng trong repository.
+    </footer>
+  </body>
+</html>

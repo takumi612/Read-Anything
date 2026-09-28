@@ -4,15 +4,16 @@ function stripFragment(href: string): string {
   return href.split("#")[0]!.split("?")[0]!;
 }
 
-/** 取末段文件名（路径前缀不一致时的兜底匹配）。 */
+/** Lấy tên tệp cuối để ghép dự phòng khi tiền tố đường dẫn khác nhau. */
 export function basename(href: string): string {
   const p = stripFragment(href);
   return p.slice(p.lastIndexOf("/") + 1);
 }
 
 /**
- * href → 匹配的章列表：先 exact（去 fragment）命中则返回全部 exact；否则返回全部 basename 命中。
- * 同 href 多章（锚点切章）会返回多项，供调用方做 anchor 级细分。
+ * Tìm các chương khớp href: ưu tiên khớp chính xác sau khi bỏ fragment,
+ * nếu không có thì ghép theo tên tệp. Nhiều chương có thể chung href và khác neo;
+ * bên gọi sẽ phân biệt tiếp theo neo.
  */
 export function chaptersMatchingHref(chapters: ChapterRefDto[], href: string): ChapterRefDto[] {
   const target = stripFragment(href);
@@ -22,7 +23,7 @@ export function chaptersMatchingHref(chapters: ChapterRefDto[], href: string): C
   return chapters.filter((c) => basename(c.href) === base);
 }
 
-/** spine 项 href → 唯一章节 id；歧义（多命中）或无命中返回 null。 */
+/** Đổi href của mục spine thành id chương duy nhất; trả null nếu mơ hồ hoặc không khớp. */
 export function chapterIdByHref(chapters: ChapterRefDto[], href: string): string | null {
   const m = chaptersMatchingHref(chapters, href);
   return m.length === 1 ? m[0]!.id : null;

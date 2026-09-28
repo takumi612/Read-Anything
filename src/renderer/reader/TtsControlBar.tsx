@@ -14,7 +14,7 @@ import { ttsController } from "@renderer/reader/tts/tts-controller";
 
 const RATE_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
-/** 朗读浮动控制条（spec §7.1）：正文区底部胶囊；status=idle 时不渲染。 */
+/** Thanh điều khiển đọc nổi ở cuối vùng nội dung; không hiện khi status=idle. */
 export function TtsControlBar() {
   const { t } = useTranslation();
   const status = useTtsStore((s) => s.status);
@@ -23,7 +23,7 @@ export function TtsControlBar() {
   if (status === "idle") return null;
 
   const toggleLabel =
-    status === "playing" ? t("reader.tts.pause", "暂停") : t("reader.tts.resume", "继续");
+    status === "playing" ? t("reader.tts.pause", "Tạm dừng") : t("reader.tts.resume", "Tiếp tục");
   return (
     <div className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 items-center gap-1 rounded-full border bg-popover px-2 py-1 shadow-md">
       <Button
@@ -37,7 +37,7 @@ export function TtsControlBar() {
       <Button
         variant="ghost"
         size="icon"
-        aria-label={t("reader.tts.stop", "停止")}
+        aria-label={t("reader.tts.stop", "Dừng")}
         onClick={() => ttsController.stop()}
       >
         <Square />
@@ -53,9 +53,9 @@ export function TtsControlBar() {
       >
         <SelectTrigger
           className="h-8 w-20 border-none shadow-none"
-          aria-label={t("reader.tts.rate", "语速")}
+          aria-label={t("reader.tts.rate", "Tốc độ")}
         >
-          {/* value 是倍率裸值（"1.25"）；显示带 × 后缀与选项一致。 */}
+          {/* Value là hệ số gốc như "1.25"; nhãn thêm × như các tùy chọn. */}
           <SelectValue>{(v) => `${v as string}×`}</SelectValue>
         </SelectTrigger>
         <SelectContent>

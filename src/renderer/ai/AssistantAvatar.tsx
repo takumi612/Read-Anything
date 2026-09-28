@@ -3,8 +3,8 @@ import { cn } from "@renderer/lib/utils";
 import defaultAvatarUrl from "@renderer/ai/default-avatar.svg";
 
 /**
- * Assistant 头像：有 avatarBlobId 走 media://blob/{id}（id 变即 URL 变、天然刷新），
- * 否则用内置默认 svg。圆形；尺寸由 className 控制（对话内小、设置预览大）。
+ * Ảnh đại diện trợ lý dùng media://blob/{id} khi có avatarBlobId; id đổi thì URL tự đổi.
+ * Nếu không có thì dùng SVG mặc định. Hình tròn và kích thước do className quyết định.
  */
 export function AssistantAvatar({ className }: { className?: string }) {
   const blobId = usePrefsStore((s) => s.avatarBlobId);
@@ -15,7 +15,7 @@ export function AssistantAvatar({ className }: { className?: string }) {
       alt=""
       className={cn("shrink-0 rounded-full object-cover", className)}
       onError={(e) => {
-        // 协议异常兜底：回落默认 svg（避免破图）。
+        // Nếu URL media lỗi, dùng SVG mặc định để tránh ảnh hỏng.
         if (e.currentTarget.src !== defaultAvatarUrl) e.currentTarget.src = defaultAvatarUrl;
       }}
     />

@@ -1,8 +1,9 @@
 import { z } from "zod";
 
 /**
- * AI provider 的 **API 端点格式**（按实际协议区分，非公司名）。一个 provider 可兼容多种（compatibleApis）。
- * `google-interactions`（Google 新 Interactions API）尚 beta，待 GA 再加。
+ * Định dạng API của nhà cung cấp AI, phân biệt theo giao thức thay vì tên công ty.
+ * Một nhà cung cấp có thể hỗ trợ nhiều định dạng trong compatibleApis.
+ * `google-interactions` còn ở giai đoạn beta nên chưa thêm.
  */
 export const aiProviderApiType = z.enum([
   "openai-responses",
@@ -12,15 +13,15 @@ export const aiProviderApiType = z.enum([
 ]);
 export type AiProviderApiType = z.infer<typeof aiProviderApiType>;
 
-/** 各 API type 官方默认端点：UI baseUrl 占位符 + 拉模型兜底共用（不注入生成路径——那交 SDK 自带默认）。 */
+/** Endpoint mặc định của từng API type; dùng cho ô baseUrl và dự phòng khi lấy danh sách model. */
 export const DEFAULT_BASE_URL: Record<AiProviderApiType, string | null> = {
   "openai-responses": "https://api.openai.com/v1",
-  "openai-chat-completions": null, // 兼容端点无默认（自建网关，必填）
+  "openai-chat-completions": null, // Gateway tương thích tự quản lý phải nhập URL.
   anthropic: "https://api.anthropic.com/v1",
   "google-generate-content": "https://generativelanguage.googleapis.com/v1beta",
 };
 
-/** API type 的 UI 显示名。 */
+/** Tên hiển thị của từng API type. */
 export const PROVIDER_TYPE_LABEL: Record<AiProviderApiType, string> = {
   "openai-responses": "OpenAI Responses",
   "openai-chat-completions": "OpenAI Chat Completions",
@@ -29,9 +30,9 @@ export const PROVIDER_TYPE_LABEL: Record<AiProviderApiType, string> = {
 };
 
 /**
- * 内置 DeepSeek 的 per-type baseUrl —— DeepSeek 同时兼容 OpenAI Chat Completions、OpenAI Responses
- * 与 Anthropic（三协议同 host，SDK 各自拼路径）；其 `db.baseUrl` 存 null，按当前 type 派生
- * （见 {@link resolveProviderBaseUrl}）。
+ * URL theo API type của DeepSeek tích hợp sẵn. DeepSeek hỗ trợ Chat Completions,
+ * Responses và Anthropic trên cùng host; từng SDK tự thêm đường dẫn.
+ * DB lưu baseUrl null rồi suy ra theo type hiện tại qua resolveProviderBaseUrl.
  */
 const DEEPSEEK_BASE_URL: Partial<Record<AiProviderApiType, string>> = {
   "openai-chat-completions": "https://api.deepseek.com",
@@ -39,15 +40,15 @@ const DEEPSEEK_BASE_URL: Partial<Record<AiProviderApiType, string>> = {
   anthropic: "https://api.deepseek.com/anthropic",
 };
 
-/** 是否为内置 DeepSeek provider（其 baseUrl 在 db 为 null、需按 type 派生，故下游须特判）。 */
+/** Xác định DeepSeek tích hợp sẵn, có baseUrl null trong DB và cần suy ra từ type. */
 export function isDeepseekProvider(p: { label: string | null; isBuiltin: boolean }): boolean {
   return p.isBuiltin && p.label === "DeepSeek";
 }
 
 /**
- * provider 在某 type 下实际生效的 baseUrl（纯逻辑单一源，main 工厂与 renderer 表单共用）：
- *  - 内置 DeepSeek：`db.baseUrl=null`，按 type 派生（chat-completions / anthropic 端点不同）；
- *  - 其它：直接用存储的 baseUrl（null = 用 type 默认端点 / SDK 默认）。
+ * URL có hiệu lực cho một provider và API type; main factory và biểu mẫu renderer dùng chung.
+ * DeepSeek tích hợp: DB lưu null, URL suy ra theo type.
+ * Các provider khác: dùng baseUrl đã lưu; null nghĩa là endpoint mặc định của type/SDK.
  */
 export function resolveProviderBaseUrl(
   p: { label: string | null; isBuiltin: boolean; baseUrl: string | null },
@@ -57,20 +58,19 @@ export function resolveProviderBaseUrl(
   return p.baseUrl;
 }
 
-/** 只含一个 provider id 的入参（reveal / remove 共用）。 */
+/** Đầu vào chỉ có provider ID, dùng chung cho reveal và remove. */
 export const providerIdInput = z.object({ id: z.string().min(1) });
 export type ProviderIdInput = z.infer<typeof providerIdInput>;
 
-/** 测试连接入参：provider id + 要测试的模型名（生成端点必须指定模型）。 */
+/** Đầu vào kiểm tra kết nối: provider ID và tên model cần thử. */
 export const testProviderInput = z.object({ id: z.string().min(1), model: z.string().min(1) });
 export type TestProviderInput = z.infer<typeof testProviderInput>;
 
 /**
- * 新建（无 id）或更新（带 id）一个 provider。
- * apiKey 两态语义（schema 仅允许这两态）：
- *  - 省略（undefined）→ 更新时保留既有密钥；新建时无密钥。
- *  - 提供非空字符串 → 替换（明文直存）。
- * 不支持把 key 清空为 null（schema 拒 null/空串；如需移除整条记录用 remove）。
+ * Tạo provider mới khi không có ID hoặc cập nhật provider có ID.
+ * Bỏ qua apiKey: giữ khóa cũ khi cập nhật, không có khóa khi tạo mới.
+ * Truyền chuỗi khác rỗng: thay khóa đang lưu. Không hỗ trợ xóa khóa bằng null/chuỗi rỗng;
+ * muốn xóa toàn bộ bản ghi thì dùng remove.
  */
 export const upsertProviderInput = z.object({
   id: z.string().min(1).optional(),
@@ -81,32 +81,32 @@ export const upsertProviderInput = z.object({
   models: z.array(z.string().min(1)).optional(),
 });
 export type UpsertProviderInput = z.infer<typeof upsertProviderInput>;
-// 注：「openai-chat-completions 必须有可用 baseUrl」的规则**依赖 isBuiltin**（内置 DeepSeek 由工厂按
-// type 派生、db 存 null 即合法），故不在此 input schema 里 refine，而在 repository.upsertProvider 按
-// effective baseUrl（resolveProviderBaseUrl）判定。
+// Yêu cầu baseUrl của openai-chat-completions phụ thuộc isBuiltin:
+// DeepSeek tích hợp có URL suy ra theo type dù DB lưu null. Vì vậy kiểm tra URL thực tế
+// trong repository.upsertProvider qua resolveProviderBaseUrl, không refine ở schema này.
 
-/** 发往 renderer 的 provider 视图：绝不含明文 / 密文，只含掩码预览。 */
+/** Dữ liệu provider gửi sang renderer chỉ chứa khóa đã che, không chứa khóa gốc hay bản mã. */
 export interface ProviderDto {
   id: string;
-  /** 当前选用的 API 端点格式（须 ∈ compatibleApis）。 */
+  /** Định dạng API hiện dùng, phải thuộc compatibleApis. */
   type: AiProviderApiType;
-  /** 此 provider 兼容的 API 格式集合。length>1 时（且内置）允许在其中切换 type；否则 type 锁定。 */
+  /** Các định dạng API hỗ trợ; provider tích hợp có nhiều lựa chọn thì được đổi type. */
   compatibleApis: AiProviderApiType[];
   label: string | null;
   baseUrl: string | null;
-  /** null = 未配置；非 null = 已配置，值为掩码预览（如 "sk-…1234"）。绝不含明文。 */
+  /** null là chưa có khóa; giá trị khác null là bản xem trước đã che, ví dụ "sk-…1234". */
   keyMask: string | null;
   models: string[];
-  /** 内置 provider（启动时按 DEFAULT_PROVIDERS 补齐）：label/baseUrl 不可改、不可删；type 仅可在 compatibleApis 内切。 */
+  /** Provider tích hợp từ DEFAULT_PROVIDERS: không sửa tên/URL hay xóa; chỉ đổi type hợp lệ. */
   isBuiltin: boolean;
   createdAt: number;
 }
 
-/** reveal 返回的临时明文（仅用于 UI「👁 显示」）。 */
+/** Khóa gốc tạm thời trả về cho thao tác hiển thị trong UI. */
 export const revealResult = z.object({ apiKey: z.string() });
 export type RevealResult = z.infer<typeof revealResult>;
 
-/** 列 provider 可用模型入参：key 解析 = 表单现填 apiKey ?? 由 id 读取的存储 key。 */
+/** Đầu vào lấy model: ưu tiên apiKey đang nhập, nếu thiếu thì đọc khóa đã lưu theo ID. */
 export const listModelsInput = z.object({
   type: aiProviderApiType,
   baseUrl: z.string().min(1).nullish(),
@@ -115,14 +115,14 @@ export const listModelsInput = z.object({
 });
 export type ListModelsInput = z.infer<typeof listModelsInput>;
 
-/** 拉模型返回（判别联合）：成功带 models；失败带真实 message，`status` 仅 HTTP 错误时有（网络层无）。 */
+/** Kết quả lấy model: thành công có models; thất bại có message, chỉ lỗi HTTP mới có status. */
 export const listModelsResult = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), models: z.array(z.string()) }),
   z.object({ ok: z.literal(false), status: z.number().int().optional(), message: z.string() }),
 ]);
 export type ListModelsResult = z.infer<typeof listModelsResult>;
 
-/** 测试连接结果（判别联合）。 */
+/** Kết quả kiểm tra kết nối. */
 export const testResult = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true) }),
   z.object({ ok: z.literal(false), status: z.number().int().optional(), message: z.string() }),

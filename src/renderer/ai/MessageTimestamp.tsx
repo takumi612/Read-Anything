@@ -3,8 +3,8 @@ import { isoAt } from "@renderer/ai/message-time";
 import { cn } from "@renderer/lib/utils";
 
 /**
- * 气泡上方 hover/focus 才浮现的完整日期时间（原 assistant 名字所占的那行）。
- * 绝对定位落在消息间距里，不占布局——不 hover 时消息流保持干净。
+ * Ngày giờ đầy đủ chỉ hiện khi rê hoặc focus phía trên bong bóng tin nhắn.
+ * Đặt tuyệt đối trong khoảng cách giữa các tin nên không chiếm bố cục khi ẩn.
  */
 export function MessageTimestamp({
   at,

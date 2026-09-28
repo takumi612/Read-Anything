@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import en from "@shared/i18n/locales/en";
-import zhCN from "@shared/i18n/locales/zh-CN";
+import vi from "@shared/i18n/locales/vi";
 
 const readingCompletionKeys = [
   "reader.completeReading.action",
@@ -16,6 +16,20 @@ const readingCompletionKeys = [
   "readingStart.description",
   "readingStart.title",
 ] as const;
+
+const streakCalendarKeys = [
+  "streak.futureDay",
+  "streak.monthTitle",
+  "streak.weekdayMon",
+  "streak.weekdayTue",
+  "streak.weekdayWed",
+  "streak.weekdayThu",
+  "streak.weekdayFri",
+  "streak.weekdaySat",
+  "streak.weekdaySun",
+] as const;
+
+const quickMenuKeys = ["settings.quickMenu"] as const;
 
 const task6ReadingKeys = [
   "readingReport.cancelFailed",
@@ -53,7 +67,7 @@ const task6ReadingKeys = [
 
 const englishTask6PluralKeys = ["readingSession.days_one", "readingSession.days_other"] as const;
 
-const chineseTask6PluralKeys = ["readingSession.days"] as const;
+const vietnameseTask6PluralKeys = ["readingSession.days_one", "readingSession.days_other"] as const;
 
 const reportProgressKeys = [
   "readingReport.progress.elapsed",
@@ -85,9 +99,11 @@ const englishReportProgressPluralKeys = [
   "readingReport.progress.steps_other",
 ] as const;
 
-const chineseReportProgressPluralKeys = [
-  "readingReport.progress.count",
-  "readingReport.progress.steps",
+const vietnameseReportProgressPluralKeys = [
+  "readingReport.progress.count_one",
+  "readingReport.progress.count_other",
+  "readingReport.progress.steps_one",
+  "readingReport.progress.steps_other",
 ] as const;
 
 const restoreKindKeys = ["settings.backup.kindCompact", "settings.backup.kindFull"] as const;
@@ -99,9 +115,11 @@ const englishRestoreConfirmationKeys = [
   "settings.backup.confirmFullRestore_other",
 ] as const;
 
-const chineseRestoreConfirmationKeys = [
-  "settings.backup.confirmCompactRestore",
-  "settings.backup.confirmFullRestore",
+const vietnameseRestoreConfirmationKeys = [
+  "settings.backup.confirmCompactRestore_one",
+  "settings.backup.confirmCompactRestore_other",
+  "settings.backup.confirmFullRestore_one",
+  "settings.backup.confirmFullRestore_other",
 ] as const;
 
 describe("locale completeness", () => {
@@ -115,34 +133,48 @@ describe("locale completeness", () => {
   it("provides non-empty copy for the reading completion flow", () => {
     for (const key of readingCompletionKeys) {
       expectNonEmptyString(en, key);
-      expectNonEmptyString(zhCN, key);
+      expectNonEmptyString(vi, key);
+    }
+  });
+
+  it("provides calendar labels in both supported languages", () => {
+    for (const key of streakCalendarKeys) {
+      expectNonEmptyString(en, key);
+      expectNonEmptyString(vi, key);
+    }
+  });
+
+  it("labels the appearance menu in both supported languages", () => {
+    for (const key of quickMenuKeys) {
+      expectNonEmptyString(en, key);
+      expectNonEmptyString(vi, key);
     }
   });
 
   it("provides non-empty copy for Task 6 reading report flow", () => {
     for (const key of task6ReadingKeys) {
       expectNonEmptyString(en, key);
-      expectNonEmptyString(zhCN, key);
+      expectNonEmptyString(vi, key);
     }
     for (const key of englishTask6PluralKeys) expectNonEmptyString(en, key);
-    for (const key of chineseTask6PluralKeys) expectNonEmptyString(zhCN, key);
+    for (const key of vietnameseTask6PluralKeys) expectNonEmptyString(vi, key);
   });
 
   it("provides non-empty copy for the report generation timeline", () => {
     for (const key of reportProgressKeys) {
       expectNonEmptyString(en, key);
-      expectNonEmptyString(zhCN, key);
+      expectNonEmptyString(vi, key);
     }
     for (const key of englishReportProgressPluralKeys) expectNonEmptyString(en, key);
-    for (const key of chineseReportProgressPluralKeys) expectNonEmptyString(zhCN, key);
+    for (const key of vietnameseReportProgressPluralKeys) expectNonEmptyString(vi, key);
   });
 
   it("keeps restore confirmation keys used by both locales", () => {
     for (const key of restoreKindKeys) {
       expectNonEmptyString(en, key);
-      expectNonEmptyString(zhCN, key);
+      expectNonEmptyString(vi, key);
     }
     for (const key of englishRestoreConfirmationKeys) expectNonEmptyString(en, key);
-    for (const key of chineseRestoreConfirmationKeys) expectNonEmptyString(zhCN, key);
+    for (const key of vietnameseRestoreConfirmationKeys) expectNonEmptyString(vi, key);
   });
 });

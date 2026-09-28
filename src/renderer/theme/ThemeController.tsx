@@ -2,12 +2,12 @@ import { useEffect } from "react";
 import { useThemeStore } from "@renderer/store/theme-store";
 
 /**
- * 把 resolvedTheme 落到 <html> 的 .dark class（与 renderer 入口首帧应用一致，负责后续状态变更同步）；
- * colorMode==="system" 时订阅 OS 外观变化，实时重解析。返回 null（无 UI）。
+ * Đồng bộ resolvedTheme với class .dark trên html sau frame đầu do renderer thiết lập.
+ * Theo dõi thay đổi giao diện hệ điều hành để cập nhật chủ đề ứng dụng và màu trang PDF.
+ * Component không hiển thị gì.
  */
 export function ThemeController() {
   const resolvedTheme = useThemeStore((s) => s.resolvedTheme);
-  const colorMode = useThemeStore((s) => s.colorMode);
   const syncSystem = useThemeStore((s) => s.syncSystem);
 
   useEffect(() => {
@@ -15,12 +15,11 @@ export function ThemeController() {
   }, [resolvedTheme]);
 
   useEffect(() => {
-    if (colorMode !== "system") return;
     const mq = window.matchMedia("(prefers-color-scheme: dark)");
     const onChange = () => syncSystem();
     mq.addEventListener("change", onChange);
     return () => mq.removeEventListener("change", onChange);
-  }, [colorMode, syncSystem]);
+  }, [syncSystem]);
 
   return null;
 }

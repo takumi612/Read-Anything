@@ -1,4 +1,4 @@
-/** 把毫秒时间戳格式化为**本地**日期键 'YYYY-MM-DD'（纯函数）。 */
+/** Chuyển timestamp mili giây thành ngày địa phương YYYY-MM-DD. */
 export function localDayKey(ms: number): string {
   const d = new Date(ms);
   const y = d.getFullYear();

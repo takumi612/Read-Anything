@@ -1,4 +1,5 @@
 import path from "node:path";
+import { eq } from "drizzle-orm";
 import { beforeAll, describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
 import { providers } from "@main/db/schema";
@@ -6,6 +7,7 @@ import type { ProviderTester } from "@main/secrets/tester";
 import {
   getProviderRow,
   listProviders,
+  migrateProviderApiKeys,
   removeProvider,
   revealProviderKey,
   testProvider,
@@ -27,7 +29,7 @@ const freshDb = () => {
 const okTester: ProviderTester = { test: async () => ({ ok: true }) };
 
 describe("provider repository", () => {
-  it("creates a provider with a plaintext key and exposes only a masked preview", () => {
+  it("stores the API key protected and exposes only a masked preview", () => {
     const db = freshDb();
     const dto = upsertProvider(db, {
       type: "openai-responses",
@@ -37,10 +39,25 @@ describe("provider repository", () => {
     expect(dto.type).toBe("openai-responses");
     expect(dto.keyMask).toBe("sk-…ghij");
     const row = getProviderRow(db, dto.id);
-    expect(row?.apiKey).toBe("sk-abcdefghij"); // 明文落库（spec 决策）
+    expect(row?.apiKey).toMatch(/^os:v1:/);
+    expect(row?.apiKey).not.toContain("sk-abcdefghij");
     // DTO 绝不暴露明文字段
     expect(dto).not.toHaveProperty("apiKey");
     expect(dto.createdAt).toBeGreaterThan(0);
+  });
+
+  it("upgrades legacy plaintext keys while preserving their value", () => {
+    const db = freshDb();
+    const created = upsertProvider(db, {
+      type: "openai-responses",
+      baseUrl: "https://api.openai.com/v1",
+    });
+    db.update(providers).set({ apiKey: "legacy-secret" }).where(eq(providers.id, created.id)).run();
+
+    migrateProviderApiKeys(db);
+
+    expect(getProviderRow(db, created.id)?.apiKey).toMatch(/^os:v1:/);
+    expect(revealProviderKey(db, created.id)).toBe("legacy-secret");
   });
 
   it("creates a provider without a key", () => {

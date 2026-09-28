@@ -1,6 +1,6 @@
-// src/main/ai/context-tools.ts —— 按上下文组装"上下文工具集"（spec 2026-06-16-reader-library-tools §3.2）。
-// reader（bookId 非空）= 阅读工具 + 书库/阅读记录工具；library（bookId 为 null）= 书库/阅读记录工具。
-// memory / search 工具在 stream-assistant 另行合并（各有门控），不在此处。
+// Ghép công cụ theo ngữ cảnh: reader có công cụ sách hiện tại và thư viện;
+// màn thư viện chỉ có công cụ thư viện/lịch sử đọc. Công cụ bộ nhớ và tìm kiếm
+// được thêm riêng trong stream-assistant theo điều kiện bật tương ứng.
 import type { DB } from "@main/db/client";
 import { createReadingTools, type LoadBytes } from "@main/ai/tools";
 import { createLibraryTools } from "@main/ai/library-tools";
@@ -8,10 +8,10 @@ import { createReadingSessionTools } from "@main/ai/reading-session-tools";
 
 export interface ContextToolsDeps {
   db: DB;
-  /** null = 书库上下文；非空 = 阅读器上下文（当前书 id）。 */
+  /** null là màn thư viện; giá trị khác null là ID sách đang đọc. */
   bookId: string | null;
   loadBytes: LoadBytes;
-  /** provider 是否支持图像 tool result（透传给 reading 工具的 readPage 门控）。 */
+  /** Provider có hỗ trợ kết quả ảnh của readPage không. */
   imageToolResults?: boolean;
 }
 

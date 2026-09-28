@@ -3,17 +3,17 @@ packages:
   - "packages/*"
   - "!packages/ui-prototype"
 
-# pnpm 11+ 的设置新家（v11 不再读 package.json 的 "pnpm" 字段，也不读 .npmrc 的多数设置）。
-# nodeLinker: hoisted —— Electron Forge 系统预检（@electron-forge/cli check-system.ts 跑
-#   `pnpm config get node-linker`）强制要求 hoisted；Electron 打包/原生模块需扁平 node_modules，
-#   isolated 的 symlink 布局不兼容（`pnpm dev` 会被预检拦下）。
-# allowBuilds：列出带构建 / postinstall 脚本的依赖并表态（true=允许运行，false=显式拒绝）。
-#   原生件（electron/better-sqlite3/esbuild）需编译故 true；core-js/es5-ext 的 postinstall
-#   只是募捐/广告信息（非功能必需），故 false——既挡掉无谓的第三方安装脚本，又消除 pnpm 的
-#   ERR_PNPM_IGNORED_BUILDS（epubjs 引入这两个传递依赖）。
-#   fs-xattr/macos-alias 是 maker-dmg → appdmg 的原生依赖（DMG 内 /Applications 别名与
-#   扩展属性），跑在 Forge CLI 的系统 Node 里（非 Electron），需编译故 true。
-# blockExoticSubdeps: false 允许 @electron/node-gyp 等 git 子依赖。
+# Vị trí cấu hình của pnpm 11+: bản này không còn đọc nhiều thiết lập từ package.json/.npmrc.
+# nodeLinker: hoisted là yêu cầu của bước kiểm tra hệ thống trong Electron Forge.
+# Forge gọi `pnpm config get node-linker`; cách bố trí node_modules bằng symlink của isolated
+# không tương thích với đóng gói Electron và các module native, nên `pnpm dev` sẽ bị chặn.
+# allowBuilds cho phép hoặc từ chối chạy script build/postinstall của từng dependency.
+# electron, better-sqlite3 và esbuild cần build nên đặt true. Script postinstall của
+# core-js và es5-ext không cần cho chức năng, nên đặt false để tránh chạy script bên thứ ba
+# và tránh ERR_PNPM_IGNORED_BUILDS (hai gói này được epubjs kéo theo).
+# fs-xattr/macos-alias là dependency native của maker-dmg → appdmg; chúng chạy trong
+# Node hệ thống của Forge CLI để tạo alias /Applications và thuộc tính mở rộng trong DMG.
+# blockExoticSubdeps: false cho phép dependency lấy từ Git như @electron/node-gyp.
 nodeLinker: hoisted
 blockExoticSubdeps: false
 allowBuilds:

@@ -8,15 +8,15 @@ const log = createLogger("providers");
 
 interface DefaultProvider {
   type: AiProviderApiType;
-  /** 兼容的 API 格式；length>1 才允许切 type（如 DeepSeek 兼容 chat-completions + anthropic）。 */
+  /** Các định dạng API hỗ trợ; nhiều lựa chọn mới cho phép đổi type. */
   compatibleApis: AiProviderApiType[];
   label: string;
   models: string[];
 }
 
-/** 内置默认 provider 的单一源。models 为预填常用起始型号；baseUrl=null（OpenAI/Anthropic/Gemini 用各 type
- *  默认端点；DeepSeek 两 API 端点不同，由 provider-factory 按 type 派生）、无 apiKey。
- *  **以 label 作内置身份**（label 内置不可改）。往此数组加一条 → 下次启动 `ensureBuiltinProviders` 自动补齐。 */
+/** Danh sách provider tích hợp. models là gợi ý ban đầu; baseUrl null dùng URL mặc định
+ * hoặc được suy ra theo type cho DeepSeek. Không có API key mặc định.
+ * label là danh tính cố định; thêm phần tử sẽ được ensureBuiltinProviders tạo khi khởi động. */
 export const DEFAULT_PROVIDERS: DefaultProvider[] = [
   {
     type: "openai-responses",
@@ -37,9 +37,8 @@ export const DEFAULT_PROVIDERS: DefaultProvider[] = [
     models: ["gemini-3.5-flash", "gemini-3.1-flash-lite", "gemini-3.1-pro-preview"],
   },
   {
-    // DeepSeek 兼容 OpenAI Chat Completions / OpenAI Responses / Anthropic 三套协议（同 host，
-    // 端点不同）：默认 chat-completions；baseUrl 不入 db（保持 null），由 provider-factory /
-    // resolveProviderBaseUrl 按 type 派生。
+    // DeepSeek hỗ trợ ba giao thức trên cùng host nhưng endpoint khác nhau.
+    // Mặc định dùng chat-completions; URL được suy ra theo type thay vì lưu trong DB.
     type: "openai-chat-completions",
     compatibleApis: ["openai-chat-completions", "openai-responses", "anthropic"],
     label: "DeepSeek",
@@ -48,10 +47,9 @@ export const DEFAULT_PROVIDERS: DefaultProvider[] = [
 ];
 
 /**
- * 启动时补齐缺失的内置 provider：对每条 DEFAULT_PROVIDERS，若不存在「同 label 的内置 provider」则插入
- * （isBuiltin=true、无 key/baseUrl、预填 models）。已存在则仅**补齐 compatibleApis 缺项**（如 DeepSeek
- * 后来支持 Responses API——既有行加上新选项，用户已选 type / key / models 一律不动）。
- * 用户自建的同名非内置 provider 不算数（只认 isBuiltin=1），故加 config 新项即自动出现，且不与用户数据冲突。
+ * Khi khởi động, thêm provider tích hợp còn thiếu theo label và isBuiltin.
+ * Provider đã có chỉ được bổ sung compatibleApis mới; giữ nguyên type, key và models của người dùng.
+ * Provider tự tạo trùng tên không được coi là provider tích hợp.
  */
 export function ensureBuiltinProviders(db: DB): void {
   const inserted: string[] = [];

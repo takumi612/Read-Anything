@@ -1,4 +1,4 @@
-/** 锚点视口坐标矩形（与 virtual-docs ViewportRect、SelectionInfo.rect 同形状，故跨层结构兼容）。 */
+/** Hình chữ nhật điểm neo theo tọa độ khung nhìn, cùng cấu trúc với ViewportRect và SelectionInfo.rect. */
 export interface AnchorRect {
   x: number;
   y: number;
@@ -7,15 +7,15 @@ export interface AnchorRect {
 }
 
 export interface HoverState {
-  /** 当前命中的标注 id；无命中为 null。 */
+  /** Id chú thích đang được trỏ tới; null nếu không có. */
   annoId: string | null;
-  /** 卡片定位锚点（视口坐标）。 */
+  /** Điểm neo đặt thẻ theo tọa độ khung nhìn. */
   anchorRect: AnchorRect | null;
-  /** 卡片是否展开。 */
+  /** Thẻ có đang mở hay không. */
   open: boolean;
 }
 
-/** 给消费方（store）的定时器指令：start＝起关闭窗口，cancel＝撤销待关，none＝不动。 */
+/** Lệnh timer cho store: start bắt đầu chờ đóng, cancel hủy chờ, none giữ nguyên. */
 export type TimerCmd = "start" | "cancel" | "none";
 
 export type HoverEvent =
@@ -33,13 +33,13 @@ export interface HoverResult {
 }
 
 /**
- * 安全 hover 状态机（纯函数）。副作用（真实 setTimeout）由 store 按 `timer` 指令执行。
- * 「可移入」靠 leave→start（150ms 窗口）、enter(card/highlight)→cancel 协调。
+ * State machine hover dạng hàm thuần; store thực hiện setTimeout theo lệnh timer.
+ * Khi rời vùng tô sáng, chờ 150 ms để con trỏ có thể đi vào thẻ; khi vào thẻ thì hủy timer.
  */
 export function reduceHover(state: HoverState, event: HoverEvent): HoverResult {
   switch (event.type) {
     case "enterHighlight": {
-      // 幂等：同 id 已展开时不重置 open（仅更新锚点，跟随当前片段），避免多片段间闪烁。
+      // Nếu cùng id đã mở, chỉ cập nhật điểm neo theo đoạn hiện tại để thẻ không nhấp nháy.
       if (state.open && state.annoId === event.annoId) {
         return { next: { ...state, anchorRect: event.rect }, timer: "cancel" };
       }
@@ -49,7 +49,7 @@ export function reduceHover(state: HoverState, event: HoverEvent): HoverResult {
       };
     }
     case "leaveHighlight":
-      // 离开高亮：起关闭窗口（给鼠标移到卡片的时间），状态暂不变。
+      // Rời vùng tô sáng thì bắt đầu chờ đóng, tạm giữ trạng thái để con trỏ vào thẻ.
       return { next: state, timer: "start" };
     case "enterCard":
       return { next: state, timer: "cancel" };

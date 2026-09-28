@@ -6,13 +6,13 @@ export const Route = createFileRoute("/vdocs-lab")({
   component: VDocsLab,
 });
 
-// 合成变高 section：不同段数的 lorem + 第 3 节插一张图
+// Tạo các section có chiều cao khác nhau: số đoạn lorem khác nhau và chèn một ảnh vào section thứ 3
 const COUNT = 200;
 const LOREM =
   "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. ";
 
 function makeHtml(i: number): string {
-  const paras = 3 + (i % 7); // 3~9 段，制造变高
+  const paras = 3 + (i % 7); // 3–9 đoạn để tạo chiều cao khác nhau
   const body = Array.from(
     { length: paras },
     (_, p) => `<p>[${i}.${p}] ${LOREM.repeat(2 + (p % 3))}</p>`,

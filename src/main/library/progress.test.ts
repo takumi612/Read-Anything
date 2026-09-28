@@ -1,8 +1,14 @@
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
+import { progress } from "@main/db/schema";
 import { importBook } from "@main/library/repository";
-import { getProgress, saveProgress } from "@main/library/progress";
+import {
+  confirmProgressPage,
+  getConfirmedProgress,
+  getProgress,
+  saveProgress,
+} from "@main/library/progress";
 import { makeFixtureEpub } from "@marginalia/epub-parser";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
@@ -26,24 +32,38 @@ describe("progress repository", () => {
     expect(getProgress(db, book.id)?.locator).toBe("epubcfi(/6/4!/4/1:0)");
   });
 
-  it("saves percent and overwrites it on update (null when omitted)", async () => {
+  it("updates completion from unique confirmed pages and never decreases when revisiting", async () => {
     const { db, book } = await setup();
-    saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)", 0);
-    expect(getProgress(db, book.id)?.percent).toBe(0);
-    saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)", 1);
-    expect(getProgress(db, book.id)?.percent).toBe(1);
-    saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)", 0.25);
-    expect(getProgress(db, book.id)?.percent).toBe(0.25);
-    saveProgress(db, book.id, "epubcfi(/6/4!/4/1:0)", 0.5);
-    expect(getProgress(db, book.id)?.percent).toBe(0.5);
-    // 不带 percent 的保存把旧值抹成 null——locator 与 percent 是同一位置的快照，留旧值即脏数据
-    saveProgress(db, book.id, "epubcfi(/6/6!/4/1:0)");
-    expect(getProgress(db, book.id)?.percent).toBeNull();
+    expect(confirmProgressPage(db, book.id, 4, 20)).toEqual({ confirmedPages: 1, percent: 0.05 });
+    expect(confirmProgressPage(db, book.id, 2, 20)).toEqual({ confirmedPages: 2, percent: 0.1 });
+    expect(confirmProgressPage(db, book.id, 4, 20)).toEqual({ confirmedPages: 2, percent: 0.1 });
+    expect(confirmProgressPage(db, book.id, 1, 20)).toEqual({ confirmedPages: 3, percent: 0.15 });
   });
 
-  it("rejects out-of-range percent via DB CHECK", async () => {
+  it("keeps a legacy completion percentage as the floor for confirmed pages", async () => {
     const { db, book } = await setup();
-    expect(() => saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)", 1.5)).toThrow(/check/i);
-    expect(() => saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)", -0.1)).toThrow(/check/i);
+    saveProgress(db, book.id, "epubcfi(/6/2!/4/1:0)");
+    db.update(progress).set({ percent: 0.4 }).run();
+
+    expect(confirmProgressPage(db, book.id, 1, 100)).toEqual({
+      confirmedPages: 1,
+      percent: 0.4,
+    });
+  });
+
+  it("keeps confirmed completion separate when saving a newer locator", async () => {
+    const { db, book } = await setup();
+    expect(confirmProgressPage(db, book.id, 2, 4).percent).toBe(0.25);
+    saveProgress(db, book.id, "epubcfi(/6/4!/4/1:0)");
+    expect(getConfirmedProgress(db, book.id)?.percent).toBe(0.25);
+    expect(getProgress(db, book.id)).toMatchObject({
+      locator: "epubcfi(/6/4!/4/1:0)",
+      percent: null,
+    });
+  });
+
+  it("rejects page numbers beyond the total", async () => {
+    const { db, book } = await setup();
+    expect(() => confirmProgressPage(db, book.id, 5, 4)).toThrow(/between 1 and totalPages/);
   });
 });

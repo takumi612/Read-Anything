@@ -6,19 +6,19 @@ import { useChatActions } from "@renderer/ai/chat-actions";
 import { textOf } from "@renderer/ai/message-text";
 import type { ChatUIMessage } from "@renderer/ai/types";
 
-/** 气泡下方 hover/focus 揭示的动作行。Copy(#67) + 按 role 的 Edit/Resend/Regenerate。 */
+/** Hàng thao tác hiện dưới tin khi rê hoặc focus: sao chép và sửa/gửi lại/tạo lại theo vai trò. */
 export function MessageToolbar({ m, onEdit }: { m: ChatUIMessage; onEdit?: () => void }) {
   const { t } = useTranslation();
   const actions = useChatActions();
   return (
-    <div role="toolbar" aria-label={t("ai.messageActions", "消息操作")} className="flex gap-0.5">
+    <div role="toolbar" aria-label={t("ai.messageActions", "Thao tác tin nhắn")} className="flex gap-0.5">
       <CopyButton text={textOf(m)} />
       {m.role === "user" && (
         <>
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={t("ai.edit", "编辑")}
+            aria-label={t("ai.edit", "Sửa")}
             onClick={onEdit}
             disabled={actions.busy}
             className="text-muted-foreground hover:text-foreground"
@@ -28,7 +28,7 @@ export function MessageToolbar({ m, onEdit }: { m: ChatUIMessage; onEdit?: () =>
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={t("ai.resend", "重新发送")}
+            aria-label={t("ai.resend", "Gửi lại")}
             onClick={() => actions.resend(m)}
             disabled={actions.busy}
             className="text-muted-foreground hover:text-foreground"
@@ -41,7 +41,7 @@ export function MessageToolbar({ m, onEdit }: { m: ChatUIMessage; onEdit?: () =>
         <Button
           variant="ghost"
           size="icon-xs"
-          aria-label={t("ai.regenerate", "重新生成")}
+          aria-label={t("ai.regenerate", "Tạo lại")}
           onClick={() => actions.regenerate(m)}
           disabled={actions.busy}
           className="text-muted-foreground hover:text-foreground"

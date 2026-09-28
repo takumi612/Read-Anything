@@ -1,4 +1,19 @@
 import { z } from "zod";
+import type { VocabularyEntryDto } from "@shared/vocabulary";
+import type { ApplicationBackgroundPickResult } from "@shared/app-background";
+import type { PdfBookmarkDto } from "@shared/pdf-bookmarks";
+import {
+  createPdfBookmarkInput,
+  deletePdfBookmarkInput,
+  renamePdfBookmarkInput,
+} from "@shared/pdf-bookmarks";
+import {
+  vocabularyDeleteInput,
+  vocabularyLookupInput,
+  vocabularySavePhraseInput,
+  vocabularyOccurrenceInput,
+  vocabularyUpdateInput,
+} from "@shared/vocabulary";
 import type { TocNode } from "@shared/types";
 import type {
   BookSummaryContentDto,
@@ -6,6 +21,8 @@ import type {
   ChapterRefDto,
   ChapterSummaryDto,
   ChapterTextSlice,
+  ExportAnnotatedPdfResult,
+  ProgressDto,
   ReadBookBytesResult,
   RecentlyReadDto,
   RelinkResult,
@@ -13,6 +30,8 @@ import type {
 import {
   bookIdInput,
   chapterRefInput,
+  clearBookCategoryInput,
+  exportAnnotatedPdfInput,
   generateChapterSummaryInput,
   importBookInput,
   readChapterTextInput,
@@ -34,6 +53,7 @@ import type {
   ConversationDto,
   MessagesByConversationOutput,
   SendAck,
+  TranslateSelectionResult,
 } from "@shared/chat";
 import {
   abortInput,
@@ -44,6 +64,7 @@ import {
   messagesByConversationInput,
   resendRequest,
   sendRequest,
+  translateSelectionInput,
 } from "@shared/chat";
 import type { AnnotationDto } from "@shared/annotations";
 import {
@@ -55,8 +76,8 @@ import type { BookNoteDto } from "@shared/book-notes";
 import { bookNoteIdInput, createBookNoteInput, updateBookNoteInput } from "@shared/book-notes";
 import type { PreferencesSnapshot } from "@shared/preferences";
 import { setPreferenceInput } from "@shared/preferences";
-import type { ReadingStatsDto } from "@shared/stats";
-import { statsGetInput, statsReadingStateInput } from "@shared/stats";
+import type { PageStreakDto, ReadingStatsDto, RecordPageReadResultDto } from "@shared/stats";
+import { recordPageReadInput, statsGetInput, statsReadingStateInput } from "@shared/stats";
 import type { BackupExportResult, BackupInspection } from "@shared/backup";
 import { backupExportInput, backupRestoreInput } from "@shared/backup";
 import type { MemoryDto } from "@shared/memory";
@@ -76,15 +97,15 @@ import {
   startReadingInput,
 } from "@shared/reading-sessions";
 
-/** ping —— 演示"带入参且经 Zod 校验"的往返 */
+/** Ping mẫu có đầu vào được Zod kiểm tra. */
 export const pingInput = z.object({ msg: z.string().min(1) });
 
 export const openExternalInput = z.object({ url: z.string().min(1) });
 export type OpenExternalInput = z.infer<typeof openExternalInput>;
 
-/** log:write —— 渲染层日志经 IPC 落 renderer-*.log。
- * 长度上限是渲染层暴露面的第一层防御（防异常对象/被污染的 renderer 灌爆日志）；
- * 主进程 logger 内部还有第二层截断（BODY_MAX，兜不走 IPC 的调用），故此处上限取宽。 */
+/** log:write ghi log renderer qua IPC vào renderer-*.log.
+ * Giới hạn độ dài tại ranh giới IPC để tránh làm đầy log; logger ở main còn cắt thêm
+ * theo BODY_MAX cho cả những lời gọi không qua IPC. */
 export const logWriteInput = z.object({
   level: z.enum(["error", "warn", "info", "debug"]),
   module: z.string().min(1).max(64),
@@ -95,14 +116,18 @@ export type PingInput = z.infer<typeof pingInput>;
 export const pingResult = z.object({ echo: z.string() });
 export type PingResult = z.infer<typeof pingResult>;
 
-/** app:get-info —— 无入参，返回版本与书数 */
+/** app:get-info không có đầu vào, trả phiên bản và số sách. */
 export const appGetInfoResult = z.object({
   version: z.string(),
   bookCount: z.number().int().nonnegative(),
+  platform: z.string(),
 });
 export type AppGetInfoResult = z.infer<typeof appGetInfoResult>;
+export interface AppOpenFilePayload {
+  filePath: string;
+}
 
-/** app:check-update —— 更新检测结果（判别联合，discriminator=status） */
+/** app:check-update trả trạng thái kiểm tra cập nhật, phân biệt bằng status. */
 export const updateCheckResult = z.discriminatedUnion("status", [
   z.object({
     status: z.literal("update-available"),
@@ -123,7 +148,7 @@ export const updateCheckResult = z.discriminatedUnion("status", [
 ]);
 export type UpdateCheckResult = z.infer<typeof updateCheckResult>;
 
-/** output 幽灵类型载体：零运行时值，仅在类型层携带 O（main 不做 output 运行时校验，故无需 schema）。 */
+/** Phần tử mang kiểu output, không tạo giá trị lúc chạy; main không kiểm tra output bằng schema. */
 declare const OUT: unique symbol;
 export interface Out<O> {
   readonly [OUT]: O;
@@ -132,7 +157,7 @@ export const out = <O>(): Out<O> => ({}) as Out<O>;
 
 export type IpcKind = "invoke" | "sync" | "event";
 
-/** 单条 IPC 契约：通道名 + 种类 + input Zod schema + output 类型载体。 */
+/** Một hợp đồng IPC gồm channel, loại, Zod schema đầu vào và kiểu đầu ra. */
 export interface Contract<S extends z.ZodType = z.ZodType, O = unknown> {
   channel: string;
   kind: IpcKind;
@@ -145,7 +170,7 @@ export type ContractMap = Record<string, Contract>;
 export type InferIn<C> = C extends Contract<infer S, infer _O> ? z.infer<S> : never;
 export type InferOut<C> = C extends Contract<z.ZodType, infer O> ? O : never;
 
-/** 定义一条契约，保留 S/O 的精确推导（供 bind/invoker 推类型）。 */
+/** Định nghĩa hợp đồng và giữ suy luận kiểu chính xác cho bind/invoker. */
 function def<S extends z.ZodType, O>(
   channel: string,
   kind: IpcKind,
@@ -156,12 +181,26 @@ function def<S extends z.ZodType, O>(
 }
 
 /**
- * IPC 契约单一真相源：新增/改通道只动这里。
- * input schema 复用各 domain 文件定义；output 为类型载体（不校验）。
+ * Nguồn duy nhất của hợp đồng IPC: thêm hoặc sửa channel tại đây.
+ * Input dùng schema từ từng miền; output chỉ dùng để kiểm tra kiểu lúc biên dịch.
  */
 export const C = {
   // app / ping
   appGetInfo: def("app:get-info", "invoke", z.void(), out<AppGetInfoResult>()),
+  appPdfAssociationStatus: def(
+    "app:pdf-association-status",
+    "invoke",
+    z.void(),
+    out<"default" | "other" | "unknown">(),
+  ),
+  appResetBackground: def("app:reset-background", "invoke", z.void(), out<void>()),
+  appSetBackground: def(
+    "app:set-background",
+    "invoke",
+    z.instanceof(Uint8Array),
+    out<ApplicationBackgroundPickResult>(),
+  ),
+  appOpenFile: def("app:open-file", "event", z.void(), out<AppOpenFilePayload>()),
   appGetLocaleSync: def("app:get-locale-sync", "sync", z.void(), out<string>()),
   appOpenExternal: def("app:open-external", "invoke", openExternalInput, out<void>()),
   appCheckUpdate: def("app:check-update", "invoke", z.void(), out<UpdateCheckResult>()),
@@ -178,15 +217,48 @@ export const C = {
     bookIdInput,
     out<ReadBookBytesResult>(),
   ),
+  libraryExportAnnotatedPdf: def(
+    "library:export-annotated-pdf",
+    "invoke",
+    exportAnnotatedPdfInput,
+    out<ExportAnnotatedPdfResult>(),
+  ),
   libraryRelink: def("library:relink", "invoke", bookIdInput, out<RelinkResult>()),
   libraryDelete: def("library:delete", "invoke", bookIdInput, out<void>()),
+  libraryClearPdfData: def("library:clear-pdf-data", "invoke", bookIdInput, out<string[]>()),
+  readerClearBookCategory: def(
+    "reader:clear-book-category",
+    "invoke",
+    clearBookCategoryInput,
+    out<number>(),
+  ),
   libraryUpdate: def("library:update", "invoke", updateBookInput, out<BookSummaryDto>()),
   libraryRecentlyRead: def("library:recently-read", "invoke", z.void(), out<RecentlyReadDto[]>()),
   libraryReorder: def("library:reorder", "invoke", reorderBooksInput, out<void>()),
+  pdfBookmarksList: def("pdf-bookmarks:list", "invoke", bookIdInput, out<PdfBookmarkDto[]>()),
+  pdfBookmarksCreate: def(
+    "pdf-bookmarks:create",
+    "invoke",
+    createPdfBookmarkInput,
+    out<PdfBookmarkDto>(),
+  ),
+  pdfBookmarksRename: def(
+    "pdf-bookmarks:rename",
+    "invoke",
+    renamePdfBookmarkInput,
+    out<PdfBookmarkDto>(),
+  ),
+  pdfBookmarksDelete: def("pdf-bookmarks:delete", "invoke", deletePdfBookmarkInput, out<void>()),
 
   // progress
-  progressGet: def("progress:get", "invoke", bookIdInput, out<{ locator: string } | null>()),
+  progressGet: def(
+    "progress:get",
+    "invoke",
+    bookIdInput,
+    out<ProgressDto | null>(),
+  ),
   progressSave: def("progress:save", "invoke", saveProgressInput, out<void>()),
+  progressSaveSync: def("progress:save-sync", "sync", saveProgressInput, out<boolean>()),
 
   // reading sessions
   readingSessionsStart: def(
@@ -287,7 +359,46 @@ export const C = {
   ),
   annotationsDelete: def("annotations:delete", "invoke", annotationIdInput, out<void>()),
 
-  // book notes（书籍级独立笔记，独立于选区标注）
+  vocabularyList: def("vocabulary:list", "invoke", bookIdInput, out<VocabularyEntryDto[]>()),
+  vocabularyCountOccurrences: def(
+    "vocabulary:count-occurrences",
+    "invoke",
+    bookIdInput,
+    out<Record<string, number>>(),
+  ),
+  vocabularyLookup: def(
+    "vocabulary:lookup",
+    "invoke",
+    vocabularyLookupInput,
+    out<VocabularyEntryDto>(),
+  ),
+  vocabularySavePhrase: def(
+    "vocabulary:save-phrase",
+    "invoke",
+    vocabularySavePhraseInput,
+    out<VocabularyEntryDto>(),
+  ),
+  vocabularyUpdate: def(
+    "vocabulary:update",
+    "invoke",
+    vocabularyUpdateInput,
+    out<VocabularyEntryDto>(),
+  ),
+  vocabularyDelete: def("vocabulary:delete", "invoke", vocabularyDeleteInput, out<void>()),
+  vocabularyRefresh: def(
+    "vocabulary:refresh",
+    "invoke",
+    vocabularyDeleteInput,
+    out<VocabularyEntryDto>(),
+  ),
+  vocabularySetOccurrence: def(
+    "vocabulary:set-occurrence",
+    "invoke",
+    vocabularyOccurrenceInput,
+    out<void>(),
+  ),
+
+  // Ghi chú cấp sách, độc lập với annotation của đoạn chọn.
   bookNotesListByBook: def("book-notes:list-by-book", "invoke", bookIdInput, out<BookNoteDto[]>()),
   bookNotesCreate: def("book-notes:create", "invoke", createBookNoteInput, out<BookNoteDto>()),
   bookNotesUpdate: def("book-notes:update", "invoke", updateBookNoteInput, out<BookNoteDto>()),
@@ -306,7 +417,7 @@ export const C = {
     out<ListModelsResult>(),
   ),
 
-  // chat（conversationsGet 为 main-only：有 handler、preload 不暴露）
+  // Chat; conversationsGet chỉ dùng trong main, preload không công khai.
   conversationsListByBook: def(
     "conversations:list-by-book",
     "invoke",
@@ -335,6 +446,12 @@ export const C = {
 
   // ai
   aiBuildChips: def("ai:build-chips", "invoke", buildChipsInput, out<Chip[]>()),
+  aiTranslateSelection: def(
+    "ai:translate-selection",
+    "invoke",
+    translateSelectionInput,
+    out<TranslateSelectionResult>(),
+  ),
   aiSend: def("ai:send", "invoke", sendRequest, out<SendAck>()),
   aiResend: def("ai:resend", "invoke", resendRequest, out<SendAck>()),
   aiAbort: def("ai:abort", "invoke", abortInput, out<void>()),
@@ -350,9 +467,16 @@ export const C = {
   ),
   preferencesSet: def("preferences:set", "invoke", setPreferenceInput, out<void>()),
 
-  // stats（阅读时长）
+  // Thống kê thời gian đọc.
   statsReadingState: def("stats:reading-state", "invoke", statsReadingStateInput, out<void>()),
   statsGet: def("stats:get", "invoke", statsGetInput, out<ReadingStatsDto>()),
+  statsPageStreakGet: def("stats:page-streak-get", "invoke", z.void(), out<PageStreakDto>()),
+  statsRecordPageRead: def(
+    "stats:record-page-read",
+    "invoke",
+    recordPageReadInput,
+    out<RecordPageReadResultDto>(),
+  ),
 
   // backup
   backupExport: def("backup:export", "invoke", backupExportInput, out<BackupExportResult | null>()),
@@ -368,7 +492,7 @@ export const C = {
   logWrite: def("log:write", "invoke", logWriteInput, out<void>()),
   appOpenLogsDir: def("app:open-logs-dir", "invoke", z.void(), out<void>()),
 
-  // agent（头像）
+  // Ảnh đại diện của trợ lý.
   agentResetAvatar: def("agent:reset-avatar", "invoke", z.void(), out<void>()),
   agentSetAvatar: def(
     "agent:set-avatar",

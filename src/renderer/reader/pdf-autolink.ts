@@ -1,13 +1,13 @@
 const URL_OR_EMAIL_RE =
   /\b(?:(?:https?:\/\/|mailto:|www\.)[^\s<>"']+|[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+)/gi;
 const TRAILING_PUNCT_RE = /[.,;:!?，。；：！？、]$/;
-/** 尾部闭括号 → 对应开括号（仅在 URL 内不配对时剥，保住 wiki 式 `…_(scheduling)` 链接）。 */
+/** Ánh xạ dấu đóng ở cuối sang dấu mở để chỉ cắt dấu ngoặc không cân trong URL. */
 const BRACKET_PAIRS: Record<string, string> = { ")": "(", "）": "（", "]": "[", "}": "{" };
 const NUMERIC_TLD_RE = /\.\d+$/;
 
 const countOf = (s: string, ch: string): number => s.split(ch).length - 1;
 
-/** 逐字符剥尾部句读；闭括号仅在不配对（闭多于开）时剥。 */
+/** Bỏ dấu câu cuối URL từng ký tự; chỉ bỏ ngoặc đóng khi số ngoặc đóng nhiều hơn ngoặc mở. */
 function trimTrailing(raw: string): string {
   let s = raw;
   for (;;) {

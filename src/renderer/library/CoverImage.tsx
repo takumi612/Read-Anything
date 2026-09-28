@@ -4,8 +4,8 @@ import type { BookSummaryDto } from "@shared/library";
 import { coverGradientClass } from "./cover-palette";
 
 /**
- * 封面图块（从 BookCover 抽出，shelf 卡共用；#48）：有封面走 cover:// 协议，无封面渐变 tile。
- * withText=false 供小尺寸场景（shelf 缩略图）——渐变 tile 上的书名/作者在小宽度下不可读，只留色块。
+ * Hình bìa dùng chung với BookCover và thẻ trên kệ: có bìa thì dùng giao thức cover://,
+ * thiếu bìa thì dùng nền chuyển màu. withText=false cho ảnh nhỏ vì chữ trên đó khó đọc.
  */
 export function CoverImage({
   book,
@@ -18,8 +18,8 @@ export function CoverImage({
   const finishedBadge =
     book.readingState === "finished" ? (
       <span
-        aria-label={t("library.finishedBadge", "已读完")}
-        title={t("library.finishedBadge", "已读完")}
+        aria-label={t("library.finishedBadge", "Đã đọc xong")}
+        title={t("library.finishedBadge", "Đã đọc xong")}
         className="absolute right-1.5 top-1.5 flex size-5 items-center justify-center rounded-full bg-emerald-600 text-white shadow-md"
       >
         <Check className="size-3.5" strokeWidth={3} />
@@ -40,7 +40,7 @@ export function CoverImage({
     );
   }
   const title = book.title ?? book.id;
-  const author = book.author ?? t("library.unknownAuthor", "未知作者");
+  const author = book.author ?? t("library.unknownAuthor", "Không rõ tác giả");
   return (
     <div className="relative">
       <div

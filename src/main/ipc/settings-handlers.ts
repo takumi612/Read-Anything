@@ -32,7 +32,7 @@ export const settingsBindings: Binding[] = [
     } catch {
       return {
         ok: false,
-        message: t("errors.noApiKeyAvailable", "该$t(terms.provider)无可用密钥"),
+        message: t("errors.noApiKeyAvailable", "Không có API key khả dụng cho $t(terms.provider) này"),
       };
     }
     try {

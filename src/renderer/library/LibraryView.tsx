@@ -8,6 +8,8 @@ import { Button } from "@renderer/components/ui/button";
 import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { qk } from "@renderer/query/keys";
 import { useNavigationStore } from "@renderer/store/navigation-store";
+import { useChatStore } from "@renderer/store/chat-store";
+import { usePdfTabsStore } from "@renderer/store/pdf-tabs-store";
 import { fileNameOf, pickBookFiles } from "./book-drop";
 import { useEpubDrop } from "./use-epub-drop";
 import { DropOverlay } from "./DropOverlay";
@@ -40,7 +42,7 @@ export function LibraryView() {
     queryFn: () => window.api.library.list(),
   });
 
-  // 按钮导入与拖拽导入收敛到同一批量 mutation：顺序逐本导入，收集成功的书与失败项。
+  // Nút nhập và kéo thả dùng chung một mutation theo lô: nhập từng sách theo thứ tự, gom kết quả và lỗi.
   const importBooks = useMutation({
     mutationFn: async (items: ImportItem[]) => {
       const ok: BookSummaryDto[] = [];
@@ -59,24 +61,25 @@ export function LibraryView() {
     },
   });
 
-  // 删书：调既有 library:delete IPC（主进程级联删 DB + unlink 导入书籍副本），成功后失效刷新书库 + toast。
+  // Xóa sách qua IPC library:delete; main process xóa dữ liệu liên quan và bản sao tệp, rồi làm mới thư viện và hiện toast.
   const deleteBook = useMutation({
     mutationFn: (b: BookSummaryDto) => window.api.library.delete({ bookId: b.id }),
     onSuccess: (_r, b) => {
+      usePdfTabsStore.getState().close(b.id);
       void qc.invalidateQueries({ queryKey: qk.library });
-      // shelf 键不含 bookId（["recently-read"]），下面的谓词移除轮不到它；删的书可能正在
-      // shelf 上（DB 侧 progress 已级联删），不失效就一直挂着死书（staleTime:0 只救重挂载）。
+      // Khóa shelf ["recently-read"] không chứa bookId nên điều kiện xóa cache bên dưới không chạm tới nó.
+      // Nếu sách vừa xóa còn trên shelf, phải làm mới ngay; staleTime:0 chỉ có tác dụng khi gắn lại.
       void qc.invalidateQueries({ queryKey: qk.recentlyRead });
-      // 该书的 per-book 缓存（book/chapters/toc/bytes/progress/annotations/summary/conversations…）
-      // 整体移除（remove 非 invalidate——书已不在，不该 refetch）。否则重导同一文件（id=文件哈希
-      // 不变）后开书会命中删除前的陈旧缓存（staleTime=∞），如旧 title=null 致侧栏书卡显示 id 哈希。
+      // Xóa toàn bộ cache theo sách: book, chapters, toc, bytes, progress, annotations, conversations.
+      // Dùng remove vì sách không còn để refetch. Nếu nhập lại cùng tệp thì id theo hash vẫn như cũ;
+      // cache cũ với staleTime vô hạn có thể khiến giao diện hiển thị dữ liệu đã xóa.
       qc.removeQueries({ predicate: (q) => q.queryKey.includes(b.id) });
-      toast.success(t("library.deleted", "已删除《{{title}}》", { title: b.title ?? b.id }));
+      toast.success(t("library.deleted", "Đã xóa “{{title}}”", { title: b.title ?? b.id }));
     },
     onError: (e, b) => {
-      // 透传主进程真实错误（honest-error），不自动消失。
+      // Hiển thị nguyên lỗi từ main process và giữ toast cho tới khi người dùng đóng.
       toast.error(
-        t("library.deleteFailed", "{{title}} 删除失败：{{error}}", {
+        t("library.deleteFailed", "Không thể xóa {{title}}: {{error}}", {
           title: b.title ?? b.id,
           error: (e as Error).message,
         }),
@@ -84,9 +87,30 @@ export function LibraryView() {
       );
     },
   });
+  const clearPdfData = useMutation({
+    mutationFn: (b: BookSummaryDto) => window.api.library.clearPdfData({ bookId: b.id }),
+    onSuccess: (conversationIds, b) => {
+      qc.removeQueries({ predicate: (query) => query.queryKey.includes(b.id) });
+      for (const id of conversationIds) qc.removeQueries({ queryKey: qk.messages(id) });
+      useNavigationStore.getState().clearPdfBookState(b.id);
+      useChatStore.getState().clearBookConversation(b.id);
+      void qc.invalidateQueries({ queryKey: qk.recentlyRead });
+      void qc.invalidateQueries({ queryKey: ["stats"] });
+      toast.success(t("library.clearPdfData.success", { title: b.title ?? b.id }));
+    },
+    onError: (error, b) => {
+      toast.error(
+        t("library.clearPdfData.error", {
+          title: b.title ?? b.id,
+          error: error instanceof Error ? error.message : String(error),
+        }),
+        { closeButton: true, duration: Infinity },
+      );
+    },
+  });
 
-  // 编辑书名/作者：成功静默（卡片即时刷新就是反馈）；失败 toast 透传主进程真实错误（honest-error）。
-  // qk.book(bookId) 必须一并失效——reader 侧栏 BookCard 与顶栏面包屑共用该 key，且 staleTime=∞。
+  // Sửa tên hoặc tác giả: thẻ sách cập nhật ngay khi thành công; thất bại hiển thị lỗi từ main process.
+  // Làm mới cả qk.book(bookId) vì breadcrumb của trình đọc dùng khóa này với staleTime vô hạn.
   const updateBook = useMutation({
     mutationFn: (input: UpdateBookInput) => window.api.library.update(input),
     onSuccess: (_r, input) => {
@@ -95,7 +119,7 @@ export function LibraryView() {
     },
     onError: (e, input) => {
       toast.error(
-        t("library.updateFailed", "{{title}} 保存失败：{{error}}", {
+        t("library.updateFailed", "Không thể lưu {{title}}: {{error}}", {
           title: input.title,
           error: (e as Error).message,
         }),
@@ -104,8 +128,8 @@ export function LibraryView() {
     },
   });
 
-  // 拖拽排序（#48 spec §6.2）：8px 位移激活（与点击打开互斥）；乐观更新缓存后全量 reorder，
-  // 失败 invalidate 恢复真序 + toast 透传真实错误（honest-error）。
+  // Kéo sắp xếp kích hoạt sau 8px để phân biệt với nhấn mở sách. Cập nhật cache trước rồi lưu thứ tự;
+  // nếu thất bại, làm mới thứ tự từ nguồn và hiển thị lỗi thật.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }));
   const [draggingId, setDraggingId] = useState<string | null>(null);
 
@@ -114,7 +138,7 @@ export function LibraryView() {
     onError: (e) => {
       void qc.invalidateQueries({ queryKey: qk.library });
       toast.error(
-        t("library.reorderFailed", "排序保存失败：{{error}}", {
+        t("library.reorderFailed", "Không thể lưu thứ tự: {{error}}", {
           error: (e as Error).message,
         }),
         { closeButton: true, duration: Infinity },
@@ -133,13 +157,13 @@ export function LibraryView() {
     const to = list.findIndex((b) => b.id === over.id);
     if (from < 0 || to < 0) return;
     const next = arrayMove(list, from, to);
-    qc.setQueryData(qk.library, next); // 乐观：先动 UI
+    qc.setQueryData(qk.library, next); // Cập nhật UI trước khi lưu.
     reorder.mutate(next.map((b) => b.id));
   };
 
   const draggingBook = draggingId ? books.data?.find((b) => b.id === draggingId) : undefined;
 
-  // 即时 toast 反馈：新增 / 已在库（幂等复用）/ 忽略非 epub / 失败（透传主进程真实错误，不自动消失）。
+  // Toast báo ngay sách mới, sách đã có, tệp không hỗ trợ hoặc lỗi thật từ main process.
   const runImport = async (items: ImportItem[], ignored: string[]) => {
     if (items.length === 0 && ignored.length === 0) return;
     const existing = new Set(books.data?.map((b) => b.id) ?? []);
@@ -147,18 +171,18 @@ export function LibraryView() {
     const added = r.ok.filter((b) => !existing.has(b.id)).length;
     const duplicate = r.ok.length - added;
 
-    if (added > 0) toast.success(t("library.imported", "已导入 {{count}} 本", { count: added }));
+    if (added > 0) toast.success(t("library.imported", "Đã nhập {{count}} cuốn sách", { count: added }));
     if (duplicate > 0) {
-      toast.info(t("library.duplicate", "{{count}} 本已在书库", { count: duplicate }));
+      toast.info(t("library.duplicate", "Đã có {{count}} cuốn sách trong thư viện", { count: duplicate }));
     }
     if (ignored.length > 0) {
-      // 列表分隔符按当前 UI 语言本地化（中文顿号 / 英文逗号），勿硬编码。
+      // Dấu phân cách danh sách phụ thuộc ngôn ngữ giao diện, không ghi cố định.
       const names = new Intl.ListFormat(i18n.language, {
         style: "narrow",
         type: "unit",
       }).format(ignored);
       toast.warning(
-        t("library.ignored", "已忽略 {{count}} 个不支持的文件：{{names}}", {
+        t("library.ignored", "Đã bỏ qua {{count}} tệp không hỗ trợ: {{names}}", {
           count: ignored.length,
           names,
         }),
@@ -166,7 +190,7 @@ export function LibraryView() {
     }
     for (const f of r.failed) {
       toast.error(
-        t("library.importFailed", "{{name}} 导入失败：{{error}}", {
+        t("library.importFailed", "Không thể nhập {{name}}: {{error}}", {
           name: f.name,
           error: f.error,
         }),
@@ -175,7 +199,7 @@ export function LibraryView() {
     }
   };
 
-  // 拖拽落点：过滤受支持书籍格式 → 取路径 → 批量导入；忽略项进 toast。
+  // Khi thả tệp, lọc định dạng hỗ trợ, lấy đường dẫn rồi nhập theo lô; báo tệp bị bỏ qua qua toast.
   const onFiles = (files: File[]) => {
     const { books, ignored } = pickBookFiles(files);
     const items = books.map((f) => ({
@@ -188,7 +212,7 @@ export function LibraryView() {
     );
   };
 
-  // 按钮导入：原生对话框取单个路径 → 同一批量通道。
+  // Nút nhập dùng hộp thoại hệ điều hành lấy một đường dẫn rồi gửi qua cùng kênh nhập theo lô.
   const onPick = async () => {
     const filePath = await window.api.library.pickBook();
     if (!filePath) return;
@@ -201,13 +225,13 @@ export function LibraryView() {
     <div {...rootHandlers} className="flex h-full flex-col overflow-hidden">
       <div className="flex h-12 shrink-0 items-center justify-between px-6">
         <span className="text-sm text-muted-foreground">
-          {t("library.count", "共 {{count}} 本", { count: books.data?.length ?? 0 })}
+          {t("library.count", "{{count}} cuốn sách", { count: books.data?.length ?? 0 })}
         </span>
         <Button onClick={() => void onPick()} disabled={importBooks.isPending}>
           <FolderOpen />
           {importBooks.isPending
-            ? t("library.importPending", "导入中…")
-            : t("library.import", "导入书籍")}
+            ? t("library.importPending", "Đang nhập…")
+            : t("library.import", "Nhập sách")}
         </Button>
       </div>
 
@@ -216,16 +240,16 @@ export function LibraryView() {
           <OnboardingCard />
           <RecentlyReadShelf onOpen={openBook} />
           {books.isPending && (
-            <p className="text-sm text-muted-foreground">{t("library.loading", "加载书库…")}</p>
+            <p className="text-sm text-muted-foreground">{t("library.loading", "Đang tải thư viện…")}</p>
           )}
           {books.isError && (
-            <p className="text-sm text-destructive">{t("library.loadError", "读取书库失败")}</p>
+            <p className="text-sm text-destructive">{t("library.loadError", "Không thể tải thư viện")}</p>
           )}
           {books.data?.length === 0 && (
             <div className="mt-20 text-center text-muted-foreground">
               <BookOpen className="mx-auto mb-3 size-10 opacity-40" />
               <p className="text-sm">
-                {t("library.empty", "书库为空，点上方「导入书籍」或把 .epub / .pdf 拖进窗口开始。")}
+                {t("library.empty", "Thư viện đang trống. Nhấn Nhập sách hoặc kéo tệp .epub hay .pdf vào cửa sổ để bắt đầu.")}
               </p>
             </div>
           )}
@@ -246,6 +270,7 @@ export function LibraryView() {
                     book={b}
                     onOpen={() => openBook(b.id)}
                     onDelete={() => deleteBook.mutate(b)}
+                    onClearData={() => clearPdfData.mutate(b)}
                     onUpdate={(patch) => updateBook.mutate({ bookId: b.id, ...patch })}
                   />
                 ))}
@@ -257,6 +282,7 @@ export function LibraryView() {
                   book={draggingBook}
                   onOpen={() => {}}
                   onDelete={() => {}}
+                  onClearData={() => {}}
                   onUpdate={() => {}}
                 />
               ) : null}

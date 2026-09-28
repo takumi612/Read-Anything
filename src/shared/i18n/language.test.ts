@@ -7,19 +7,19 @@ import {
 } from "@shared/i18n/language";
 
 describe("uiLanguage / LANGS", () => {
-  it("enum covers exactly zh-CN + en, all ltr", () => {
-    expect(uiLanguage.options).toEqual(["zh-CN", "en"]);
-    expect(LANGS.map((l) => l.code).sort()).toEqual(["en", "zh-CN"]);
+  it("enum covers exactly vi + en, all ltr", () => {
+    expect(uiLanguage.options).toEqual(["vi", "en"]);
+    expect(LANGS.map((l) => l.code).sort()).toEqual(["en", "vi"]);
     expect(LANGS.every((l) => l.dir === "ltr")).toBe(true);
   });
 });
 
 describe("matchSystemLanguage", () => {
-  it("maps any zh* locale to zh-CN, else en", () => {
-    for (const loc of ["zh", "zh-CN", "zh-TW", "zh-HK", "ZH-cn"]) {
-      expect(matchSystemLanguage(loc)).toBe("zh-CN");
+  it("maps Vietnamese locales to vi, else en", () => {
+    for (const loc of ["vi", "vi-VN", "VI-vn", "vi-Latn-VN"]) {
+      expect(matchSystemLanguage(loc)).toBe("vi");
     }
-    for (const loc of ["en", "en-US", "de", "fr-FR", ""]) {
+    for (const loc of ["en", "en-US", "zh-CN", "de", "fr-FR", ""]) {
       expect(matchSystemLanguage(loc)).toBe("en");
     }
   });
@@ -27,8 +27,8 @@ describe("matchSystemLanguage", () => {
 
 describe("resolveInitialLanguage", () => {
   it("prefers stored, falls back to system match", () => {
-    expect(resolveInitialLanguage("en", "zh-CN")).toBe("en");
-    expect(resolveInitialLanguage(undefined, "zh-TW")).toBe("zh-CN");
+    expect(resolveInitialLanguage("en", "vi-VN")).toBe("en");
+    expect(resolveInitialLanguage(undefined, "vi-VN")).toBe("vi");
     expect(resolveInitialLanguage(undefined, "fr")).toBe("en");
   });
 });

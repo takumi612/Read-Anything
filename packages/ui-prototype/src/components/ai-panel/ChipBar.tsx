@@ -12,10 +12,10 @@ interface HoverState {
 
 const POPOVER_WIDTH = 320;
 
-/** 输入栏上方的 chip 栏：selection + paragraph 各为一张**小卡片**，
- *  卡片内显示 label + token 数 + **一行截断的内容预览**；hover 卡片 → 上方浮出完整全文
- *  （portal 渲染、视口夹取、自绘细滚动条、浮层可悬停滚动，不挤占布局）。
- *  Phase 1 二者均必备（锁图标）。 */
+/** Thanh chip phía trên ô nhập: mỗi chip selection và paragraph là một **thẻ nhỏ**,
+ *  trong thẻ hiển thị nhãn + số token + **bản xem trước nội dung bị cắt trên một dòng**; di chuột lên thẻ → hiện toàn văn phía trên
+ *  (kết xuất bằng portal, giữ trong khung nhìn, thanh cuộn mảnh tự vẽ, lớp nổi có thể cuộn khi rê chuột, không chiếm chỗ bố cục).
+ *  Trong Phase 1, cả hai đều bắt buộc (biểu tượng khóa). */
 export function ChipBar({ chips }: { chips: Chip[] }) {
   const { t } = useTranslation();
   const [hover, setHover] = useState<HoverState | null>(null);
@@ -76,7 +76,7 @@ function ChipPopover({
   const { chip, rect } = hover;
   const vw = window.innerWidth;
   const left = Math.min(Math.max(rect.left, 12), vw - POPOVER_WIDTH - 12);
-  const bottom = window.innerHeight - rect.top + 8; // 浮层底边贴卡片顶上方 8px，向上生长
+  const bottom = window.innerHeight - rect.top + 8; // Mép dưới lớp nổi cách phía trên thẻ 8px; lớp nổi mở rộng lên trên
 
   return createPortal(
     <div

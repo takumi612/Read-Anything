@@ -9,9 +9,9 @@ import { createLogger } from "@main/logger";
 const log = createLogger("onboarding");
 
 /**
- * 首启幂等播种内置样书：未播过则按 language 构建并导入一本（DB 行 + 磁盘文件副本），置 sampleSeeded 标记。
- * 已播过（含用户删书后）直接返回——删了不再自动塞回。失败留 warn 不置标记，下次重试。
- * booksDir 注入（appService.getPath("booksDir")），与正常导入路径写同一位置，故样书可正常打开阅读。
+ * Ở lần chạy đầu, tạo sách mẫu theo ngôn ngữ, lưu DB và bản sao tệp rồi đánh dấu sampleSeeded.
+ * Nếu đã tạo, kể cả người dùng đã xóa sách, không tự thêm lại. Lỗi thì ghi warn và thử lần sau.
+ * booksDir được truyền vào và dùng cùng đường dẫn import thông thường.
  */
 export async function maybeSeedSampleBook(
   db: DB,

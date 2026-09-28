@@ -34,7 +34,7 @@ export interface ReadingReportServiceDeps {
   db: DB;
   loadBytes: LoadBytes;
   resolveModel: () => ResolvedModel;
-  /** 仅 subagent 走此池；主 agent 是前台任务，见下方 startReadingReportGeneration 的注释。 */
+  /** Chỉ tác vụ điều tra dùng pool nền; báo cáo chính là tác vụ foreground. */
   runBackground: RunBackground;
   runAgent: typeof runReadingReportAgent;
   createInvestigator: typeof createInvestigator;
@@ -81,8 +81,8 @@ export function startReadingReportGeneration(
   }
   const claim = deps.runtime.claim(sessionId, kind);
   if (claim == null) return { outcome: "accepted" };
-  // 刻意不包 runBackground：报告生成是用户显式触发、有进度反馈、可取消的前台任务，与聊天同级。
-  // 让它长期占用后台并发额度既会挡住真正的后台摘要，也会与其派出的 subagent 互等成死锁。
+  // Báo cáo do người dùng yêu cầu, có tiến độ và có thể hủy nên chạy foreground.
+  // Giữ suất nền lâu sẽ chặn tác vụ khác và có thể gây chờ lẫn nhau với tác vụ điều tra.
   void (async () => {
     claim.signal.throwIfAborted();
     const title =

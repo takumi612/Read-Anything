@@ -21,13 +21,13 @@ export function SettingsShell() {
   const setActive = useSettingsStore((s) => s.setActiveCategory);
 
   const CATEGORIES: { key: SettingsCategory; label: string }[] = [
-    { key: "models", label: t("settings.models", "模型") },
-    { key: "appearance", label: t("settings.appearance", "外观") },
-    { key: "reading", label: t("settings.reading", "阅读") },
-    { key: "agent", label: t("settings.agent", "助手") },
-    { key: "memory", label: t("settings.memory", "记忆") },
-    { key: "webSearch", label: t("settings.webSearch", "联网搜索") },
-    { key: "advanced", label: t("settings.advanced", "高级") },
+    { key: "models", label: t("settings.models", "Model") },
+    { key: "appearance", label: t("settings.appearance", "Giao diện") },
+    { key: "reading", label: t("settings.reading", "Đọc") },
+    { key: "agent", label: t("settings.agent", "Trợ lý") },
+    { key: "memory", label: t("settings.memory", "Bộ nhớ") },
+    { key: "webSearch", label: t("settings.webSearch", "Tìm kiếm trên web") },
+    { key: "advanced", label: t("settings.advanced", "Nâng cao") },
   ];
 
   useEffect(() => {
@@ -42,13 +42,24 @@ export function SettingsShell() {
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={t("settings.title", "设置")}
-      className="fixed inset-0 z-50 flex bg-background font-sans"
+      aria-label={t("settings.title", "Cài đặt")}
+      className="fixed inset-0 z-[100] flex bg-background font-sans"
     >
       <ScrollArea className="w-48 shrink-0 border-e border-border">
         <nav className="flex flex-col gap-1 p-3">
-          <div className="mb-2 px-2 font-serif text-base font-semibold">
-            {t("settings.title", "设置")}
+          <div className="mb-2 flex min-h-9 items-center justify-between gap-2 px-2">
+            <span className="font-serif text-base font-semibold">
+              {t("settings.title", "Cài đặt")}
+            </span>
+            <Button
+              variant="ghost"
+              size="icon-lg"
+              onClick={() => setOpen(false)}
+              aria-label={t("settings.close", "Đóng cài đặt")}
+              title={t("settings.close", "Đóng cài đặt")}
+            >
+              <X />
+            </Button>
           </div>
           {CATEGORIES.map((c) => (
             <button
@@ -66,15 +77,6 @@ export function SettingsShell() {
         </nav>
       </ScrollArea>
       <div className="relative min-w-0 flex-1">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setOpen(false)}
-          className="absolute end-4 top-4 z-10"
-          aria-label={t("settings.close", "关闭设置")}
-        >
-          <X />
-        </Button>
         <ScrollArea className="h-full">
           <div className="mx-auto max-w-2xl p-6">
             {active === "models" && <ModelsSettings />}

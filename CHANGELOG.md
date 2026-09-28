@@ -1,4 +1,9 @@
-# marginalia
+# Read-Anything
+
+## 0.1.0
+
+- First Read-Anything release. Offline English–Vietnamese lookup, PDF and EPUB reading, annotations, bookmarks, reading statistics, optional AI, and Windows source builds.
+- Forked from Marginalia. Earlier entries below are the upstream project's historical changelog.
 
 ## 0.18.5
 

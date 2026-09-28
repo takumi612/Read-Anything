@@ -2,23 +2,23 @@ import { isToolUIPart } from "ai";
 import type { DynamicToolUIPart, ToolUIPart } from "ai";
 import type { ChatUIMessage } from "@renderer/ai/types";
 
-/** 气泡内可渲染的工具 part（static + dynamic）。 */
+/** Tool part có thể hiển thị trong bong bóng chat, gồm dạng tĩnh và động. */
 export type ToolPart = ToolUIPart | DynamicToolUIPart;
 
-/** 气泡内的一段：合并后的文本块，或单个工具步骤行。 */
+/** Một đoạn trong bong bóng chat: khối văn bản đã gộp hoặc một dòng bước công cụ. */
 export type Segment = { kind: "text"; text: string } | { kind: "tool"; part: ToolPart };
 
 /**
- * 把 UIMessage.parts 按出现顺序归并成段序列：连续 text 合并为一段（与既有
- * textOf 全拼接行为一致，避免 markdown 跨段断裂），tool part 独立成段，
- * 其余 part（step-start 等）过滤。空 text part（流式起点）跳过。
+ * Gộp UIMessage.parts theo thứ tự xuất hiện. Các text part liên tiếp thành một đoạn
+ * để Markdown không bị tách, giống hành vi nối của textOf. Mỗi tool part là một đoạn riêng;
+ * bỏ các part khác như step-start và text part rỗng ở đầu stream.
  */
 export function segments(parts: ChatUIMessage["parts"]): Segment[] {
   const out: Segment[] = [];
   for (const p of parts) {
     if (p.type === "text") {
       if (p.text === "") continue;
-      // 累积仅发生在本次调用新建的对象上；调用方不得跨调用缓存返回的 Segment。
+      // Chỉ gộp trên object mới của lần gọi này; bên gọi không cache Segment qua các lần gọi.
       const last = out.at(-1);
       if (last?.kind === "text") last.text += p.text;
       else out.push({ kind: "text", text: p.text });

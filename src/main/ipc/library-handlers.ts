@@ -1,7 +1,7 @@
 import path from "node:path";
-import { BrowserWindow, dialog } from "electron";
+import { BrowserWindow, dialog, ipcMain } from "electron";
 import { C } from "@shared/ipc";
-import type { BookSummaryDto } from "@shared/library";
+import type { BookSummaryDto, SaveProgressInput } from "@shared/library";
 import { getDb } from "@main/db/instance";
 import { appService } from "@main/app";
 import {
@@ -21,8 +21,14 @@ import {
   relinkBookFile,
   writeBookFile,
 } from "@main/library/book-files";
+import { writePdfExport } from "@main/library/export-pdf";
 import { readBookBytes } from "@main/library/import-source";
-import { getProgress, saveProgress } from "@main/library/progress";
+import {
+  getConfirmedProgress,
+  getProgress,
+  maxProgressPercent,
+  saveProgress,
+} from "@main/library/progress";
 import { assertTextLayer, getToc, listChapters, readChapterText } from "@main/library/content";
 import {
   assertSummaryModelReady,
@@ -32,18 +38,35 @@ import {
   getChapterSummaryView,
 } from "@main/ai/summary";
 import { makeSummaryDeps } from "@main/ai/send-deps";
+import { abortConversationStreams } from "@main/ipc/ai-handlers";
 import { bind, register, type Binding } from "@main/ipc/registry";
 import { createLogger } from "@main/logger";
-import { getActiveReadingSession, getBookReadingState } from "@main/reading-sessions/repository";
+import { getBookReadingState } from "@main/reading-sessions/repository";
+import {
+  createPdfBookmark,
+  deletePdfBookmark,
+  listPdfBookmarks,
+  renamePdfBookmark,
+} from "@main/library/pdf-bookmarks";
+import { clearPdfReadingData } from "@main/library/clear-pdf-data";
+import { clearBookCategory } from "@main/library/clear-book-category";
 
 const log = createLogger("library");
 
-/** 开书惰性升级：epub 且 parserVersion 落后时载字节重建索引（幂等、版本门控）。失败不阻塞开书。 */
+function persistReadingProgress(input: SaveProgressInput): void {
+  const db = getDb();
+  if (!getBook(db, input.bookId)) throw new Error(`progress:save — book ${input.bookId} not found`);
+  // A debounced final position can arrive just after the session is completed.
+  // The reader gates new saves by its active-mode prop; preserve that last snapshot.
+  saveProgress(db, input.bookId, input.locator);
+}
+
+/** Khi mở EPUB cũ, đọc bytes và dựng lại chỉ mục nếu phiên bản parser thấp; lỗi không chặn mở sách. */
 async function ensureEpubIndexed(bookId: string): Promise<void> {
   const db = getDb();
   const book = getBook(db, bookId);
   if (!book || book.format !== "epub") return;
-  if ((book.parserVersion ?? 0) >= CURRENT_PARSER_VERSION) return; // 已最新：不载字节
+  if ((book.parserVersion ?? 0) >= CURRENT_PARSER_VERSION) return; // Bản mới không cần đọc lại bytes.
   try {
     const bytes = await readBookFile(appService.getPath("booksDir"), bookId, book.format);
     reindexBookIfStale(db, bytes, bookId);
@@ -73,10 +96,14 @@ const toDto = (b: {
 });
 
 export const libraryBindings: Binding[] = [
+  bind(C.pdfBookmarksList, ({ bookId }) => listPdfBookmarks(getDb(), bookId)),
+  bind(C.pdfBookmarksCreate, (input) => createPdfBookmark(getDb(), input)),
+  bind(C.pdfBookmarksRename, ({ id, title }) => renamePdfBookmark(getDb(), id, title)),
+  bind(C.pdfBookmarksDelete, ({ id }) => deletePdfBookmark(getDb(), id)),
   bind(C.libraryImport, async (input) => {
     const bytes = await readBookBytes(input.filePath);
     const book = await importBook(getDb(), { bytes, fileName: path.basename(input.filePath) });
-    await writeBookFile(appService.getPath("booksDir"), book.id, book.format, bytes); // 复制进 app 自有位置（relink/重导即覆盖）
+    await writeBookFile(appService.getPath("booksDir"), book.id, book.format, bytes); // Lưu bản sao của ứng dụng.
     log.info(`book imported: ${book.id} (${book.format}, ${Math.round(bytes.length / 1024)}KB)`);
     return toDto({
       ...book,
@@ -116,9 +143,42 @@ export const libraryBindings: Binding[] = [
     return readBookFileResult(appService.getPath("booksDir"), input.bookId, book.format);
   }),
 
+  bind(C.libraryExportAnnotatedPdf, async (input) => {
+    const book = getBook(getDb(), input.bookId);
+    if (!book || book.format !== "pdf") throw new Error("Không tìm thấy tài liệu PDF cần xuất.");
+    const safeName = (book.title ?? "document")
+      .replace(/[<>:"/\\|?*\p{Cc}]/gu, "-")
+      .replace(/[. ]+$/gu, "")
+      .trim();
+    const defaultPath = `${safeName || "document"}-annotated.pdf`;
+    const win = BrowserWindow.getFocusedWindow();
+    const options = {
+      defaultPath,
+      filters: [{ name: "PDF", extensions: ["pdf"] }],
+    };
+    const result = win
+      ? await dialog.showSaveDialog(win, options)
+      : await dialog.showSaveDialog(options);
+    if (result.canceled || !result.filePath) return { status: "canceled" as const };
+    const destination =
+      path.extname(result.filePath).toLowerCase() === ".pdf"
+        ? result.filePath
+        : `${result.filePath}.pdf`;
+    await writePdfExport(destination, input.bytes);
+    log.info(`annotated PDF exported (${input.bytes.byteLength} bytes)`);
+    return { status: "saved" as const };
+  }),
+
   bind(C.libraryDelete, (input) =>
     deleteBook(getDb(), appService.getPath("booksDir"), input.bookId),
   ),
+  bind(C.libraryClearPdfData, ({ bookId }) => {
+    const conversationIds = clearPdfReadingData(getDb(), bookId);
+    for (const id of conversationIds) abortConversationStreams(id);
+    log.info(`local PDF reading data cleared: ${bookId}`);
+    return conversationIds;
+  }),
+  bind(C.readerClearBookCategory, (input) => clearBookCategory(getDb(), input)),
 
   bind(C.libraryRelink, async (input) => {
     const db = getDb();
@@ -152,7 +212,7 @@ export const libraryBindings: Binding[] = [
     });
   }),
 
-  // shelf 数据：toDto 复用保证 hasCover 布尔化等口径一致，percent/lastReadAt 原样透传。
+  // Dùng toDto chung cho dữ liệu kệ sách để hasCover và các trường tiến độ nhất quán.
   bind(C.libraryRecentlyRead, () =>
     listRecentlyRead(getDb()).map((r) => ({
       ...toDto(r),
@@ -165,17 +225,16 @@ export const libraryBindings: Binding[] = [
 
   bind(C.progressGet, (input) => {
     const p = getProgress(getDb(), input.bookId);
-    return p ? { locator: p.locator } : null;
+    const confirmed = getConfirmedProgress(getDb(), input.bookId);
+    return p || confirmed
+      ? {
+          locator: p?.locator ?? null,
+          percent: maxProgressPercent(p?.percent, confirmed?.percent),
+        }
+      : null;
   }),
 
-  bind(C.progressSave, (input) => {
-    const db = getDb();
-    if (!getBook(db, input.bookId))
-      throw new Error(`progress:save — book ${input.bookId} not found`);
-    if (!getActiveReadingSession(db, input.bookId))
-      throw new Error(`progress:save — book ${input.bookId} has no active reading session`);
-    saveProgress(db, input.bookId, input.locator, input.percent);
-  }),
+  bind(C.progressSave, persistReadingProgress),
 
   bind(C.contentToc, async (input) => {
     const db = getDb();
@@ -195,10 +254,10 @@ export const libraryBindings: Binding[] = [
     getChapterSummaryView(getDb(), input.bookId, input.chapterId),
   ),
 
-  // 触发本章摘要懒生成（开章自动 / pill 手动按钮）。fire-and-forget：ensureChapterSummary
-  // 内部自含 reject 兜底；同步前缀会把状态派生为 generating，故返回当前派生状态即时反馈。
-  // force（pill「重新生成」）跳过 ready-skip；自动触发不传——否则每次开章都会重生成已 ready 的摘要。
-  // 预检：模型未配置 → reject 带 reason（pill toast 透传；自动触发侧 catch 静默），不再静默装死。
+  // Tạo tóm tắt chương khi mở chương hoặc khi người dùng yêu cầu.
+  // ensureChapterSummary chạy nền nhưng đánh dấu generating đồng bộ để UI phản hồi ngay.
+  // Chỉ thao tác thủ công mới truyền force để tạo lại tóm tắt đã có.
+  // Kiểm tra model trước; nếu chưa cấu hình, trả lỗi có lý do cho UI.
   bind(C.contentGenerateChapterSummary, (input) => {
     const db = getDb();
     const deps = makeSummaryDeps();
@@ -212,13 +271,13 @@ export const libraryBindings: Binding[] = [
 
   bind(C.contentBookSummary, (input) => getBookSummaryView(getDb(), input.bookId)),
 
-  // 触发全书摘要懒生成（书卡手动按钮）。fire-and-forget；同步前缀置 inFlight，故返回即为 generating。
+  // Tạo tóm tắt toàn sách theo yêu cầu; đánh dấu generating trước khi trả về.
   bind(C.contentGenerateBookSummary, (input) => {
     const db = getDb();
     const deps = makeSummaryDeps();
-    assertSummaryModelReady(deps.resolveModel); // 模型未配置 → reject 带 reason（书卡 toast 透传）
+    assertSummaryModelReady(deps.resolveModel); // Trả lỗi có lý do nếu chưa cấu hình model.
     assertTextLayer(db, input.bookId);
-    // force=true：书卡「生成/重新生成」总是（重）生成，覆盖旧摘要。
+    // Nút tạo/tạo lại trên thẻ sách luôn dùng force=true.
     void ensureBookSummary(deps, input.bookId, true).catch((err) =>
       log.warn("generate book summary failed", err),
     );
@@ -230,8 +289,7 @@ export const libraryBindings: Binding[] = [
     const book = getBook(db, input.bookId);
     if (!book) throw new Error(`content: book ${input.bookId} not found`);
     await ensureEpubIndexed(input.bookId);
-    // readBookFile 缺失即抛 BookFileMissingError（message 已含 bookId），其他 OS 错误原样透传——
-    // 不再包一层「可能缺失/重新导入」的笼统文案（对非缺失错误属编造），与 readBookBytes handler 一致。
+    // Thiếu tệp thì trả BookFileMissingError; lỗi hệ điều hành khác được truyền nguyên dạng.
     const bytes = await readBookFile(appService.getPath("booksDir"), input.bookId, book.format);
     return await readChapterText(db, bytes, input.bookId, input.chapterId, {
       offset: input.offset,
@@ -242,4 +300,17 @@ export const libraryBindings: Binding[] = [
 
 export function registerLibraryHandlers(): void {
   register(libraryBindings);
+  // Flush the latest scroll position while the window is closing. This handler must finish
+  // synchronously because an invoke queued by the renderer can be dropped on teardown.
+  ipcMain.on(C.progressSaveSync.channel, (event, raw: unknown) => {
+    event.returnValue = false;
+    const parsed = C.progressSaveSync.input.safeParse(raw);
+    if (!parsed.success) return;
+    try {
+      persistReadingProgress(parsed.data);
+      event.returnValue = true;
+    } catch (error) {
+      log.warn("synchronous progress save failed", error);
+    }
+  });
 }

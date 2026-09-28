@@ -18,7 +18,9 @@ describe("ipc schemas", () => {
   });
 
   it("app info result requires version + bookCount", () => {
-    expect(appGetInfoResult.safeParse({ version: "1.0.0", bookCount: 0 }).success).toBe(true);
+    expect(
+      appGetInfoResult.safeParse({ version: "1.0.0", bookCount: 0, platform: "win32" }).success,
+    ).toBe(true);
     expect(appGetInfoResult.safeParse({ version: "1.0.0" }).success).toBe(false);
   });
 });
@@ -47,6 +49,19 @@ describe("ipc contract map C", () => {
     expect(C.libraryGet.channel).toBe("library:get");
     expect(C.aiChunk.kind).toBe("event");
     expect(C.preferencesGetAllSync.kind).toBe("sync");
+  });
+
+  it("constrains reader category clearing to a book and a supported category", () => {
+    expect(
+      C.readerClearBookCategory.input.safeParse({ bookId: "book-1", category: "annotations" })
+        .success,
+    ).toBe(true);
+    expect(
+      C.readerClearBookCategory.input.safeParse({ bookId: "book-1", category: "progress" })
+        .success,
+    ).toBe(false);
+    expect(C.readerClearBookCategory.input.safeParse({ bookId: "", category: "notes" }).success)
+      .toBe(false);
   });
 });
 

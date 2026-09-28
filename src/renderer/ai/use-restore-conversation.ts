@@ -8,11 +8,11 @@ const log = createLogger("chat");
 type RestoreTarget = { kind: "restore"; id: string } | { kind: "empty" };
 
 /**
- * 据会话列表（updatedAt 倒序）+ 记忆值，决定开「该上下文」时该恢复的目标（纯函数，便于测试）。
- * 优先级：命中记忆 > null 空态 > 回落最新 > 无会话空态。
- * - remembered=string 且仍在 list → 精确恢复上次正看的；
- * - remembered=null → 上次停在「将开新会话」空态，忠实还原（empty）；
- * - remembered 失效 / 缺键 → 回落 list[0]（最新）；list 空 → empty。
+ * Chọn hội thoại cần khôi phục trong context từ danh sách mới nhất trước và giá trị đã nhớ.
+ * Ưu tiên id còn tồn tại, sau đó trạng thái rỗng được nhớ, rồi hội thoại mới nhất.
+ * remembered là id có trong danh sách thì mở lại đúng hội thoại đó.
+ * remembered=null thì giữ trạng thái chuẩn bị tạo hội thoại mới.
+ * Nếu id cũ không còn hoặc chưa có giá trị nhớ thì chọn list[0]; danh sách rỗng thì để trống.
  */
 export function pickRestoreTarget(
   list: readonly { id: string }[],
@@ -29,15 +29,11 @@ type RestoreSlots = {
   activeByBook: Record<string, string | null>;
   activeLibraryConversation: string | null;
 };
-type RestoreAction =
-  | { kind: "restore"; id: string }
-  | { kind: "empty"; presetSummaryChips: boolean };
+type RestoreAction = RestoreTarget;
 
 /**
- * 据上下文挑记忆槽（book→activeByBook[bookId]，library→activeLibraryConversation），
- * 再经 pickRestoreTarget 决策（纯函数，便于测试）。
- * 空态仅 book 预亮摘要 chips——library 无书/章，摘要 pill 不渲染，预亮无意义。
- * library 的 activeLibraryConversation 初值即 null（非 undefined）⇒ 首次使用走 empty（开新会话），不回落最新。
+ * Chọn ô nhớ theo context: sách dùng activeByBook[bookId], thư viện dùng activeLibraryConversation,
+ * rồi quyết định qua pickRestoreTarget. Giá trị ban đầu của thư viện là null nên lần đầu mở ở trạng thái rỗng.
  */
 export function resolveRestore(
   ctx: ChatContext,
@@ -47,18 +43,17 @@ export function resolveRestore(
   const remembered =
     ctx.kind === "book" ? slots.activeByBook[ctx.bookId] : slots.activeLibraryConversation;
   const target = pickRestoreTarget(list, remembered);
-  if (target.kind === "restore") return target;
-  return { kind: "empty", presetSummaryChips: ctx.kind === "book" };
+  return target;
 }
 
 /**
- * 恢复某上下文上次的会话（spec §7，泛化到 book + library）：取该上下文会话列表
- * （book→bookId，library→null），按 resolveRestore 决定恢复哪个 / 还原空态。
- * 命中/回落 → restoreConversation（发 context-tagged openCommand 载历史，不强开面板）；
- * 空态 → 置 active null（写槽 null + 清 openCommand），book 再预亮摘要 chips。
+ * Khôi phục hội thoại gần nhất cho context sách hoặc thư viện từ danh sách tương ứng.
+ * resolveRestore chọn hội thoại hay trạng thái rỗng. Nếu có hội thoại, restoreConversation
+ * phát openCommand kèm context để tải lịch sử mà không ép mở bảng.
+ * Nếu rỗng, đặt active=null và xóa openCommand.
  *
- * 入参 ctx=null ⇒ 不跑（如阅读器尚无书）。effect 仅依赖从 ctx 派生的稳定基元
- * kind/bookId，不依赖每 render 新建的 ctx 对象（正确性不押在 React Compiler 记忆化上）。
+ * Bỏ qua ctx=null, chẳng hạn trình đọc chưa có sách. Effect chỉ phụ thuộc kind và bookId ổn định,
+ * không phụ thuộc object ctx được tạo lại mỗi lần render.
  */
 export function useRestoreConversation(ctx: ChatContext | null) {
   const kind = ctx?.kind ?? null;
@@ -78,7 +73,6 @@ export function useRestoreConversation(ctx: ChatContext | null) {
           s.restoreConversation(restoreCtx, action.id);
         } else {
           s.setActiveConversation(restoreCtx, null);
-          if (action.presetSummaryChips) s.setSummaryChipsPreset();
         }
       })
       .catch((err: unknown) => log.warn("restore conversation failed", err));

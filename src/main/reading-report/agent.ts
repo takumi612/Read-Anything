@@ -6,8 +6,8 @@ import { createLogger } from "@main/logger";
 const log = createLogger("report");
 
 /**
- * 工具步上限。刻意保留而非取消：取消后模型卡在翻页循环里就没有兜底了。
- * 需容纳「列清单 + 外派若干 subagent + 回读几段原文 + 写正文」，10 步曾在写正文前就耗尽。
+ * Giữ giới hạn bước công cụ để model không kẹt trong vòng đọc trang.
+ * Cần đủ bước cho liệt kê, điều tra nhiều hội thoại, đọc lại bằng chứng và viết báo cáo.
  */
 export const REPORT_AGENT_MAX_STEPS = 40;
 
@@ -32,9 +32,8 @@ export async function runReadingReportAgent(input: RunReadingReportAgentInput): 
     providerOptions: providerCallOptions(input.resolved.providerType),
     abortSignal: input.abortSignal,
     stopWhen: isStepCount(REPORT_AGENT_MAX_STEPS),
-    // 刻意不设 maxOutputTokens（对齐 stream-assistant，走 provider 默认）：推理模型的思考 token 与正文
-    // 共享该预算，而写报告那步的上下文最大（前若干步的全部工具结果），思考会把小额度吃光、正文一字不出
-    // ——表现为 finishReason=length + text 为空，然后被下面的空文本检查报成误导性的 "empty text"。
+    // Không đặt maxOutputTokens: model reasoning dùng chung ngân sách cho suy luận và văn bản.
+    // Mức quá thấp có thể hết token trước khi báo cáo được viết.
     maxRetries: 1,
     onStepFinish: ({ finishReason, toolCalls, text }) => {
       log.debug(

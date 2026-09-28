@@ -1,5 +1,5 @@
-// src/main/ai/memory-tools.ts —— Lia 的记忆/SOUL 写工具（spec 2026-06-10 §4）。
-// 失败一律转结构化工具结果（模型自纠），不抛 IPC 错误；软失败留 log.warn。
+// Công cụ ghi bộ nhớ và SOUL của Lia. Lỗi trả về kết quả có cấu trúc để model
+// có thể sửa yêu cầu; ghi warn thay vì ném lỗi IPC.
 import { tool } from "ai";
 import { z } from "zod";
 import type { DB } from "@main/db/client";

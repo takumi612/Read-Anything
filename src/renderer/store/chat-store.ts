@@ -9,49 +9,42 @@ interface ChatState {
   draftText: string;
   draftChips: Chip[];
   /**
-   * 一次性命令信号（非状态）：nonce 递增触发 AIPanel 载入该会话历史。
-   * 与「当前 active 会话」解耦——发消息路径只写记忆槽、不发本命令，
-   * 故发消息不会触发历史重载（避免覆盖刚流式出来的内容）。镜像 annotation-store.scrollCommand。
-   * 带 context 标签：消费侧 resolveOpenCommandTarget 据此拒绝跨 context 命令
-   * （如读书时设下的 book 会话泄漏进 library 浮窗助手）。
+   * Lệnh dùng một lần, không phải state: nonce tăng để AIPanel tải lịch sử hội thoại.
+   * Tách khỏi hội thoại active; khi gửi tin chỉ ghi ô nhớ, không phát lệnh này,
+   * tránh tải lại lịch sử và ghi đè nội dung vừa stream. Tương tự annotation-store.scrollCommand.
+   * Lệnh mang nhãn context để resolveOpenCommandTarget loại lệnh thuộc context khác.
    */
   openCommand: OpenCommand | null;
-  /** 常驻摘要 toggle（spec §6）：true=on 随下条消息发送。 */
-  summaryChips: { chapter: boolean; book: boolean };
   /**
-   * 每本书上次 active 的会话（视图记忆，唯一真相 + persist 持久化字段之一）。
-   * 值 = 会话 id；null = 上次停在「将开新会话」空态；缺键 = 该书从无记忆（回落最新）。
-   * 「当前 active 会话」由此派生（见 useActiveConversationId / getActiveConversationId），不独立存储。
+   * Hội thoại active cuối của từng sách, là nguồn dữ liệu duy nhất và được lưu bền.
+   * Giá trị là id; null nghĩa là đang chuẩn bị hội thoại mới; thiếu khóa nghĩa là chưa từng nhớ,
+   * khi đó chọn hội thoại mới nhất. Hội thoại active được suy ra từ đây, không lưu riêng.
    */
   activeByBook: Record<string, string | null>;
   /**
-   * 书库伴侣（library 上下文）的 active 会话（持久化）。
+   * Hội thoại active của trợ lý trong context thư viện, được lưu bền.
    */
   activeLibraryConversation: string | null;
 }
+
 interface ChatActions {
-  /** 设指定上下文的 active（写记忆槽）；id=null 同时清 openCommand（其载入命令失效）。 */
+  /** Đặt hội thoại active cho context; id=null cũng xóa openCommand không còn hợp lệ. */
   setActiveConversation: (ctx: ChatContext, id: string | null) => void;
   setDraftText: (text: string) => void;
   setDraftChips: (chips: Chip[]) => void;
-  /** 重开会话：发命令信号（触发载历史）+ 写记忆槽 + 开面板（经 prefs-store 布局）。 */
+  /** Mở lại hội thoại: phát lệnh tải lịch sử, lưu ô nhớ và mở bảng qua bố cục prefs-store. */
   openConversation: (ctx: ChatContext, id: string) => void;
-  /** 开书恢复会话：同 openConversation 但不强制开面板（spec §7）。 */
+  /** Khôi phục hội thoại khi mở sách như openConversation nhưng không ép mở bảng. */
   restoreConversation: (ctx: ChatContext, id: string) => void;
-  setSummaryChip: (kind: "chapter" | "book", on: boolean) => void;
-  /** 「将开启新会话」预亮（spec §6）：新对话按钮 / 开书无会话。 */
-  setSummaryChipsPreset: () => void;
-  /** 回落全 off。 */
-  resetSummaryChips: () => void;
-  /** 切书重置：仅清残留 openCommand（避免 AIPanel 重挂重放上本书会话）；保留 activeByBook 与草稿。 */
+  /** Khi đổi sách, xóa lệnh để không phát lại sang sách khác; giữ activeByBook và bản nháp. */
   resetForBookSwitch: () => void;
+  clearBookConversation: (bookId: string) => void;
 }
 
 export const CHAT_INITIAL: ChatState = {
   draftText: "",
   draftChips: [],
   openCommand: null,
-  summaryChips: { chapter: false, book: false },
   activeByBook: {},
   activeLibraryConversation: null,
 };
@@ -78,7 +71,6 @@ export const useChatStore = create<ChatState & ChatActions>()(
         openPanelAndFocusComposer();
         return set((s) => ({
           openCommand: { conversationId: id, context: ctx, nonce: (s.openCommand?.nonce ?? 0) + 1 },
-          summaryChips: { chapter: false, book: false },
           ...(ctx.kind === "book"
             ? { activeByBook: { ...s.activeByBook, [ctx.bookId]: id } }
             : { activeLibraryConversation: id }),
@@ -87,16 +79,20 @@ export const useChatStore = create<ChatState & ChatActions>()(
       restoreConversation: (ctx, id) =>
         set((s) => ({
           openCommand: { conversationId: id, context: ctx, nonce: (s.openCommand?.nonce ?? 0) + 1 },
-          summaryChips: { chapter: false, book: false },
           ...(ctx.kind === "book"
             ? { activeByBook: { ...s.activeByBook, [ctx.bookId]: id } }
             : { activeLibraryConversation: id }),
         })),
-      setSummaryChip: (kind, on) =>
-        set((s) => ({ summaryChips: { ...s.summaryChips, [kind]: on } })),
-      setSummaryChipsPreset: () => set({ summaryChips: { chapter: true, book: true } }),
-      resetSummaryChips: () => set({ summaryChips: { chapter: false, book: false } }),
       resetForBookSwitch: () => set({ openCommand: null }),
+      clearBookConversation: (bookId) =>
+        set((s) => {
+          const activeByBook = { ...s.activeByBook };
+          delete activeByBook[bookId];
+          return {
+            activeByBook,
+            openCommand: null,
+          };
+        }),
     }),
     {
       name: "marginalia-chat",
@@ -109,7 +105,7 @@ export const useChatStore = create<ChatState & ChatActions>()(
   ),
 );
 
-/** 组件用：当前上下文的 active 会话（派生）。 */
+/** Hội thoại active suy ra cho context hiện tại, dùng trong component. */
 export function useActiveConversationId(ctx: ChatContext): string | null {
   return useChatStore((s) =>
     ctx.kind === "book"
@@ -118,7 +114,7 @@ export function useActiveConversationId(ctx: ChatContext): string | null {
   );
 }
 
-/** action / transport 等非响应式语境用。 */
+/** Dùng trong action, transport và những nơi không theo cơ chế phản ứng. */
 export function getActiveConversationId(ctx: ChatContext): string | null {
   const s = useChatStore.getState();
   return ctx.kind === "book"

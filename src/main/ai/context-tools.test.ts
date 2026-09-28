@@ -9,7 +9,7 @@ import { type LoadBytes } from "@main/ai/tools";
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 const noopLoad: LoadBytes = async () => new Uint8Array();
 
-const READING_KEYS = ["getToc", "readChapterText", "getChapterSummary", "getBookSummary"];
+const READING_KEYS = ["getToc", "readChapterText"];
 const LIBRARY_KEYS = ["listBooks", "getBook", "getBookNotes", "listAnnotations", "getReadingStats"];
 const READING_SESSION_KEYS = ["listReadingSessions", "getReadingReport"];
 
@@ -21,6 +21,8 @@ describe("createContextTools", () => {
     const tools = createContextTools({ db, bookId: book.id, loadBytes: noopLoad });
     const keys = Object.keys(tools);
     expect(keys).toEqual(expect.arrayContaining(READING_KEYS));
+    expect(keys).not.toContain("getChapterSummary");
+    expect(keys).not.toContain("getBookSummary");
     expect(keys).toEqual(expect.arrayContaining(LIBRARY_KEYS));
     expect(keys).toEqual(expect.arrayContaining(READING_SESSION_KEYS));
   });

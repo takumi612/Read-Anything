@@ -29,7 +29,7 @@ const BLOCK_TAGS = new Set([
   "figcaption",
 ]);
 
-/** 该元素是否嵌在另一块级元素内（其文本已被祖先块收集，跳过以免重复）。 */
+/** Kiểm tra phần tử có nằm trong khối khác đã được thu thập, để tránh lặp văn bản. */
 function isNestedInsideBlock(el: HTMLElement): boolean {
   let node = el.parentNode as HTMLElement | null;
   while (node) {
@@ -39,17 +39,17 @@ function isNestedInsideBlock(el: HTMLElement): boolean {
   return false;
 }
 
-/** 顶层块级元素（保序）：querySelectorAll 命中后剔除嵌套块。 */
+/** Các phần tử khối cấp trên cùng theo thứ tự gốc; bỏ khối lồng nhau. */
 function topLevelBlocks(body: HTMLElement): HTMLElement[] {
   return body.querySelectorAll(BLOCK_SELECTOR).filter((b) => !isNestedInsideBlock(b));
 }
 
-/** 取某 anchor 所在 spine 文件的「本章块级文本」：[anchor 所在块, nextAnchor 所在块) 区间。 */
+/** Lấy văn bản khối trong một tệp spine từ anchor đến trước nextAnchor. */
 function sliceTextByAnchor(xhtml: string, anchor: string, nextAnchor?: string): string {
   const root = parseHtml(xhtml);
   const body = (root.querySelector("body") ?? root) as HTMLElement;
   const startEl = root.getElementById(anchor);
-  if (!startEl) return htmlToText(xhtml); // 定位不到 ⇒ 退化整文件（不静默空）
+  if (!startEl) return htmlToText(xhtml); // Không tìm thấy anchor: lấy cả tệp, tránh trả rỗng.
   const startOffset = startEl.range[0];
   const endEl = nextAnchor ? root.getElementById(nextAnchor) : null;
   const endOffset = endEl ? endEl.range[0] : Number.POSITIVE_INFINITY;
@@ -61,9 +61,10 @@ function sliceTextByAnchor(xhtml: string, anchor: string, nextAnchor?: string): 
 }
 
 /**
- * 取单个 spine 文件内 [fromAnchor 所在块, toAnchor 所在块) 的块级文本（跨文件抽取的逐文件原语）。
- * fromAnchor 省略 ⇒ 从文件开头；toAnchor 省略 ⇒ 到文件结尾。锚点元素找不到时该端退化为开头/结尾
- * （不静默丢正文）。与 sliceTextByAnchor 的差异：fromAnchor 缺失时按「从头」取块，而非整文件 htmlToText 回退。
+ * Lấy văn bản khối của một tệp spine trong khoảng từ fromAnchor đến trước toAnchor.
+ * Thiếu fromAnchor/toAnchor thì dùng đầu/cuối tệp. Nếu không tìm thấy anchor, cũng dùng
+ * đầu/cuối để không làm mất nội dung. Khác sliceTextByAnchor: fromAnchor thiếu thì
+ * lấy các khối từ đầu thay vì chuyển cả tệp qua htmlToText.
  */
 function sliceFileBlocks(xhtml: string, fromAnchor?: string, toAnchor?: string): string {
   const root = parseHtml(xhtml);
@@ -79,7 +80,7 @@ function sliceFileBlocks(xhtml: string, fromAnchor?: string, toAnchor?: string):
     .join("\n");
 }
 
-/** 把整章纯文本按 offset/maxChars 分页成 ChapterTextSlice（nextOffset 永不越界）。 */
+/** Cắt văn bản chương theo offset/maxChars thành ChapterTextSlice; nextOffset không vượt quá cuối. */
 function paginate(full: string, opts: ReadOptions): ChapterTextSlice {
   const offset = Math.max(0, opts.offset ?? 0);
   const maxChars = Math.max(1, opts.maxChars ?? DEFAULT_MAX_CHARS);
@@ -88,7 +89,7 @@ function paginate(full: string, opts: ReadOptions): ChapterTextSlice {
   return { text: slice, hasMore: nextOffset < full.length, nextOffset };
 }
 
-/** XHTML → 纯文本：块级元素文本，块间换行，规整空白。
+/** Chuyển XHTML thành văn bản: lấy nội dung các khối, xuống dòng giữa khối và gộp khoảng trắng.
  * Known limitations:
  *   - <pre> whitespace is collapsed (not preserved).
  *   - Char-offset slicing (in extractChapterText) may split a surrogate pair for rare
@@ -106,7 +107,7 @@ export function htmlToText(xhtml: string): string {
   return parts.join("\n");
 }
 
-/** 从 ePub 字节里取某 href 的章节纯文本（分页）。纯函数：不碰 DB/fs。 */
+/** Lấy văn bản chương theo href từ bytes EPUB rồi phân trang; không truy cập DB hoặc đĩa. */
 export function extractChapterText(
   bytes: Uint8Array,
   href: string,
@@ -123,19 +124,16 @@ export function extractChapterText(
 }
 
 /**
- * 取「一个 TOC 章节」的纯文本——可横跨多个连续 spine 文档（分页）。纯函数：不碰 DB/fs。
+ * Lấy văn bản của một mục lục, có thể trải qua nhiều tệp spine liên tiếp; không truy cập DB/đĩa.
  *
- * 背景：一个目录项的正文常被切成多个 spine 文件（如 `part_012`=标题 + `part_013`=正文主体），
- * 而中间那些没有独立目录项的「孤儿」spine 文件逻辑上属于本章。按单 href 抽取会整段漏掉它们。
+ * Một mục TOC có thể gồm nhiều tệp spine: một tệp chứa tiêu đề, tệp sau chứa nội dung.
+ * Các tệp không có mục TOC riêng ở giữa vẫn thuộc chương này; đọc một href sẽ bỏ sót chúng.
  *
- * 区间语义：本章正文 = 从 `start`(href, anchor) 到 `end`(下一目录项的 href, anchor) 之前，按 spine
- * 阅读顺序拼接。`end` 省略表示读到全书末尾（末章）。
- *   - 首文件：从 start.anchor 起到文件尾（anchor 省略 ⇒ 整文件）。
- *   - 中间文件：整取（被旧逻辑漏掉的孤儿文件）。
- *   - 末文件：仅当 end.anchor 明确存在才纳入 [文件首, end.anchor)；end.anchor 省略表示下一章从该文件
- *     开头起、本章不含它。
- * 防御：start.href 不在 spine、或 end 早于 start / 不在 spine（畸形 TOC）⇒ 保守只抽 start 文件，
- * 既不静默丢正文、也不把后文整本拽进本章。
+ * Nội dung chương bắt đầu tại start(href, anchor) và kết thúc trước end của mục TOC kế tiếp,
+ * ghép theo thứ tự spine. Nếu không có end thì đọc đến hết sách.
+ * Tệp đầu: đọc từ start.anchor; tệp giữa: lấy toàn bộ; tệp cuối chỉ lấy đến end.anchor nếu có.
+ * Nếu end không có anchor, chương kế tiếp bắt đầu ở đầu tệp đó nên tệp ấy không thuộc chương này.
+ * TOC lỗi (start không ở spine hoặc end không hợp lệ): chỉ lấy tệp start để tránh nuốt cả sách.
  */
 export function extractChapterAcrossSpine(
   bytes: Uint8Array,
@@ -155,14 +153,14 @@ export function extractChapterAcrossSpine(
 
   const segments: string[] = [];
   if (startIdx === -1) {
-    // start.href 不在 spine（异常）：退化为仅该文件，同文件 end 才参与切界。
+    // start.href không có trong spine: chỉ lấy tệp đó, áp dụng end nếu cùng tệp.
     const sameFileEnd = end && end.href === start.href ? end.anchor : undefined;
     segments.push(sliceFileBlocks(fileText(start.href), start.anchor, sameFileEnd));
   } else if (end && endIdx === startIdx) {
-    // 同一 spine 文件内的相邻锚点边界（含「父章 → 首个子节」）：[start.anchor, end.anchor)。
+    // Hai anchor trong cùng tệp: lấy từ start đến trước end, gồm cả chương cha và mục con.
     segments.push(sliceFileBlocks(fileText(start.href), start.anchor, end.anchor));
   } else if (!end || endIdx > startIdx) {
-    // 正常跨文件，或读到书末（end 省略）。
+    // Khoảng qua nhiều tệp hoặc đọc đến cuối sách.
     const lastExclusive = end ? endIdx : spine.length;
     segments.push(sliceFileBlocks(fileText(start.href), start.anchor, undefined));
     for (let i = startIdx + 1; i < lastExclusive; i++) {
@@ -171,22 +169,23 @@ export function extractChapterAcrossSpine(
     if (end?.anchor)
       segments.push(sliceFileBlocks(fileText(spine[endIdx]!), undefined, end.anchor));
   } else {
-    // 边界异常（end 早于 start / 不在 spine）：保守只取 start 文件，不臆测区间。
+    // end không hợp lệ: chỉ lấy tệp start, không tự đoán ranh giới.
     segments.push(sliceFileBlocks(fileText(start.href), start.anchor, undefined));
   }
   return paginate(segments.filter(Boolean).join("\n"), opts);
 }
 
 /**
- * 从 ePub 字节里按 href 顺序取全书纯文本，拼接到 `maxChars`。**只解压一次**（关键：逐章调
- * extractChapterText 会每次全解压 epub，N 章 = N 次全解压、同步阻塞主进程）。纯函数：不碰 DB/fs。
+ * Lấy văn bản toàn sách theo thứ tự href đến maxChars. Chỉ giải nén EPUB một lần;
+ * gọi extractChapterText cho từng chương sẽ giải nén N lần và chặn main process.
+ * Hàm này không truy cập DB hoặc đĩa.
  */
 export function extractBookText(
   bytes: Uint8Array,
   hrefs: string[],
   opts: { maxChars: number },
 ): { text: string; truncated: boolean } {
-  const files = unzipSync(bytes); // 只解压一次
+  const files = unzipSync(bytes); // Giải nén một lần.
   const parts: string[] = [];
   let used = 0;
   let truncated = false;
@@ -197,7 +196,7 @@ export function extractBookText(
       break;
     }
     const entry = files[href];
-    if (!entry) continue; // spine 列了但 zip 缺失 → 容错跳过
+    if (!entry) continue; // Bỏ qua tệp có trong spine nhưng thiếu trong ZIP.
     const full = htmlToText(strFromU8(entry));
     const slice = full.slice(0, remaining);
     if (slice.length > 0) {
@@ -205,7 +204,7 @@ export function extractBookText(
       used += slice.length;
     }
     if (slice.length < full.length) {
-      truncated = true; // 该章被预算截断 → 停
+      truncated = true; // Hết ngân sách ký tự: dừng.
       break;
     }
   }

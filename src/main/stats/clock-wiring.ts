@@ -8,18 +8,18 @@ import { getActiveReadingSession } from "@main/reading-sessions/repository";
 
 const log = createLogger("stats");
 
-/** flush 周期：崩溃最多丢一个间隔；跨午夜由按 atMs 重算 day 自然切分。 */
+/** Chu kỳ lưu thời gian; crash có thể mất tối đa một chu kỳ, qua nửa đêm tính lại ngày. */
 const FLUSH_INTERVAL_MS = 60_000;
 
 let clock: ReadingClock | null = null;
 
-/** 供 IPC handler 调用的时钟句柄。 */
+/** Tay cầm đồng hồ đọc cho IPC handler. */
 export function getReadingClock(): ReadingClock {
   if (!clock) throw new Error("reading clock not initialized");
   return clock;
 }
 
-/** app.ready 调一次：建时钟 + 接 powerMonitor + 周期 flush + 退出收尾。 */
+/** Gọi một lần sau app.ready để tạo đồng hồ, nghe powerMonitor và lưu theo chu kỳ. */
 export function initReadingClock(): void {
   if (clock) return;
   clock = createReadingClock({
@@ -41,7 +41,7 @@ export function initReadingClock(): void {
   clock.setAwake(true);
   powerMonitor.on("suspend", () => clock?.setAwake(false));
   powerMonitor.on("resume", () => clock?.setAwake(true));
-  powerMonitor.on("lock-screen", () => clock?.setAwake(false)); // macOS/Windows；缺失时 suspend 兜底
+  powerMonitor.on("lock-screen", () => clock?.setAwake(false)); // suspend là đường dự phòng.
   powerMonitor.on("unlock-screen", () => clock?.setAwake(true));
   const interval = setInterval(() => clock?.tick(), FLUSH_INTERVAL_MS);
   app.on("before-quit", () => {
@@ -50,7 +50,7 @@ export function initReadingClock(): void {
   });
 }
 
-/** createWindow 调：绑定窗口焦点；reload/closed 复位 currentBook。 */
+/** Gắn sự kiện focus của cửa sổ; reload/đóng sẽ xóa sách đang đọc. */
 export function bindWindowToClock(win: BrowserWindow): void {
   const c = getReadingClock();
   c.setFocused(win.isFocused());

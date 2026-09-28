@@ -1,6 +1,6 @@
 import { C } from "@shared/ipc";
 import { appService } from "@main/app";
-import { writeRendererLog } from "@main/logger/logger-service"; // 深导入：IPC 胶水专用入口
+import { writeRendererLog } from "@main/logger/logger-service"; // Lối vào riêng cho IPC.
 import { bind, register, type Binding } from "@main/ipc/registry";
 
 export const logBindings: Binding[] = [

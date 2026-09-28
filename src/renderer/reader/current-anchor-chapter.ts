@@ -1,10 +1,10 @@
 export interface AnchorChapterPos {
   id: string;
   anchor: string;
-  top: number; // 该锚点元素在 section 内的 offsetTop（px）
+  top: number; // offsetTop của phần tử neo trong section, tính bằng px.
 }
 
-/** 选「锚点 offsetTop ≤ 视口顶位置」中最靠后的章；都在下方则取第一个（section 刚进顶部）。 */
+/** Chọn chương có neo gần đầu khung nhìn nhất mà không vượt qua; nếu mọi neo ở dưới thì lấy chương đầu. */
 export function pickAnchorChapterId(
   chapters: AnchorChapterPos[],
   viewportTop: number,

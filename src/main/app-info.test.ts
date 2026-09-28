@@ -15,7 +15,7 @@ describe("app-info", () => {
     const db = createDb(":memory:");
     runMigrations(db, MIGRATIONS);
     const info = getAppInfo(db, "9.9.9");
-    expect(info).toEqual({ version: "9.9.9", bookCount: 0 });
+    expect(info).toEqual({ version: "9.9.9", bookCount: 0, platform: process.platform });
   });
 
   it("getAppInfo counts inserted books", () => {

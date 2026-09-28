@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
   PREFERENCE_SCHEMAS,
+  appBackgroundColor,
+  appBackgroundMode,
   preferenceKey,
+  readerColorMode,
   readerLayoutSchema,
   readerPrefsSchema,
   setPreferenceInput,
@@ -20,20 +23,32 @@ describe("preferences schemas", () => {
 
   it("registers exactly the keys with current consumers", () => {
     expect(Object.keys(PREFERENCE_SCHEMAS).sort()).toEqual([
+      "aiDataConsent",
+      "annotationColors",
+      "annotationPalette",
+      "appBackgroundBlobId",
+      "appBackgroundColor",
+      "appBackgroundMode",
       "autoSummarize",
       "avatarBlobId",
       "backgroundConcurrency",
       "chatModel",
       "colorMode",
+      "epubColorMode",
       "instructions",
       "language",
       "lastHighlightStyle",
       "memoryAutoConsolidate",
       "memoryEnabled",
       "onboardingDismissed",
+      "pdfBrightness",
+      "pdfColorMode",
+      "pdfSurroundingBackground",
+      "pdfSurroundingBrightness",
       "pdfZoom",
       "readerLayout",
       "readerPrefs",
+      "restorePdfTabs",
       "showAgentAvatar",
       "soul",
       "stepLimit",
@@ -50,22 +65,70 @@ describe("preferences schemas", () => {
     expect(preferenceKey.safeParse("nope").success).toBe(false);
   });
 
-  it("readerLayoutSchema requires all three boolean flags", () => {
+  it("readerLayoutSchema stores sidebar and panel while ignoring the retired header flag", () => {
+    expect(readerLayoutSchema.parse({ sidebarOpen: true, panelOpen: false })).toEqual({
+      sidebarOpen: true,
+      panelOpen: false,
+    });
     expect(
-      readerLayoutSchema.safeParse({ sidebarOpen: true, panelOpen: false, headerOpen: true })
-        .success,
-    ).toBe(true);
+      readerLayoutSchema.parse({ sidebarOpen: true, panelOpen: false, headerOpen: false }),
+    ).toEqual({ sidebarOpen: true, panelOpen: false });
     expect(readerLayoutSchema.safeParse({ sidebarOpen: true, panelOpen: false }).success).toBe(
-      false,
+      true,
     );
-    expect(
-      readerLayoutSchema.safeParse({ sidebarOpen: 1, panelOpen: false, headerOpen: true }).success,
-    ).toBe(false);
+    expect(readerLayoutSchema.safeParse({ sidebarOpen: 1, panelOpen: false }).success).toBe(false);
   });
 
   it("lastHighlightStyle validates against the annotation style enum", () => {
     expect(PREFERENCE_SCHEMAS.lastHighlightStyle.safeParse("yellow").success).toBe(true);
+    expect(PREFERENCE_SCHEMAS.lastHighlightStyle.safeParse("#FB923C").success).toBe(true);
     expect(PREFERENCE_SCHEMAS.lastHighlightStyle.safeParse("teal").success).toBe(false);
+  });
+
+  it("annotationColors stores an independent library of unique fill colors", () => {
+    expect(
+      PREFERENCE_SCHEMAS.annotationColors.safeParse([
+        "yellow",
+        "green",
+        "blue",
+        "pink",
+        "purple",
+        "#FB923C",
+        "#14b8a6",
+      ]).success,
+    ).toBe(true);
+    expect(PREFERENCE_SCHEMAS.annotationColors.safeParse([]).success).toBe(false);
+    expect(PREFERENCE_SCHEMAS.annotationColors.safeParse(["#abc"]).success).toBe(false);
+  });
+
+  it("annotationPalette stores unique toolbar colors independently from library size", () => {
+    expect(
+      PREFERENCE_SCHEMAS.annotationPalette.safeParse([
+        "yellow",
+        "green",
+        "blue",
+        "pink",
+        "purple",
+        "#FB923C",
+      ]).success,
+    ).toBe(true);
+    expect(PREFERENCE_SCHEMAS.annotationPalette.safeParse([]).success).toBe(false);
+    expect(PREFERENCE_SCHEMAS.annotationPalette.safeParse(["yellow", "yellow"]).success).toBe(
+      false,
+    );
+    expect(
+      PREFERENCE_SCHEMAS.annotationPalette.safeParse([
+        "yellow",
+        "green",
+        "blue",
+        "pink",
+        "purple",
+        "#fb923c",
+        "#60a5fa",
+      ]).success,
+    ).toBe(true);
+    expect(PREFERENCE_SCHEMAS.annotationPalette.safeParse(["#abc"]).success).toBe(false);
+    expect(PREFERENCE_SCHEMAS.annotationPalette.safeParse(["underline"]).success).toBe(false);
   });
 
   it("setPreferenceInput covers exactly the registered keys (no drift)", () => {
@@ -74,12 +137,54 @@ describe("preferences schemas", () => {
   });
 
   it("setPreferenceInput validates value per key at the boundary", () => {
+    expect(
+      setPreferenceInput.safeParse({ key: "annotationColors", value: ["yellow", "#123456"] })
+        .success,
+    ).toBe(true);
     expect(setPreferenceInput.safeParse({ key: "autoSummarize", value: true }).success).toBe(true);
     expect(setPreferenceInput.safeParse({ key: "autoSummarize", value: "yes" }).success).toBe(
       false,
     );
     expect(setPreferenceInput.safeParse({ key: "colorMode", value: "dark" }).success).toBe(true);
     expect(setPreferenceInput.safeParse({ key: "colorMode", value: "sepia" }).success).toBe(false);
+    expect(setPreferenceInput.safeParse({ key: "pdfColorMode", value: "dark" }).success).toBe(true);
+    const pdfBackground = {
+      colors: [
+        { id: "sage", name: "Soft sage", color: "#e4ece3", showInThemeMenu: true },
+      ],
+      selectedId: "sage",
+    };
+    expect(
+      setPreferenceInput.safeParse({ key: "pdfSurroundingBackground", value: pdfBackground })
+        .success,
+    ).toBe(true);
+    expect(
+      setPreferenceInput.safeParse({
+        key: "pdfSurroundingBackground",
+        value: { ...pdfBackground, selectedId: "missing" },
+      }).success,
+    ).toBe(false);
+    expect(setPreferenceInput.safeParse({ key: "pdfBrightness", value: 100 }).success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "pdfBrightness", value: 151 }).success).toBe(false);
+    expect(setPreferenceInput.safeParse({ key: "pdfBrightness", value: 49 }).success).toBe(false);
+    expect(
+      setPreferenceInput.safeParse({ key: "pdfSurroundingBrightness", value: 100 }).success,
+    ).toBe(true);
+    expect(
+      setPreferenceInput.safeParse({ key: "pdfSurroundingBrightness", value: 151 }).success,
+    ).toBe(false);
+    expect(setPreferenceInput.safeParse({ key: "epubColorMode", value: "dark" }).success).toBe(
+      true,
+    );
+    expect(readerColorMode.safeParse("sepia").success).toBe(true);
+    expect(readerColorMode.safeParse("sage").success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "epubColorMode", value: "sepia" }).success).toBe(
+      true,
+    );
+    expect(setPreferenceInput.safeParse({ key: "pdfColorMode", value: "sage" }).success).toBe(true);
+    expect(appBackgroundMode.safeParse("image").success).toBe(true);
+    expect(appBackgroundColor.safeParse("#9caabb").success).toBe(true);
+    expect(appBackgroundColor.safeParse("not-a-color").success).toBe(false);
     expect(
       setPreferenceInput.safeParse({ key: "readerPrefs", value: { fontScale: 1 } }).success,
     ).toBe(false);
@@ -146,7 +251,8 @@ describe("language preference", () => {
   });
   it("setPreferenceInput accepts a valid language, rejects junk", () => {
     expect(setPreferenceInput.safeParse({ key: "language", value: "en" }).success).toBe(true);
-    expect(setPreferenceInput.safeParse({ key: "language", value: "zh-CN" }).success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "language", value: "vi" }).success).toBe(true);
+    expect(setPreferenceInput.safeParse({ key: "language", value: "zh-CN" }).success).toBe(false);
     expect(setPreferenceInput.safeParse({ key: "language", value: "fr" }).success).toBe(false);
   });
 });

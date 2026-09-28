@@ -3,7 +3,7 @@ import type { ColorMode } from "@shared/preferences";
 import { resolveTheme, type ResolvedTheme } from "@shared/theme";
 import { persistPreference } from "@renderer/store/persist-preference";
 
-/** 读系统是否偏好暗色（matchMedia 薄包；headless 无 window → false）。 */
+/** Đọc tùy chọn nền tối của hệ điều hành qua matchMedia; thiếu window thì trả false. */
 function prefersDark(): boolean {
   return (
     typeof window !== "undefined" &&
@@ -11,30 +11,38 @@ function prefersDark(): boolean {
   );
 }
 
-/** 启动初值：preload 已把整份快照同步缓存于 window.api.preferences.getAll()。 */
+/** Giá trị ban đầu lấy từ snapshot mà preload đã cache đồng bộ qua preferences.getAll(). */
 function initialColorMode(): ColorMode {
   if (typeof window === "undefined") return "system";
   return window.api?.preferences?.getAll?.()?.colorMode ?? "system";
 }
 
 interface ThemeState {
-  /** 用户选择（持久化）。 */
+  /** Lựa chọn của người dùng, được lưu bền. */
   colorMode: ColorMode;
-  /** 实际生效（派生：system 经 matchMedia 消解）。 */
+  /** Chủ đề đang áp dụng; system được phân giải qua matchMedia. */
   resolvedTheme: ResolvedTheme;
+  /** OS preference remains available when the app appearance has an explicit light/dark override. */
+  systemTheme: ResolvedTheme;
   setColorMode: (mode: ColorMode) => void;
-  /** OS 外观变化时按当前 colorMode 重解析（仅 system 档有意义）。 */
+  /** Tính lại theo colorMode khi giao diện hệ điều hành đổi; chỉ ảnh hưởng mức system. */
   syncSystem: () => void;
 }
 
 const initMode = initialColorMode();
+const initialSystemTheme: ResolvedTheme = prefersDark() ? "dark" : "light";
 
 export const useThemeStore = create<ThemeState>()((set, get) => ({
   colorMode: initMode,
-  resolvedTheme: resolveTheme(initMode, prefersDark()),
+  resolvedTheme: resolveTheme(initMode, initialSystemTheme === "dark"),
+  systemTheme: initialSystemTheme,
   setColorMode: (colorMode) => {
     persistPreference({ key: "colorMode", value: colorMode });
-    set({ colorMode, resolvedTheme: resolveTheme(colorMode, prefersDark()) });
+    const systemTheme: ResolvedTheme = prefersDark() ? "dark" : "light";
+    set({ colorMode, systemTheme, resolvedTheme: resolveTheme(colorMode, systemTheme === "dark") });
   },
-  syncSystem: () => set({ resolvedTheme: resolveTheme(get().colorMode, prefersDark()) }),
+  syncSystem: () => {
+    const systemTheme: ResolvedTheme = prefersDark() ? "dark" : "light";
+    set({ systemTheme, resolvedTheme: resolveTheme(get().colorMode, systemTheme === "dark") });
+  },
 }));

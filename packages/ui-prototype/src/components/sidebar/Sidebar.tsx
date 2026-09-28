@@ -25,12 +25,12 @@ export function Sidebar() {
 
   return (
     <div className="flex h-full flex-col bg-muted/40 font-sans">
-      {/* 书库（占位：单本高亮；点开看全书概要） */}
+      {/* Thư viện (giữ chỗ: tô sáng một sách; nhấp để xem tóm tắt toàn sách) */}
       <div className="shrink-0 border-b border-border p-3">
         <BookCard />
       </div>
 
-      {/* 标签栏（图标常显，仅活动页显文字 → 适配长语种不溢出） */}
+      {/* Thanh tab (biểu tượng luôn hiện, chỉ hiện chữ ở trang đang hoạt động → tránh tràn với ngôn ngữ có từ dài) */}
       <div className="flex shrink-0 items-center gap-1 border-b border-border p-2">
         <TabBtn
           active={tab === "toc"}

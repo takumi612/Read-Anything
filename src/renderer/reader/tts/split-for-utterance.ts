@@ -1,10 +1,10 @@
-/** 单 utterance 字符上限：超长 utterance 在部分引擎截断/卡死（spec §4.3/§8 防御）。 */
+/** Giới hạn ký tự mỗi utterance vì một số engine cắt hoặc treo với văn bản quá dài. */
 export const MAX_UTTERANCE_CHARS = 300;
 
 /**
- * 把超长段切成 ≤max 的 utterance 块：句边界（Intl.Segmenter）贪心聚合；
- * 单句仍超长再按逗号/分号/顿号细切（保留分隔符在前块尾，朗读停顿自然）。
- * 拼接结果与原文一致（不丢字），对用户透明（spec §4.3：同段共享 voice 与高亮）。
+ * Chia đoạn dài thành các utterance không quá max ký tự, ưu tiên ghép theo câu từ Intl.Segmenter.
+ * Nếu một câu còn quá dài, chia tiếp theo dấu câu và giữ dấu ở cuối phần trước để ngắt nghỉ tự nhiên.
+ * Nối các phần vẫn ra đúng văn bản gốc; cùng đoạn dùng chung giọng và vùng tô sáng.
  */
 export function splitForUtterance(text: string, max = MAX_UTTERANCE_CHARS): string[] {
   if (text.length <= max) return [text];
@@ -21,7 +21,7 @@ export function splitForUtterance(text: string, max = MAX_UTTERANCE_CHARS): stri
       flush();
       for (const piece of s.split(/(?<=[,;，；、])/)) {
         if (piece.length > max) {
-          // 无标点超长片段：字符级硬切兜底（引擎截断防御不可绕过）
+          // Nếu đoạn quá dài không có dấu câu, buộc cắt theo ký tự để bảo vệ engine.
           flush();
           for (let i = 0; i < piece.length; i += max) out.push(piece.slice(i, i + max));
           continue;

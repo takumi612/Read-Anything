@@ -20,9 +20,9 @@ export function Composer() {
   const ref = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
-    // 仅在面板「常驻可见」时聚焦：收起态下 Composer 渲染在 translate 离屏的 PeekDrawer 里，
-    // 对它 .focus() 会触发 scroll-into-view，进而扰乱离屏抽屉的 transform 绘制（stale paint，
-    // 表现为收起后右栏仍停在原位盖住正文）。preventScroll 再兜底一层，杜绝程序化聚焦带动滚动。
+    // Chỉ đặt tiêu điểm khi bảng luôn hiển thị: ở trạng thái thu gọn, Composer được kết xuất trong PeekDrawer đã dịch ra ngoài màn hình,
+    // gọi .focus() sẽ kích hoạt scroll-into-view và làm rối quá trình vẽ transform của ngăn kéo ngoài màn hình (bản vẽ cũ,
+    // khiến cột bên phải vẫn nằm nguyên vị trí và che nội dung sau khi thu gọn). preventScroll là lớp bảo vệ bổ sung để việc đặt tiêu điểm bằng mã không kéo theo cuộn.
     if (focusNonce > 0 && panelOpen) ref.current?.focus({ preventScroll: true });
   }, [focusNonce, panelOpen]);
 

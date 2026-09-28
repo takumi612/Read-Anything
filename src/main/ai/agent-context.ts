@@ -1,6 +1,5 @@
-// src/main/ai/agent-context.ts —— system prompt 中间三层（instructions + SOUL + 记忆索引）的
-// 渲染与会话快照冻结（spec 2026-06-10 §3/§5）。
-// 快照不持久化：进程内 Map，app 重启即重渲染（provider 缓存 TTL 早过期，语义零损失）。
+// Dựng ba lớp giữa của system prompt: instructions, SOUL và chỉ mục bộ nhớ.
+// Snapshot theo hội thoại giữ trong Map của tiến trình; khởi động lại sẽ dựng lại.
 import type { DB } from "@main/db/client";
 import { getPreference } from "@main/preferences/repository";
 import { listMemories } from "@main/memory/repository";
@@ -21,20 +20,20 @@ export function renderAssistantIdentity(db: DB): string {
 export function renderMemoryIndex(db: DB): string | null {
   const memoryEnabled = getPreference(db, "memoryEnabled") ?? true;
   if (!memoryEnabled) return null;
-  const all = listMemories(db); // 已按 (createdAt, id) 确定性排序
+  const all = listMemories(db); // Đã sắp ổn định theo createdAt và ID.
   if (all.length === 0) return null;
   const lines = all.map((memory) => `- [${memory.slug}] ${memory.title} — ${memory.description}`);
   return `## Memory index\n\n${lines.join("\n")}`;
 }
 
-/** 纯渲染（测试直测）：instructions 段 + SOUL 段 + 记忆索引段；空段整体省略。 */
+/** Dựng instructions, SOUL và chỉ mục bộ nhớ; bỏ cả đoạn khi không có nội dung. */
 export function renderAgentContext(db: DB): string {
   return [renderReaderInstructions(db), renderAssistantIdentity(db), renderMemoryIndex(db)]
     .filter((section): section is string => section !== null)
     .join("\n\n");
 }
 
-/** 会话快照：首轮渲染并冻结，本会话每轮逐字复用（保 provider prompt cache 前缀稳定）。 */
+/** Dựng một lần ở lượt đầu rồi dùng lại nguyên văn để tiền tố cache của provider ổn định. */
 export function getAgentContext(db: DB, conversationId: string): string {
   const cached = snapshots.get(conversationId);
   if (cached !== undefined) return cached;
@@ -43,12 +42,12 @@ export function getAgentContext(db: DB, conversationId: string): string {
   return rendered;
 }
 
-/** SOUL / instructions 变更时调用：清空全部快照，下一轮立即生效（spec §5 失效细则）。 */
+/** Xóa snapshot khi SOUL hoặc instructions đổi để lượt sau dùng nội dung mới. */
 export function invalidateAllAgentContexts(): void {
   snapshots.clear();
 }
 
-/** 会话删除时清理对应快照（防泄漏）。 */
+/** Xóa snapshot khi hội thoại bị xóa để không giữ dữ liệu trong bộ nhớ. */
 export function dropAgentContext(conversationId: string): void {
   snapshots.delete(conversationId);
 }

@@ -1,8 +1,8 @@
-// 原型本地类型（不镜像 shared/ 或 AI SDK；仅供 UI 原型用）。
+// Kiểu dữ liệu cục bộ của bản mẫu (không sao chép shared/ hoặc AI SDK; chỉ dùng cho UI mẫu).
 
 export type SummaryStatus = "pending" | "generating" | "ready" | "unavailable";
 
-/** 浮动工具栏上的预设 AI 动作（「AI 问」= null，无模板）。 */
+/** Thao tác AI đặt sẵn trên thanh công cụ nổi ("AI hỏi" = null, không có mẫu). */
 export type PresetId = "explain" | "translate" | "summarize";
 
 export interface TocNode {
@@ -17,7 +17,7 @@ export interface Chapter {
   title: string;
   paragraphs: string[];
   summaryStatus: SummaryStatus;
-  /** 章节摘要正文（status=ready 时展示）。 */
+  /** Nội dung tóm tắt chương (hiển thị khi status=ready). */
   summary: string;
 }
 
@@ -27,31 +27,31 @@ export interface Book {
   author: string;
   chapters: Chapter[];
   toc: TocNode[];
-  /** 全书 / global 摘要正文（2026-06-01 纳入 Phase 1）。 */
+  /** Nội dung tóm tắt toàn sách / global (được đưa vào Phase 1 ngày 2026-06-01). */
   summary: string;
   summaryStatus: SummaryStatus;
 }
 
-/** 渲染层选区提取的产物（原型在静态正文上用浏览器原生选区还原）。 */
+/** Kết quả trích xuất vùng chọn ở lớp hiển thị (bản mẫu khôi phục vùng chọn bằng API vùng chọn gốc của trình duyệt trên văn bản tĩnh). */
 export interface SelectionInfo {
   selectionText: string;
   paragraphText: string;
-  /** 选区触及的章节（按文档序去重）；length>1 = 跨章选择。 */
+  /** Các chương mà vùng chọn chạm tới (khử trùng lặp theo thứ tự tài liệu); length > 1 = chọn xuyên chương. */
   chapterIds: string[];
-  /** 划词结束时指针在视口中的坐标（用于浮动工具栏定位，贴合指针）。 */
+  /** Tọa độ con trỏ trong khung nhìn khi kết thúc chọn văn bản (dùng để đặt thanh công cụ nổi cạnh con trỏ). */
   anchor: { x: number; y: number };
-  /** 选区按段拆出的字符区间（用于落标注、渲染高亮）。 */
+  /** Các khoảng ký tự tách theo đoạn từ vùng chọn (dùng để tạo mục đánh dấu và hiển thị tô sáng). */
   ranges: AnnoRange[];
 }
 
-// ——— 标注 / 笔记（Apple Books 式高亮 + 便签）———
+// ——— Đánh dấu / ghi chú (tô sáng + ghi chú kiểu Apple Books) ———
 
 export type HighlightColor = "yellow" | "green" | "blue" | "pink" | "purple";
 
-/** 标注在单个段落内的字符区间（按段落字符串下标）。 */
+/** Khoảng ký tự được đánh dấu trong một đoạn văn (theo chỉ số chuỗi của đoạn). */
 export interface AnnoRange {
   chapterId: string;
-  /** 段落在本章 paragraphs 中的下标。 */
+  /** Chỉ số của đoạn trong danh sách paragraphs của chương này. */
   paragraphIndex: number;
   start: number;
   end: number;
@@ -60,13 +60,13 @@ export interface AnnoRange {
 export interface Annotation {
   id: string;
   color: HighlightColor;
-  /** 笔记正文；"" = 仅高亮无笔记。 */
+  /** Nội dung ghi chú; "" = chỉ tô sáng, không có ghi chú. */
   note: string;
-  /** 高亮原文（用于标注列表展示）。 */
+  /** Văn bản gốc được tô sáng (hiển thị trong danh sách mục đánh dấu). */
   text: string;
-  /** 起始章（用于列表分组）。 */
+  /** Chương bắt đầu (dùng để nhóm danh sách). */
   chapterId: string;
-  /** 跨段时一条标注含多段区间。 */
+  /** Khi vùng chọn đi qua nhiều đoạn, một mục đánh dấu chứa nhiều khoảng. */
   ranges: AnnoRange[];
   createdAt: number;
 }
@@ -99,17 +99,17 @@ export type ChatMessage =
       status: "streaming" | "done" | "error";
     };
 
-/** 侧栏会话列表项（原型仅作视觉演示）。 */
+/** Mục hội thoại trong danh sách thanh bên (bản mẫu chỉ dùng để minh họa giao diện). */
 export interface ConversationMeta {
   id: string;
   title: string;
-  chapterId: string | null; // null = 独立会话（跨章）
+  chapterId: string | null; // null = hội thoại riêng (xuyên chương)
 }
 
 export interface ReaderPrefs {
-  /** 正文字号缩放（1 = 基准）。 */
+  /** Tỷ lệ cỡ chữ nội dung (1 = mặc định). */
   fontScale: number;
   lineHeight: number;
-  /** 正文列最大宽度（px）。 */
+  /** Chiều rộng tối đa của cột nội dung (px). */
   maxWidth: number;
 }

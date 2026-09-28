@@ -1,11 +1,11 @@
 export type PresetId = "explain" | "translate" | "summarize";
 
 /**
- * AI 动作触发时对 Composer 草稿文本的处置（纯决策，无 i18n 依赖，故可无头单测）：
- * - 有 preset（解释/翻译/概括）→ 用预设提示语**覆盖**草稿；
- * - 无 preset（「AI 问」）→ 返回 `null`，表示**保留**用户已输入的文字（不清空）。
+ * Quyết định cách xử lý bản nháp Composer khi kích hoạt hành động AI, không phụ thuộc i18n.
+ * Có preset giải thích, dịch hoặc tóm tắt thì thay bản nháp bằng prompt đã chọn.
+ * Không có preset thì trả null để giữ nguyên chữ người dùng đã nhập.
  *
- * @param resolvePrompt 注入的预设提示语解析器（依赖 i18n，留在调用方 hook 里）。
+ * @param resolvePrompt Hàm lấy prompt preset do hook bên gọi cung cấp vì cần i18n.
  */
 export function presetDraftText(
   preset: PresetId | null,

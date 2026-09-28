@@ -1,17 +1,17 @@
 import type { Chip } from "@shared/chat";
 import i18n from "@renderer/i18n";
 
-/** chip 的本地化显示名（调用时求值，跟随 UI 语言）。 */
+/** Nhãn chip được dịch tại thời điểm gọi để theo ngôn ngữ giao diện hiện tại. */
 export const chipLabel = (chip: Chip): string => {
   switch (chip.labelKey) {
     case "chip.selection":
-      return i18n.t("ai.chip.selection", "选区");
+      return i18n.t("ai.chip.selection", "Đoạn chọn");
     case "chip.paragraph":
-      return i18n.t("ai.chip.paragraph", "段落上下文");
+      return i18n.t("ai.chip.paragraph", "Ngữ cảnh đoạn văn");
     case "chip.chapterSummary":
-      return i18n.t("ai.chip.chapterSummary", "章节摘要");
+      return i18n.t("ai.chip.chapterSummary", "Tóm tắt chương");
     case "chip.bookSummary":
-      return i18n.t("ai.chip.bookSummary", "全书摘要");
+      return i18n.t("ai.chip.bookSummary", "Tóm tắt sách");
     default:
       return chip.labelKey;
   }

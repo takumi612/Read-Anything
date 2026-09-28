@@ -1,9 +1,9 @@
-// src/main/ai/structured-output.ts —— 从模型自由文本里健壮地抽取并校验 JSON 输出。
-// 不用 generateObject/response_format——OpenAI 兼容 provider 对 json_object 支持参差、tool 模式亦不可靠；
-// 自己解析对任何文本模型都通用，且解析逻辑可单测。memory-consolidation 与 reading-report 的 subagent 共用。
+// Trích và kiểm tra JSON từ văn bản tự do của model.
+// Không dùng generateObject/response_format vì mức hỗ trợ khác nhau giữa provider;
+// bộ nhớ và báo cáo đọc dùng chung bộ phân tích này.
 import type { z } from "zod";
 
-/** 剥 markdown 代码围栏并扫出最外层平衡的 {…}（容忍模型在 JSON 前后夹带 prose）；找不到返回 null。 */
+/** Bỏ code fence và tìm đối tượng JSON ngoài cùng dù có văn bản ở trước/sau; thiếu thì null. */
 export function extractJsonObject(text: string): string | null {
   const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
   const body = fenced?.[1] ?? text;
@@ -28,8 +28,8 @@ export function extractJsonObject(text: string): string | null {
 }
 
 /**
- * 剥围栏 → 平衡括号扫出最外层对象 → JSON.parse → Zod 校验。
- * 任何一步失败返回 null（调用方自行决定跳过、重试还是降级）。
+ * Bỏ code fence, tìm cặp ngoặc ngoài cùng, JSON.parse rồi kiểm tra Zod.
+ * Bất kỳ bước nào lỗi thì trả null để bên gọi quyết định thử lại hoặc bỏ qua.
  */
 export function parseJsonOutput<T extends z.ZodType>(text: string, schema: T): z.infer<T> | null {
   const json = extractJsonObject(text);

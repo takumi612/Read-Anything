@@ -30,7 +30,7 @@ export function BackupExportButton({ disabled, onExport }: Props) {
         onClick={() => onExport("compact")}
       >
         <Download data-icon="inline-start" />
-        {t("settings.backup.exportCompact", "导出精简备份")}
+        {t("settings.backup.exportCompact", "Xuất bản sao lưu gọn nhẹ")}
       </Button>
       <DropdownMenu>
         <DropdownMenuTrigger
@@ -41,7 +41,7 @@ export function BackupExportButton({ disabled, onExport }: Props) {
               size="icon-sm"
               className="rounded-l-none px-1.5"
               disabled={disabled}
-              aria-label={t("settings.backup.exportOptions", "选择备份类型")}
+              aria-label={t("settings.backup.exportOptions", "Chọn loại bản sao lưu")}
             />
           }
         >
@@ -53,10 +53,10 @@ export function BackupExportButton({ disabled, onExport }: Props) {
               <Archive />
               <span>
                 <span className="block font-medium">
-                  {t("settings.backup.exportFull", "导出完整备份")}
+                  {t("settings.backup.exportFull", "Xuất bản sao lưu đầy đủ")}
                 </span>
                 <span className="block text-xs text-muted-foreground">
-                  {t("settings.backup.exportFullDesc", "包含所有 EPUB / PDF 原文件")}
+                  {t("settings.backup.exportFullDesc", "Bao gồm tất cả tệp EPUB và PDF gốc")}
                 </span>
               </span>
             </DropdownMenuItem>

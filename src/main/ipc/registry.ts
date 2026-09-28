@@ -6,13 +6,13 @@ import { createLogger } from "@main/logger";
 
 const log = createLogger("ipc");
 
-/** 声明式绑定：契约 + 业务 fn，纯数据、不碰 Electron（供 headless 覆盖测试读取）。 */
+/** Binding gồm hợp đồng và hàm nghiệp vụ, chưa phụ thuộc Electron. */
 export interface Binding {
   contract: Contract;
   fn: (input: never, event: IpcMainInvokeEvent) => unknown;
 }
 
-/** 把契约与业务 fn 绑成一条 Binding；input 类型由契约 input schema 推导，返回值被 output 类型约束。 */
+/** Ghép hợp đồng với hàm; kiểu đầu vào/đầu ra được suy từ hợp đồng. */
 export function bind<S extends z.ZodType, O>(
   contract: Contract<S, O>,
   fn: (input: z.infer<S>, event: IpcMainInvokeEvent) => NoInfer<O> | Promise<NoInfer<O>>,
@@ -20,7 +20,7 @@ export function bind<S extends z.ZodType, O>(
   return { contract, fn: fn as Binding["fn"] };
 }
 
-/** 唯一碰 ipcMain 的地方：为每条 Binding 注册经 Zod 校验的 invoke handler。 */
+/** Nơi duy nhất đăng ký ipcMain handler, kiểm tra đầu vào bằng Zod. */
 export function register(bindings: Binding[]): void {
   for (const { contract, fn } of bindings) {
     ipcMain.handle(contract.channel, async (event, raw: unknown) => {

@@ -8,11 +8,11 @@ export function DailyBarChart({ daily }: { daily: DailyPoint[] }) {
   const last = daily[daily.length - 1]?.day ?? "";
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="mb-3 text-sm font-semibold">{t("stats.dailyTitle", "每日时长")}</div>
+      <div className="mb-3 text-sm font-semibold">{t("stats.dailyTitle", "Đọc mỗi ngày")}</div>
       <div
         className="flex h-28 items-end gap-1"
         role="img"
-        aria-label={`${t("stats.dailyTitle", "每日时长")}: ${first} – ${last}`}
+        aria-label={`${t("stats.dailyTitle", "Đọc mỗi ngày")}: ${first} – ${last}`}
       >
         {daily.map((d) => (
           <div

@@ -41,8 +41,8 @@ function textOf(v: unknown): string | undefined {
 type Manifest = Map<string, { href: string; properties: string }>;
 
 /**
- * 定位并解析 OPF：返回 package 节点、OPF 目录、manifest(id→解析后包内绝对 href) 与取文件文本的闭包。
- * 供 parseEpub 与 readSpine 共享——后者要在不重复定位 container/OPF 的前提下拿到有序 spine。
+ * Tìm và phân tích OPF, trả về nút package, thư mục OPF, manifest (id→href tuyệt đối trong EPUB)
+ * và hàm đọc văn bản tệp. Dùng chung cho parseEpub/readSpine để lấy spine theo thứ tự mà không tìm OPF lại.
  */
 function loadOpf(files: Record<string, Uint8Array>) {
   const text = (p: string): string => {
@@ -73,7 +73,7 @@ function loadOpf(files: Record<string, Uint8Array>) {
   return { pkg, opfDir, manifest, text };
 }
 
-/** 由 spine 的 itemref 列表 + manifest 组出有序 spine 项（保 itemref 顺序，丢弃 manifest 缺失项）。 */
+/** Tạo các mục spine theo thứ tự itemref; bỏ mục không có trong manifest. */
 function buildSpine(itemref: unknown, manifest: Manifest): SpineItem[] {
   return asArray(itemref as { "@_idref": string } | { "@_idref": string }[] | undefined)
     .map((ref) => {
@@ -84,8 +84,8 @@ function buildSpine(itemref: unknown, manifest: Manifest): SpineItem[] {
 }
 
 /**
- * 从已解压的 epub `files` 读有序 spine（包内绝对 href）。调用方已 `unzipSync` 后传入，
- * 避免二次全解压——供跨 spine 章节抽取（extractChapterAcrossSpine）按阅读顺序枚举文件。
+ * Đọc spine theo thứ tự từ `files` của EPUB đã giải nén, dùng href tuyệt đối trong gói.
+ * Bên gọi đã chạy unzipSync để tránh giải nén lần hai; phục vụ trích chương qua nhiều tệp spine.
  */
 export function readSpine(files: Record<string, Uint8Array>): SpineItem[] {
   const { pkg, manifest } = loadOpf(files);
@@ -143,7 +143,7 @@ function readToc(
           .querySelectorAll("li")
           .filter((li) => li.parentNode === listEl)
           .map((li) => {
-            // 已知限制：<li><span>分组</span><ol>…</ol></li> 这类无 <a> 的分组节点会取到嵌套后代的 <a>；当前只支持 <a> 直接子节点的常见结构。
+            // Giới hạn đã biết: nút nhóm không có <a> có thể lấy nhầm <a> lồng bên trong; hiện chỉ hỗ trợ cấu trúc phổ biến với <a> là con trực tiếp.
             const a = li.querySelector("a");
             const childOls = li.querySelectorAll("ol");
             const childOl = childOls.find((o) => o.parentNode === li) ?? null;

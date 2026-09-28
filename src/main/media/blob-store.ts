@@ -3,7 +3,7 @@ import { v7 as uuidv7 } from "uuid";
 import type { DB } from "@main/db/client";
 import { blob } from "@main/db/schema";
 
-/** 写入一条 blob，返回新 id。data 为原始字节，mimeType 由调用方（写入时嗅探）提供。 */
+/** Lưu bytes và MIME của blob, trả ID mới; bên gọi nhận diện MIME khi ghi. */
 export function writeBlob(db: DB, data: Uint8Array, mimeType: string): string {
   const id = uuidv7();
   db.insert(blob)
@@ -12,12 +12,12 @@ export function writeBlob(db: DB, data: Uint8Array, mimeType: string): string {
   return id;
 }
 
-/** 删除一条 blob（缺失无害）。 */
+/** Xóa blob; ID không tồn tại không gây lỗi. */
 export function deleteBlob(db: DB, id: string): void {
   db.delete(blob).where(eq(blob.id, id)).run();
 }
 
-/** 读一条 blob 的字节 + content-type（media:// 协议 handler 用）。无此 id → null。 */
+/** Lấy bytes và MIME cho media://; ID không tồn tại trả null. */
 export function blobResponseFor(
   db: DB,
   id: string,

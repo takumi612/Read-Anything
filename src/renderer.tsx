@@ -11,9 +11,9 @@ import { App } from "@renderer/App";
 import { ErrorBoundary } from "@renderer/ErrorBoundary";
 import { createLogger } from "@renderer/logger";
 
-// 首帧前按 theme-store 初始 resolvedTheme 挂 .dark（store 已从 preload 快照 + matchMedia 解析好）。
-// 放此处而非 preload：sandbox preload 模块求值时 document.documentElement 尚为 null；renderer 入口时
-// DOM 已就绪、index.css 已注入，且在 createRoot 之前同步执行——零首帧闪白。
+// Áp dụng lớp .dark từ theme-store trước khung hình đầu tiên.
+// Renderer đã có DOM và CSS, còn preload có thể chưa có document.documentElement.
+// Thực hiện đồng bộ trước createRoot để tránh chớp nền sáng.
 document.documentElement.classList.toggle(
   "dark",
   useThemeStore.getState().resolvedTheme === "dark",
@@ -22,7 +22,7 @@ document.documentElement.classList.toggle(
 const rootEl = document.getElementById("root");
 if (!rootEl) throw new Error("renderer: #root not found");
 
-// 全局错误 funnel：组件生命周期之外的错误也留痕（boundary 只覆盖渲染树内）
+// Ghi cả lỗi ngoài vòng đời component; error boundary chỉ bao phủ cây React.
 const windowLog = createLogger("window");
 window.onerror = (message, source, lineno, colno, error) => {
   const msg = typeof message === "string" ? message : "script error";

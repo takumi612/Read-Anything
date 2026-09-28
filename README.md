@@ -1,101 +1,69 @@
-<div align="center">
+# Read-Anything
 
-<img src="assets/icon.svg" width="128" alt="Marginalia app icon">
+[Tiếng Việt](README.vi.md)
 
-# Marginalia
+Read-Anything is an offline-first desktop reader for PDF and EPUB books. Look up English words in the bundled English–Vietnamese dictionary, mark passages, keep notes and bookmarks, and resume where you left off. AI is optional: connect a provider with your own API key when you want to ask about a selected passage.
 
-**Talk to AI in the margins.**
+## What it does
 
-A desktop AI reader for ePub and PDF books.
+- Read PDF and EPUB files on your computer. PDF text selection and dictionary lookup require a text layer; scanned pages remain readable as images.
+- Look up words offline, including common inflected forms, and hear pronunciation through voices installed on your system.
+- Search inside a PDF; save highlights, notes, bookmarks, vocabulary, and reading position locally.
+- Choose annotation colors and page or surrounding colors. PDF page appearance and EPUB page colors are separate settings.
+- Track daily reading and a streak after ten distinct pages. The statistics screen shows a calendar.
+- Ask AI about selected text with OpenAI, Anthropic, Google, or an OpenAI-compatible endpoint you configure. Provider charges, if any, are determined by that provider.
+- Use the interface in English or Vietnamese. No account is required for offline reading.
 
-English · [简体中文](README.zh-CN.md)
+## Run on Windows from source
 
-</div>
+You need **Windows 10 or later (64-bit)**, **Node.js 24 with Corepack**, and **Git** for cloning. The first install downloads the app's npm dependencies, Electron, and the pinned pnpm version. Later runs reuse the local installation. The offline dictionary is included in the repository; no API key is needed for lookup.
 
-![Reading in Marginalia — select a passage and the AI answers in the side panel, context in hand](assets/reader.png)
-
-## What is Marginalia
-
-Marginalia puts AI right in the margins of your reading. Open an ePub or PDF, hit a sentence you want to dig into, **select it**, and an assistant joins you in the side panel — already holding the context of the book. Explain an allusion, translate a passage, summarize the thread, or just ask — and when you'd rather listen, it reads the page aloud. No breaking your flow, no copy-pasting into another window.
-
-It's local-first, bring-your-own-key, and tied to no single model provider — your books and notes stay quietly on your own machine.
-
-## ✨ Features
-
-### 🪄 Ask by selecting — the core
-
-Select text in an ePub or text-layer PDF and a floating toolbar appears: **Explain / Translate / Summarize** in one click, or hit "Ask AI" for an open question. Answers **stream** into the side panel, so you can read and ask in the same breath.
-
-### 🔊 Or let it read to you
-
-Press play and Marginalia reads the book aloud, paragraph by paragraph — highlighting the line it's on and scrolling to keep pace, straight through chapter breaks. Choose a voice per language and set the speed; it speaks with the voices already on your machine, so nothing leaves it.
-
-### 🧩 Transparent context
-
-Every question ships its context as visible, toggleable **chips**: your exact selection, its surrounding paragraph, the chapter summary, the whole-book summary — each labeled, each switchable. **You always know what the AI sees.**
-
-### 🧠 A companion, not a chatbot
-
-Give the assistant a name, a **persona**, and standing instructions, and it shows up that way in every conversation. It can **remember** what matters across chats — and every memory is yours to read, edit, or delete, or to switch off entirely. Each book keeps its own saved conversations, so you can return to an old thread or start a fresh one.
-
-### 🖍️ Highlights, notes & a notebook
-
-Five highlight colors plus underline, with sticky notes on any passage — all gathered into a side-panel list in reading order, one click back to the spot. Each book also gets its own free-form **Markdown notebook** for the thoughts that don't belong to a single line.
-
-### 📖 Immersive reading
-
-Real, continuously-scrolling reading that remembers and restores your place. ePub gets tuneable typography; PDF gets fit-to-width rendering, zoom controls, clickable links, and text-layer selection when the document provides text. Switch between dark / light / system themes anytime.
-
-### 🗂️ Cover-wall library
-
-An Apple Books-style cover wall to spot your books at a glance. **Drag an ePub or PDF into the window** to import it; books without a cover get a tasteful generated tile.
-
-![The library — an Apple Books-style cover wall](assets/library.jpg)
-
-### 🔌 Bring your own key, any provider
-
-Connect OpenAI, Anthropic, Google, or any **OpenAI-compatible endpoint** (self-hosted gateway or proxy).
-
-### 🌍 Local-first · bilingual
-
-A bilingual interface (English / 简体中文) that follows your system language. Everything lives on your machine — no uploads, no account required.
-
-## 📦 Installation
-
-### Homebrew (recommended)
-
-```bash
-brew tap eurfelux/tap
-brew install --cask marginalia
+```powershell
+git clone https://github.com/takumi612/Read-Anything.git
+cd Read-Anything
+.\scripts\windows.ps1 setup
+.\scripts\windows.ps1 dev
 ```
 
-The cask clears the quarantine flag for you, so the app opens right away — no Gatekeeper hoops.
+If PowerShell restricts local scripts, run the equivalent commands directly:
 
-### Manual download
+```powershell
+corepack pnpm install --frozen-lockfile
+corepack pnpm dev
+```
 
-Grab the latest `.dmg` from [Releases](https://github.com/EurFelux/marginalia/releases), open it, and drag Marginalia into Applications.
+`install` builds the workspace packages and rebuilds `better-sqlite3` for Electron through `postinstall`. Keep the terminal open while developing. If the native module cannot compile on your Windows machine, install the Microsoft C++ build tools, then repeat `corepack pnpm install`.
 
-> [!IMPORTANT]
-> **macOS will warn that the app "cannot be verified"** on first launch — Marginalia is ad-hoc signed but not notarized by Apple (that requires a paid developer certificate). To open it anyway:
->
-> 1. Double-click the app once (the warning appears) — then go to **System Settings → Privacy & Security**, scroll down, and click **Open Anyway**.
-> 2. Or, from a terminal: `xattr -d com.apple.quarantine /Applications/marginalia.app`
->
-> The app is open source — you can always audit the code and build it yourself with `pnpm make`.
+## Build and run the Windows EXE
 
-## 🪄 A glance at getting started
+Close any running Read-Anything EXE before rebuilding. The `package` action creates an app folder that must stay together:
 
-1. **Drop in a book** — drag an ePub or PDF into the library and start reading.
-2. **Select text, hit "Ask AI"** — the side panel picks up the passage's context automatically.
-3. **Watch the answer stream in** — read, annotate, follow up, and summarize, all in one window.
-4. **Make it yours** — give the assistant a name and persona, and let it remember what matters from chat to chat.
+```powershell
+.\scripts\windows.ps1 package
+.\out\Read-Anything-win32-x64\Read-Anything.exe
+```
 
-## 🧭 Principles
+To create a Windows installer instead, run `.\scripts\windows.ps1 installer`. Electron Forge writes the Squirrel installer under `out\make\squirrel.windows\x64\`. A build from source is not code signed. Building the installer does not publish a GitHub release.
 
-- **Transparent context** — every piece of context sent to the AI is shown and switchable.
-- **Local-first** — books, progress, notes, and conversations stay on your own machine.
-- **No lock-in** — bring your own API key, switch models and providers freely.
+The same actions are available as `corepack pnpm package` and `corepack pnpm make:win`. On macOS or Linux, install the same Node.js version and use `corepack pnpm install --frozen-lockfile`, `corepack pnpm dev`, and `corepack pnpm package`. Packaging for a platform must run on that platform; this repository does not include a signed or notarized release workflow.
 
-## License
+## First use
 
-[GPL-3.0-or-later](LICENSE) © 2026 eurfelux
+1. Import a PDF or EPUB from the library.
+2. Select an English word and choose **Look up** for the offline dictionary. Select a passage and choose **Ask AI** only if you have configured a provider.
+3. Open **Settings** to choose a provider and enter your own API key if you want AI responses. Keys are not part of backups.
+4. To offer Read-Anything as a PDF app in Windows, open the app's advanced settings. Windows Default Apps controls the final `.pdf` choice.
+
+Existing Marginalia data is reused on the same machine when Read-Anything has no data directory yet. The database and saved keys keep their legacy internal names for compatibility. Back up your library before uninstalling an older version.
+
+## Documentation
+
+- [Set up from source](docs/run-from-source.html)
+- [Build a Windows EXE](docs/build-windows-exe.html)
+- [Project architecture](docs/architecture.html)
+- [Code map](docs/code-map.html)
+- [Runtime flows](docs/runtime-flows.html)
+
+## License and data
+
+Application code is distributed under [GPL-3.0-or-later](LICENSE). This project builds on [Marginalia by EurFelux](https://github.com/EurFelux/marginalia); its copyright and history are retained. The bundled dictionary has a separate [CC BY-SA 4.0 attribution](assets/dictionary/ATTRIBUTION.md) and [source note](assets/dictionary/README.md). Books and API credentials are never included in this repository.

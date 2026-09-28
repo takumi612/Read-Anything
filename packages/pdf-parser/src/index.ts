@@ -1,6 +1,6 @@
-// 注意：fixture（依赖 devDep pdf-lib）刻意不从主入口导出——主进程 bundle 会把
-// 主入口的依赖图整体内联，pdf-lib 的 UMD/tslib 互操作在 bundle 后崩溃（dev 启动实锤）。
-// 测试经 "@marginalia/pdf-parser/fixture" 子路径导入。
+// Không export fixture từ entry chính vì nó phụ thuộc pdf-lib chỉ dùng khi phát triển.
+// Bundle của main sẽ gộp toàn bộ cây dependency của entry; pdf-lib có thể lỗi sau khi gộp.
+// Kiểm thử import fixture qua đường dẫn phụ @marginalia/pdf-parser/fixture.
 export type { ParsedPdf, TocNode, ChapterRange, ChapterTextSlice } from "./types";
 export { parsePdf, openPdf, pageText } from "./parse";
 export { extractPdfText } from "./content";

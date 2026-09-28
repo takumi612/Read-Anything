@@ -83,7 +83,7 @@ function orphanSpineBook(): Uint8Array {
   });
 }
 
-beforeAll(() => initMainI18n("zh-CN"));
+beforeAll(() => initMainI18n("vi"));
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 const setup = async () => {
@@ -202,7 +202,7 @@ describe("content (pdf)", () => {
   it("assertTextLayer throws an honest error for scanned pdf", async () => {
     const db = freshDb();
     const book = await importBook(db, { bytes: await makeScannedPdf() });
-    expect(() => assertTextLayer(db, book.id)).toThrow(/text layer|文本层/i);
+    expect(() => assertTextLayer(db, book.id)).toThrow(/text layer|lớp văn bản/i);
   });
 
   it("assertTextLayer passes for text pdf and epub", async () => {
@@ -260,7 +260,7 @@ describe("scanned pdf guard (no text layer)", () => {
     const book = await importBook(db, { bytes });
     const ch = db.select().from(chapters).where(eq(chapters.bookId, book.id)).get()!;
     await expect(readChapterText(db, bytes, book.id, ch.id, {})).rejects.toThrow(
-      /text layer|文本层/,
+      /text layer|lớp văn bản/i,
     );
   });
 
@@ -269,7 +269,7 @@ describe("scanned pdf guard (no text layer)", () => {
     const bytes = await makeScannedPdf();
     const book = await importBook(db, { bytes });
     await expect(readBookText(db, bytes, book.id, { maxChars: 100 })).rejects.toThrow(
-      /text layer|文本层/,
+      /text layer|lớp văn bản/i,
     );
   });
 });

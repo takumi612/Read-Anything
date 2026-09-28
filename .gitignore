@@ -60,6 +60,9 @@ typings/
 # dotenv environment variables file
 .env
 .env.test
+.env.*
+!.env.example
+!.env.*.example
 
 # parcel-bundler cache (https://parceljs.org/)
 .cache
@@ -106,3 +109,34 @@ docs/plans/
 
 # Workspace package build output (tsup)
 packages/*/dist/
+
+# Local agent instructions, hooks, plans, and incident logs
+/.agents/
+/.claude/
+/.codex/
+/AGENTS.md
+/AGENTS.override.md
+/CLAUDE.md
+/skills-lock.json
+/project_memory/
+
+# Legacy screenshots and README for a language not supported by this fork
+/README.zh-CN.md
+/assets/*-zh-CN.*
+
+# Personal books, application data, backups, and temporary E2E artifacts
+*.pdf
+*.epub
+*.sqlite
+*.sqlite3
+*.db
+*.db-shm
+*.db-wal
+!assets/dictionary/dictionary_en_vi.db
+*.zip
+*.exe
+/data/
+/backups/
+/screenshots/
+/test-results/
+/tmp/

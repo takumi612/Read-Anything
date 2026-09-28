@@ -36,10 +36,10 @@ export function ReportEditor({ initialContent, disabled, onSave, onCancel }: Rep
       </div>
       <div className="flex items-center justify-end gap-2 font-sans">
         <Button variant="ghost" onClick={onCancel} disabled={disabled}>
-          {t("common.cancel", "取消")}
+          {t("common.cancel", "Hủy")}
         </Button>
         <Button onClick={() => save(content)} disabled={disabled || !trimmed}>
-          {t("common.save", "保存")}
+          {t("common.save", "Lưu")}
         </Button>
       </div>
     </div>

@@ -7,7 +7,7 @@ import type { BackupKind } from "@shared/backup";
 
 type Move = (source: string, destination: string) => Promise<void>;
 
-/** 校验 staged DB 引用的每本书文件在 staged books/ 中存在；返回缺失 bookId 列表。 */
+/** Kiểm tra tệp của mọi sách trong DB tạm có trong thư mục books tạm; trả ID còn thiếu. */
 export function verifyBookFiles(
   stagedDbPath: string,
   stagedBooksDir: string,
@@ -27,7 +27,7 @@ export function verifyBookFiles(
   }
 }
 
-/** 以只读连接执行 SQLite quick_check，拒绝损坏或非 SQLite 数据库。 */
+/** Mở chỉ đọc và chạy SQLite quick_check để từ chối DB hỏng hoặc tệp không phải SQLite. */
 export function verifySqliteDatabase(dbFile: string): void {
   let sqlite: Database.Database | undefined;
   try {
@@ -47,7 +47,7 @@ export function verifySqliteDatabase(dbFile: string): void {
 /**
  * Snapshot replacement: full archives move DB + books into preRestoreTarget and replace both;
  * compact archives move only the DB three-piece and leave books untouched.
- * staging 与 dataDir 同盘（userData/tmp），rename 不跨设备。调用前须已 closeDb() 释放锁。
+ * Thư mục tạm nằm cùng ổ với dataDir để rename hoạt động; phải closeDb trước khi thay.
  */
 export async function applyRestore(opts: {
   kind: BackupKind;
@@ -69,7 +69,7 @@ export async function applyRestore(opts: {
   const stagedBooks = path.join(opts.stagingDir, "books");
 
   try {
-    // 1) 当前数据 → pre-restore 安全副本
+    // 1. Giữ dữ liệu hiện tại trong bản sao an toàn pre-restore.
     for (const file of dbFiles) {
       const source = path.join(opts.dataDir, file);
       if (existsSync(source)) {
@@ -82,7 +82,7 @@ export async function applyRestore(opts: {
       movedBooks = true;
     }
 
-    // 2) staged → 正式位置
+    // 2. Chuyển dữ liệu tạm sang vị trí chính thức.
     await move(stagedDb, path.join(opts.dataDir, opts.dbFileName));
     installedDb = true;
     if (opts.kind === "full" && existsSync(stagedBooks)) {

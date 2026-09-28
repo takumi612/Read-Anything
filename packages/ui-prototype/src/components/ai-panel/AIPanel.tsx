@@ -21,7 +21,7 @@ export function AIPanel() {
   } = useReaderAI();
   const scrollRef = useRef<HTMLDivElement | null>(null);
 
-  // 作用域：优先看当前草稿选区，其次已发送会话，最后退回当前阅读章
+  // Phạm vi: ưu tiên vùng chọn trong bản nháp hiện tại, tiếp đến hội thoại đã gửi, cuối cùng quay về chương đang đọc
   const scopeIds = (
     draftChapterIds.length
       ? draftChapterIds
@@ -35,7 +35,7 @@ export function AIPanel() {
     .filter((c): c is (typeof book.chapters)[number] => Boolean(c));
   const chapterTitles = scopeChapters.map((c) => c.title).join(" · ");
 
-  // 新消息/流式增量 → 滚到底
+  // Tin nhắn mới / nội dung luồng tăng thêm → cuộn xuống cuối
   useEffect(() => {
     const el = scrollRef.current;
     if (el) el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
@@ -82,7 +82,7 @@ export function AIPanel() {
   );
 }
 
-/** 单章会话：点 pill 弹卡看本章摘要正文（未就绪显示占位 + 演示切换）。 */
+/** Hội thoại một chương: nhấp pill để mở thẻ xem nội dung tóm tắt chương (nếu chưa sẵn sàng thì hiện nội dung giữ chỗ + điều khiển minh họa chuyển trạng thái). */
 function SummaryPill({ chapterId }: { chapterId: string }) {
   const { t } = useTranslation();
   const { book, summaryStatusOf, cycleSummaryStatus } = useReaderAI();
@@ -127,7 +127,7 @@ function SummaryPill({ chapterId }: { chapterId: string }) {
   );
 }
 
-/** 跨章独立会话：点 pill 弹卡列各章摘要（best-effort，只就绪者计入组合）。 */
+/** Hội thoại riêng xuyên chương: nhấp pill để mở thẻ liệt kê tóm tắt từng chương (best-effort, chỉ tính các chương đã sẵn sàng). */
 function CombinedSummary({ ids }: { ids: string[] }) {
   const { t } = useTranslation();
   const { book, summaryStatusOf } = useReaderAI();

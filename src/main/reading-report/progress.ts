@@ -1,9 +1,9 @@
-// src/main/reading-report/progress.ts —— 把工具调用变成用户可见的生成进度事件。
+// Chuyển lời gọi công cụ thành sự kiện tiến độ báo cáo cho người dùng.
 import type { ToolSet } from "ai";
 import type { ReadingReportProgressOutcome } from "@shared/reading-sessions";
 import type { ProgressSink } from "@main/reading-report/runtime";
 
-/** 报告工具的输出统一是分页形状；从中抽出可展示的条目数，抽不到返回 null。 */
+/** Lấy số mục có thể hiển thị từ kết quả phân trang của công cụ; thiếu thì null. */
 export function progressCount(output: unknown): number | null {
   if (typeof output !== "object" || output === null) return null;
   const record = output as Record<string, unknown>;
@@ -15,9 +15,8 @@ export function progressCount(output: unknown): number | null {
 }
 
 /**
- * 只区分「成功」与「被跳过」。runTool 把异常吞成 { error }、investigateConversation
- * 把拿不到额度/调查失败降级成 busy/failed —— 这些都是既定降级路径，对用户显示为「已跳过」
- * 而非报错，免得让人以为整份报告废了。
+ * Chỉ phân biệt thành công và đã bỏ qua. Lỗi công cụ hoặc tác vụ điều tra bận
+ * được trả theo đường dự phòng; UI không báo cả báo cáo hỏng vì một mục lỗi.
  */
 export function progressOutcome(output: unknown): ReadingReportProgressOutcome {
   if (typeof output !== "object" || output === null) return "ok";
@@ -30,8 +29,8 @@ export function progressOutcome(output: unknown): ReadingReportProgressOutcome {
 type AnyExecute = (input: never, options: never) => unknown;
 
 /**
- * 在每个工具的 execute 入口/出口上报进度。刻意不用 generateText 的 onStepFinish：
- * 那只在步结束后触发，「正在读第 3 个会话」要等读完才显示，恰好错过需要反馈的那段时间。
+ * Báo tiến độ khi công cụ bắt đầu và kết thúc. onStepFinish chỉ chạy sau bước,
+ * quá muộn để hiện thông báo "đang đọc hội thoại" trong lúc xử lý.
  */
 export function withProgress<T extends ToolSet>(tools: T, sink: ProgressSink): T {
   const entries = Object.entries(tools).map(([name, definition]) => {

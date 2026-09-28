@@ -17,6 +17,7 @@ const MAC_VOICES = [
   v("Samantha", "en-US"),
   v("Alex", "en-US"),
   v("Tingting", "zh-CN"),
+  v("Vietnamese", "vi-VN"),
   v("Kyoko", "ja-JP"),
 ];
 
@@ -32,6 +33,9 @@ describe("pickVoice", () => {
   it("macOS recommended order is honored", () => {
     expect(pickVoice("en", MAC_VOICES, { voiceByLang: {} }, "macos")?.name).toBe("Samantha");
     expect(pickVoice("zh", MAC_VOICES, { voiceByLang: {} }, "macos")?.name).toBe("Tingting");
+  });
+  it("selects a Vietnamese voice for Vietnamese paragraphs", () => {
+    expect(pickVoice("vi", MAC_VOICES, { voiceByLang: {} }, "macos")?.name).toBe("Vietnamese");
   });
   it("generic fallback skips novelty voices", () => {
     const voices = [v("Albert", "en-US"), v("Whisper", "en-US"), v("Plain", "en-GB")];
@@ -57,5 +61,28 @@ describe("pickVoice", () => {
     // 修复前通用兜底会选 Eddy，修复后推荐表命中「婷婷」。
     const voices = [v("Eddy (中文（中国大陆）)", "zh-CN"), v("婷婷", "zh-CN")];
     expect(pickVoice("zh", voices, { voiceByLang: {} }, "macos")?.name).toBe("婷婷");
+  });
+  it("can require an installed local voice even when a remote voice is preferred", () => {
+    const voices = [
+      v("Cloud English", "en-US", { localService: false, default: true }),
+      v("Installed English", "en-GB", { localService: true }),
+    ];
+    const got = pickVoice("en", voices, { voiceByLang: { en: "Cloud English" } }, "windows", {
+      localOnly: true,
+    });
+
+    expect(got?.name).toBe("Installed English");
+  });
+
+  it("returns no pronunciation voice when only remote English voices are installed", () => {
+    expect(
+      pickVoice(
+        "en",
+        [v("Cloud English", "en-US", { localService: false, default: true })],
+        { voiceByLang: {} },
+        "windows",
+        { localOnly: true },
+      ),
+    ).toBeNull();
   });
 });

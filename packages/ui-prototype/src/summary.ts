@@ -1,6 +1,6 @@
 import type { SummaryStatus } from "#/mock/types";
 
-/** 摘要状态徽标：i18n key + 配色（AI 面板 pill / 弹卡 / 侧栏书卡共用）。 */
+/** Nhãn trạng thái tóm tắt: khóa i18n + màu sắc (dùng chung cho pill ở bảng AI, thẻ bật lên và thẻ sách trong thanh bên). */
 export const SUMMARY_BADGE: Record<SummaryStatus, { key: string; cls: string }> = {
   pending: { key: "summary.pending", cls: "bg-muted text-muted-foreground" },
   generating: {
@@ -11,7 +11,7 @@ export const SUMMARY_BADGE: Record<SummaryStatus, { key: string; cls: string }> 
   unavailable: { key: "summary.unavailable", cls: "bg-destructive/15 text-destructive" },
 };
 
-/** 未就绪态占位文案的 i18n key（ready 返回空串，调用方仅在非 ready 时用）。 */
+/** Khóa i18n cho nội dung giữ chỗ khi chưa sẵn sàng (ready trả về chuỗi rỗng; nơi gọi chỉ dùng khi trạng thái khác ready). */
 export function summaryPlaceholderKey(status: SummaryStatus): string {
   switch (status) {
     case "generating":

@@ -7,7 +7,7 @@ import { createLogger } from "@main/logger";
 
 const log = createLogger("backup");
 
-/** 流式算文件 sha256（十六进制）。 */
+/** Tính SHA-256 của tệp theo luồng, trả dạng hex. */
 export function sha256File(filePath: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const h = createHash("sha256");
@@ -24,7 +24,7 @@ type CreateBackupZipOptions = {
   manifest: unknown;
 } & ({ kind: "full"; booksDir: string } | { kind: "compact" });
 
-/** 写备份 zip：db 快照 → marginalia.db；完整包含 books/；manifest.json。流式，大书库不入内存。 */
+/** Tạo ZIP sao lưu theo luồng gồm DB snapshot, manifest và thư mục books với bản đầy đủ. */
 export function createBackupZip(opts: CreateBackupZipOptions): Promise<void> {
   return new Promise((resolve, reject) => {
     const output = createWriteStream(opts.zipPath);
@@ -43,7 +43,7 @@ export function createBackupZip(opts: CreateBackupZipOptions): Promise<void> {
   });
 }
 
-/** 读 zip 内单条目为 utf8 文本；条目不存在时 reject。 */
+/** Đọc một mục ZIP thành UTF-8; thiếu mục thì báo lỗi. */
 export function readZipEntryText(zipPath: string, entryName: string): Promise<string> {
   return new Promise((resolve, reject) => {
     yauzl.open(zipPath, { lazyEntries: true }, (err, zip) => {
@@ -75,7 +75,7 @@ export function readZipEntryText(zipPath: string, entryName: string): Promise<st
   });
 }
 
-/** 解包整个 zip 到 destDir（含 zip-slip 防御）。 */
+/** Giải nén ZIP vào destDir và chặn đường dẫn zip-slip. */
 export function extractZip(zipPath: string, destDir: string): Promise<void> {
   const root = path.resolve(destDir);
   return new Promise((resolve, reject) => {

@@ -1,7 +1,7 @@
 export interface ReadingClockDeps {
-  /** 当前时间（ms）。注入便于测试。 */
+  /** Thời gian hiện tại tính bằng ms; truyền vào để kiểm thử. */
   now: () => number;
-  /** 落账：把某书一段秒数记到 atMs 所属日期（day 归属由 sink 用 localDayKey 计算）。 */
+  /** Ghi số giây đọc sách vào ngày chứa atMs; sink xác định ngày địa phương. */
   commit: (bookId: string, atMs: number, seconds: number) => void;
 }
 
@@ -10,11 +10,11 @@ export interface ReadingClock {
   setReadingBook: (bookId: string | null) => void;
   setFocused: (focused: boolean) => void;
   setAwake: (awake: boolean) => void;
-  /** 周期 flush（结算并进位）。 */
+  /** Chốt số giây đã tích lũy theo chu kỳ. */
   tick: () => void;
 }
 
-/** 阅读时钟纯状态机：active = 有书 && 聚焦 && 未休眠。 */
+/** Máy trạng thái đồng hồ đọc: chỉ chạy khi có sách, cửa sổ được focus và máy không ngủ. */
 export function createReadingClock(deps: ReadingClockDeps): ReadingClock {
   let currentBookId: string | null = null;
   let isFocused = false;
@@ -23,7 +23,7 @@ export function createReadingClock(deps: ReadingClockDeps): ReadingClock {
 
   const isActive = () => currentBookId != null && isFocused && isAwake;
 
-  /** 结算已累计的整秒并进位 activeSince（保留 <1s 余数，防长会话漂移）。 */
+  /** Ghi số giây nguyên, giữ phần dưới một giây để phiên dài không bị lệch. */
   function settle(): void {
     if (activeSince == null || !isActive() || currentBookId == null) return;
     const t = deps.now();
@@ -34,7 +34,7 @@ export function createReadingClock(deps: ReadingClockDeps): ReadingClock {
     }
   }
 
-  /** 状态翻转：先按旧状态结算，再切换，再重置活跃段起点。 */
+  /** Khi đổi trạng thái, chốt thời gian cũ trước rồi đặt lại mốc bắt đầu. */
   function transition(mutate: () => void): void {
     settle();
     mutate();

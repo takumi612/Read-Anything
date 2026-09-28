@@ -7,23 +7,23 @@ import {
   type AnchorRect,
 } from "@renderer/reader/note-hover-machine";
 
-/** 离开高亮/卡片后关闭的宽限窗口（ms），对齐 hover-card.tsx 现有 closeDelay。 */
+/** Thời gian chờ trước khi đóng sau khi rời vùng tô sáng hoặc thẻ, tính bằng ms. */
 const CLOSE_DELAY_MS = 150;
 
 interface NoteHoverActions {
-  /** 命中适配上报：悬停到带笔记的高亮。 */
+  /** Báo con trỏ đi vào vùng tô sáng có ghi chú. */
   hoverHighlight: (annoId: string, rect: AnchorRect) => void;
-  /** 命中适配上报：离开高亮。 */
+  /** Báo con trỏ rời vùng tô sáng. */
   leaveHighlight: () => void;
-  /** 卡片自身：鼠标移入（取消待关）。 */
+  /** Con trỏ vào thẻ, hủy timer đóng. */
   enterCard: () => void;
-  /** 卡片自身：鼠标移出（起待关）。 */
+  /** Con trỏ rời thẻ, bắt đầu chờ đóng. */
   leaveCard: () => void;
-  /** 立即关闭（滚动 / 点编辑 / Esc / 点外部）。 */
+  /** Đóng ngay khi cuộn, chọn sửa, nhấn Esc hoặc nhấn bên ngoài. */
   closeNow: () => void;
 }
 
-// 模块级单定时器：store 是单例，关闭窗口全局唯一。
+// Store là singleton nên chỉ cần một timer đóng ở cấp module.
 let closeTimer: ReturnType<typeof setTimeout> | null = null;
 function clearCloseTimer() {
   if (closeTimer) {

@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button } from "@renderer/components/ui/button";
 
-/** user 消息就地编辑：textarea + 保存/取消。Enter 保存、Shift+Enter 换行、Esc 取消。 */
+/** Sửa tin người dùng tại chỗ: Enter lưu, Shift+Enter xuống dòng, Esc hủy. */
 export function MessageEditor({
   initialText,
   busy,
@@ -18,7 +18,7 @@ export function MessageEditor({
   const [text, setText] = useState(initialText);
   const ref = useRef<HTMLTextAreaElement | null>(null);
 
-  // 挂载时聚焦并把光标置末尾（命令式，React Compiler 不接管 effect 清理/聚焦）。
+  // Khi gắn, focus và đặt con trỏ ở cuối; React Compiler không quản lý thao tác focus của effect.
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -52,10 +52,10 @@ export function MessageEditor({
       />
       <div className="flex justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={onCancel}>
-          {t("ai.editCancel", "取消")}
+          {t("ai.editCancel", "Hủy")}
         </Button>
         <Button size="sm" disabled={!canSave} onClick={save}>
-          {t("ai.editSave", "发送")}
+          {t("ai.editSave", "Gửi")}
         </Button>
       </div>
     </div>

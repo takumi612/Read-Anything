@@ -3,16 +3,16 @@ import type { TocNode } from "@marginalia/epub-parser";
 
 export type { TocNode };
 
-/** 上下文 chip 的 id 枚举（live Chip 与持久化 contextChips 共用，单一来源避免漂移） */
+/** ID chip ngữ cảnh dùng chung cho trạng thái hiện tại và snapshot đã lưu. */
 export const chipIdSchema = z.enum(["selection", "paragraph", "chapter-summary", "book-summary"]);
 
-/** 消息角色联合（主-渲染跨层共享，避免 ×4 重复声明） */
+/** Vai trò tin nhắn dùng chung giữa main và renderer. */
 export type MessageRole = "system" | "user" | "assistant";
 
-/** 一轮 AI 对话的终态（仅 assistant 行可能非 complete；写一次不再改，见 DB lifecycle spec §3）。 */
+/** Trạng thái cuối của lượt AI; chỉ tin trợ lý có thể khác complete, đã ghi thì không sửa. */
 export type MessageStatus = "complete" | "error" | "aborted";
 
-/** DB JSON 列 parse-on-read 用 */
+/** Schema dùng khi đọc cột JSON từ DB. */
 export const tocNodeSchema: z.ZodType<TocNode> = z.lazy(() =>
   z.object({
     label: z.string(),
@@ -22,7 +22,7 @@ export const tocNodeSchema: z.ZodType<TocNode> = z.lazy(() =>
   }),
 );
 
-/** 消息附带的 app 元数据（存入 UIMessage.metadata） */
+/** Metadata ứng dụng đính kèm tin nhắn trong UIMessage.metadata. */
 export const messageMetadataSchema = z.object({
   contextChips: z
     .array(
@@ -40,7 +40,7 @@ export const messageMetadataSchema = z.object({
       outputTokens: z.number().int().nonnegative(),
     })
     .optional(),
-  // error 终态的原因（透传 provider 真实 name/message；不编造、不分类——结构化 reason 是 ma5-deferred #6）。
+  // Lý do lỗi lấy nguyên tên/thông điệp từ provider, không tự suy đoán.
   error: z
     .object({
       name: z.string(),

@@ -1,25 +1,26 @@
 import type { AlignResult } from "@marginalia/virtual-docs";
 
 /**
- * 阅读位置状态机（纯逻辑，无 DOM / React / store）。
+ * State machine vị trí đọc, chỉ gồm logic và không phụ thuộc DOM, React hay store.
  *
- * 核心不变量：只有 following 才持久化进度。恢复过程中虚拟列表会先短暂落在中间 section，
- * 此时存盘会把错误位置写死；恢复结束（成功 / 超时 / 被用户抢占）后才放开。
+ * Chỉ lưu tiến độ ở trạng thái following. Trong lúc khôi phục, danh sách ảo có thể đi qua
+ * section trung gian; lưu lúc đó sẽ ghi nhầm vị trí. Chỉ mở khóa sau khi hoàn tất,
+ * hết giờ hoặc người dùng chủ động thay vị trí.
  */
 
-/** 执行器在派发 TOP_SECTION_CHANGED 前算好的位置快照（CFI / 百分比 / 章节归属都需 DOM 几何）。 */
+/** Ảnh chụp vị trí do executor tính trước TOP_SECTION_CHANGED; CFI, tỉ lệ và chương đều cần hình học DOM. */
 export interface ReadingPosition {
-  /** 视口顶 section 的 spine 索引。 */
+  /** Chỉ số spine của section ở đầu khung nhìn. */
   index: number;
-  /** 视口顶在该 section 内的相对位置，0–1。 */
+  /** Vị trí tương đối của đầu khung nhìn trong section, từ 0 đến 1. */
   scrollRatio: number;
-  /** 视口顶那个块级元素首字符的 range CFI。 */
+  /** Range CFI của ký tự đầu trong phần tử khối tại đầu khung nhìn. */
   cfi: string;
-  /** 全书阅读进度，0–1。 */
+  /** Tiến độ đọc cả sách, từ 0 đến 1. */
   percent: number;
   chapterId: string | null;
   chapterTitle: string | null;
-  /** 「读我当前位置」工具用的章内字符偏移。 */
+  /** Vị trí ký tự trong chương cho công cụ đọc vị trí hiện tại. */
   offset: number;
 }
 
@@ -29,7 +30,7 @@ export type ReadingPositionState =
   | { kind: "following" };
 
 export type ReadingPositionEvent =
-  /** book 与 progress 查询均就绪；targetIndex 为 locator 解析出的 spine 索引，解析失败为 null。 */
+  /** Sách và tiến độ đã tải; targetIndex là chỉ số spine từ locator, null nếu phân tích thất bại. */
   | { type: "SESSION_READY"; locator: string | null; targetIndex: number | null }
   | { type: "RESTORE_FINISHED"; result: AlignResult }
   | { type: "USER_NAVIGATED" }
@@ -64,7 +65,7 @@ export function reduceReadingPosition(
       return { next: { kind: "loading" }, effects: [] };
 
     case "SESSION_READY": {
-      // 非 loading 时忽略：progress 缓存回写会重放此事件，不得触发二次恢复。
+      // Bỏ qua ngoài trạng thái loading vì cập nhật cache tiến độ có thể phát lại sự kiện này.
       if (state.kind !== "loading") return { next: state, effects: [] };
       if (event.locator == null || event.targetIndex == null)
         return { next: { kind: "following" }, effects: [] };
@@ -75,7 +76,7 @@ export function reduceReadingPosition(
     }
 
     case "RESTORE_FINISHED":
-      // settled / timeout / cancelled 一律离开 restoring——恢复门没有吸收态。
+      // Hoàn tất, hết giờ hoặc bị hủy đều phải rời restoring; không giữ state này vĩnh viễn.
       if (state.kind !== "restoring") return { next: state, effects: [] };
       return { next: { kind: "following" }, effects: [] };
 
@@ -84,8 +85,8 @@ export function reduceReadingPosition(
       return { next: { kind: "following" }, effects: [] };
 
     case "CHAPTER_REQUESTED":
-      // loading 期间忽略：首次 currentChapterId 可能是上次会话留在 store 里的旧值，
-      // 让它跳转会抢在深处 initialIndex 之前挂载超长正文。
+      // Bỏ qua khi loading vì currentChapterId ban đầu có thể là giá trị cũ trong store.
+      // Chuyển theo nó quá sớm sẽ gắn nội dung dài trước khi initialIndex tới đúng vị trí.
       if (state.kind === "loading") return { next: state, effects: [] };
       return {
         next: { kind: "following" },

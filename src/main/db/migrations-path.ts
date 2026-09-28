@@ -1,7 +1,7 @@
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 
-/** dev/prod 迁移目录解析（与历史 instance.ts 逻辑一致）。碰 Electron 全局，不在纯核心测试中调用。 */
+/** Xác định thư mục migration trong dev/bản phát hành; phụ thuộc Electron. */
 export function resolveMigrationsFolder(): string {
   const devUrl =
     typeof MAIN_WINDOW_VITE_DEV_SERVER_URL !== "undefined"
@@ -12,7 +12,7 @@ export function resolveMigrationsFolder(): string {
     : path.join(process.resourcesPath, "migrations");
 }
 
-/** 列出迁移子目录名（字典序；目录格式 <timestamp>_<name>）。纯函数（注入 folder）。 */
+/** Liệt kê thư mục migration theo thứ tự tên; dạng <timestamp>_<name>. */
 export function listMigrationDirs(folder: string): string[] {
   if (!existsSync(folder)) return [];
   return readdirSync(folder, { withFileTypes: true })
@@ -21,7 +21,7 @@ export function listMigrationDirs(folder: string): string[] {
     .sort();
 }
 
-/** 最新迁移目录名（字典序末位）；无迁移时空串。纯函数。 */
+/** Lấy thư mục migration mới nhất theo tên; không có thì trả chuỗi rỗng. */
 export function latestMigrationDir(folder: string): string {
   const dirs = listMigrationDirs(folder);
   return dirs.length ? dirs[dirs.length - 1] : "";

@@ -3,7 +3,7 @@ import { Check, Loader2, Minus } from "lucide-react";
 import { useTranslation } from "react-i18next";
 import type { ReadingReportProgressStep } from "@shared/reading-sessions";
 
-/** 每秒滴答一次，让进行中的条目自己走秒——主进程只推时间戳，不推秒数。 */
+/** Cập nhật mỗi giây để mục đang chạy tự đếm thời gian; main process chỉ gửi timestamp. */
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Temporal.Now.instant().epochMilliseconds);
   useEffect(() => {
@@ -15,8 +15,8 @@ function useNow(active: boolean): number {
 }
 
 /**
- * 工具名 → 文案 key。写成显式映射而非模板拼接：i18n key 是类型化的联合，
- * 模板字面量过不了类型检查，而显式表还能让 typecheck 保证每个 key 真实存在。
+ * Ánh xạ tên công cụ sang khóa bản dịch. Viết rõ từng cặp vì khóa i18n có kiểu union;
+ * ghép chuỗi động sẽ không qua kiểm tra kiểu, còn bảng này bảo đảm khóa tồn tại.
  */
 const TOOL_LABEL_KEYS = {
   getBookSummary: "readingReport.progress.tool.getBookSummary",
@@ -93,7 +93,7 @@ function TimelineRow({ step, now }: { step: ReadingReportProgressStep; now: numb
   const { t } = useTranslation();
   const running = step.endedAt == null;
   const skipped = step.outcome === "skipped";
-  // 未知工具名回退到通用文案：将来新增工具忘了配文案，退化成一条素条目而非露出英文工具名。
+  // Công cụ chưa có ánh xạ dùng nhãn chung để không lộ tên kỹ thuật trên giao diện.
   const labelKey =
     step.tool in TOOL_LABEL_KEYS
       ? TOOL_LABEL_KEYS[step.tool as keyof typeof TOOL_LABEL_KEYS]

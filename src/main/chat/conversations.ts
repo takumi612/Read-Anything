@@ -20,8 +20,8 @@ function toDto(row: ConversationRow): ConversationDto {
 }
 
 /**
- * 创建会话（绑定到书或书库；单一全局 agent，无 assistant 概念）。
- * 防堆积（spec §5）：该书/书库已存在零消息会话 → 返回最新的那个而不新建。
+ * Tạo hội thoại cho sách hoặc thư viện. Nếu đã có hội thoại rỗng cùng ngữ cảnh,
+ * dùng lại hội thoại mới nhất để không tích tụ bản ghi rỗng.
  */
 export function createConversation(db: DB, input: CreateConversationInput): ConversationDto {
   const bookId = input.bookId ?? null;
@@ -46,18 +46,18 @@ export function getConversation(db: DB, id: string): ConversationDto | null {
   return row ? toDto(row) : null;
 }
 
-/** 设置会话标题（auto naming 写回；未来手动命名复用）。 */
+/** Đặt tiêu đề hội thoại, hiện dùng cho tự đặt tên và có thể dùng cho sửa thủ công. */
 export function setConversationTitle(db: DB, id: string, title: string): void {
   db.update(conversations).set({ title }).where(eq(conversations.id, id)).run();
 }
 
-/** 删除会话（messages 由 FK 级联删）；幂等——未知 id 为 0-row delete。 */
+/** Xóa hội thoại; tin nhắn bị xóa theo khóa ngoại. ID lạ không gây lỗi. */
 export function deleteConversation(db: DB, id: string): void {
   db.delete(conversations).where(eq(conversations.id, id)).run();
   dropAgentContext(id);
 }
 
-/** 列出某书的会话（bookId 为 null ⇒ 书库会话），最近更新在前。 */
+/** Liệt kê hội thoại của sách, hoặc thư viện khi bookId null; mới cập nhật đứng trước. */
 export function listConversationsByBook(db: DB, bookId: string | null): ConversationDto[] {
   const match = bookId === null ? isNull(conversations.bookId) : eq(conversations.bookId, bookId);
   return db

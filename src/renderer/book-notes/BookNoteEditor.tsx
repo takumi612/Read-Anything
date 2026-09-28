@@ -10,10 +10,10 @@ export type BookNoteEditorState =
   | { mode: "edit"; noteId: string; initialContent: string };
 
 /**
- * 全高内嵌笔记编辑器：占满 BookNotesPanel 整区（替代列表视图），与 AI 面板同级并存
- * ——写笔记时可同时查看/复制对话内容（曾是居中 Dialog，模态遮罩挡 AI 面板故弃用）。
- * 编辑内核是 CodeMirror Markdown 源码模式（语法高亮）；由调用方按 state != null 条件挂载，
- * 每次进入编辑态都是全新挂载，初值经 defaultValue 灌入即可。
+ * Editor ghi chú chiếm toàn vùng BookNotesPanel thay danh sách, đứng cạnh bảng AI.
+ * Người dùng vẫn xem và sao chép hội thoại khi viết ghi chú.
+ * Editor dùng CodeMirror ở chế độ nguồn Markdown có tô cú pháp.
+ * Bên gọi gắn lại mỗi lần vào chế độ sửa, nên defaultValue cung cấp nội dung ban đầu.
  */
 export function BookNoteEditor({
   state,
@@ -21,13 +21,13 @@ export function BookNoteEditor({
   onClose,
 }: {
   state: BookNoteEditorState;
-  /** 保存回调；只会收到 trim 后非空的 content。edit 模式的 noteId 由调用方从 state 取。 */
+  /** Callback lưu chỉ nhận content không rỗng sau trim; bên gọi lấy noteId từ state khi sửa. */
   onSave: (content: string) => void;
   onClose: () => void;
 }) {
   const { t } = useTranslation();
   const initial = state.mode === "edit" ? state.initialContent : "";
-  // 编辑器内容的镜像：仅用于保存按钮的禁用判断与点击保存；⌘+Enter 路径由编辑器直接携带全文。
+  // State phản chiếu nội dung chỉ phục vụ nút Lưu; phím tắt ⌘+Enter lấy toàn văn trực tiếp từ editor.
   const [text, setText] = useState(initial);
 
   const submit = (value: string) => {
@@ -41,8 +41,8 @@ export function BookNoteEditor({
     <div className="flex h-full flex-col gap-2 p-2">
       <h3 className="shrink-0 px-1 text-sm font-semibold">
         {state.mode === "edit"
-          ? t("bookNotes.editTitle", "编辑笔记")
-          : t("bookNotes.addTitle", "新建笔记")}
+          ? t("bookNotes.editTitle", "Sửa ghi chú")
+          : t("bookNotes.addTitle", "Ghi chú mới")}
       </h3>
       <MarkdownEditor
         autoFocus
@@ -50,18 +50,18 @@ export function BookNoteEditor({
         onChange={setText}
         onSubmit={submit}
         onCancel={onClose}
-        placeholder={t("bookNotes.placeholder", "写点对这本书的想法…")}
+        placeholder={t("bookNotes.placeholder", "Viết suy nghĩ của bạn về cuốn sách…")}
         className="flex-1"
       />
       <p className="shrink-0 px-1 text-xs text-muted-foreground">
-        {t("bookNotes.markdownHint", "支持 Markdown，保存后渲染")}
+        {t("bookNotes.markdownHint", "Hỗ trợ Markdown, nội dung sẽ được hiển thị sau khi lưu")}
       </p>
       <div className="flex shrink-0 justify-end gap-2">
         <Button variant="ghost" size="sm" onClick={onClose}>
-          {t("common.cancel", "取消")}
+          {t("common.cancel", "Hủy")}
         </Button>
         <Button size="sm" onClick={() => submit(text)} disabled={text.trim() === ""}>
-          {t("common.save", "保存")}
+          {t("common.save", "Lưu")}
           <KbdGroup>
             <ModKey className="border-transparent bg-primary-foreground/20 text-primary-foreground" />
             <Kbd className="border-transparent bg-primary-foreground/20 text-primary-foreground">

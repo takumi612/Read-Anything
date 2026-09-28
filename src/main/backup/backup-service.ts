@@ -1,8 +1,9 @@
 import { copyFile, mkdir, rm, unlink } from "node:fs/promises";
 import path from "node:path";
-import type Database from "better-sqlite3";
+import Database from "better-sqlite3";
 import type { DB } from "@main/db/client";
 import { createLogger } from "@main/logger";
+import { webSearchConfig } from "@shared/web-search";
 import {
   backupManifestSchema,
   type BackupKind,
@@ -16,7 +17,43 @@ import { applyRestore, verifyBookFiles, verifySqliteDatabase } from "@main/backu
 
 const log = createLogger("backup");
 
-/** 导出：.backup() 一致快照 → 算 sha256 → buildManifest → 流式 zip → 清临时。 */
+/** Keep credentials out of portable archives, including plaintext keys from older app versions. */
+function stripCredentialsFromSnapshot(snapshotPath: string): void {
+  const snapshot = new Database(snapshotPath, { fileMustExist: true });
+  try {
+    // The archive includes only the .db file. Keep redaction writes out of a WAL sidecar.
+    snapshot.pragma("journal_mode = DELETE");
+    snapshot.transaction(() => {
+      snapshot.prepare("UPDATE providers SET api_key = NULL WHERE api_key IS NOT NULL").run();
+      const row = snapshot
+        .prepare("SELECT value FROM preferences WHERE key = 'webSearch'")
+        .get() as { value: string } | undefined;
+      if (!row) return;
+      let parsed: ReturnType<typeof webSearchConfig.safeParse>;
+      try {
+        parsed = webSearchConfig.safeParse(JSON.parse(row.value));
+      } catch {
+        parsed = webSearchConfig.safeParse(null);
+      }
+      if (!parsed.success) {
+        snapshot.prepare("DELETE FROM preferences WHERE key = 'webSearch'").run();
+        return;
+      }
+      const safeConfig = {
+        backends: parsed.data.backends.map(({ apiKey: _apiKey, hasApiKey: _hasApiKey, ...backend }) =>
+          backend,
+        ),
+      };
+      snapshot
+        .prepare("UPDATE preferences SET value = ? WHERE key = 'webSearch'")
+        .run(JSON.stringify(safeConfig));
+    })();
+  } finally {
+    snapshot.close();
+  }
+}
+
+/** Xuất: tạo snapshot DB nhất quán, tính SHA-256, lập manifest, ZIP theo luồng rồi dọn tạm. */
 export async function exportBackup(opts: {
   kind: BackupKind;
   createdAt: number;
@@ -32,6 +69,7 @@ export async function exportBackup(opts: {
   const snapshotPath = path.join(opts.tmpDir, `export-${opts.createdAt}.db`);
   try {
     await opts.rawSqlite.backup(snapshotPath);
+    stripCredentialsFromSnapshot(snapshotPath);
     const dbSha256 = await sha256File(snapshotPath);
     const manifest = buildManifest(opts.db, {
       kind: opts.kind,
@@ -58,7 +96,7 @@ export async function exportBackup(opts: {
   }
 }
 
-/** 检视：读 manifest.json → Zod 校验 → 兼容性判定。 */
+/** Xem bản sao lưu: đọc manifest.json, kiểm tra bằng Zod và xác định tương thích. */
 export async function inspectBackup(opts: {
   zipPath: string;
   knownMigrationDirs: string[];
@@ -76,7 +114,7 @@ export async function inspectBackup(opts: {
   return { path: opts.zipPath, archiveSha256, manifest, compatible, reason };
 }
 
-/** 还原（快照替换）：隔离 archive source/payload → 校验完整性/兼容性 → closeDb → applyRestore。relaunch 由 handler 做。 */
+/** Khôi phục: tách nguồn ZIP và payload, kiểm tra, đóng DB rồi thay snapshot; handler khởi động lại. */
 export async function restoreBackup(opts: {
   zipPath: string;
   archiveSha256: string;
@@ -103,13 +141,13 @@ export async function restoreBackup(opts: {
     }
     await extractZip(stagedArchive, payloadDir);
 
-    // 兼容性（manifest 必在、schemaHead 已知）
+    // Cần manifest và phiên bản schema đã biết.
     const manifestRaw = await readZipEntryText(stagedArchive, "manifest.json");
     const manifest = backupManifestSchema.parse(JSON.parse(manifestRaw));
     const compat = checkRestoreCompatibility(manifest.schemaHead, opts.knownMigrationDirs);
     if (!compat.compatible) throw new Error(`restore refused: ${compat.reason}`);
 
-    // 完整性：db sha256 + SQLite quick_check；完整包还须书文件齐全
+    // Kiểm tra hash DB, SQLite quick_check và đủ tệp sách với bản sao lưu đầy đủ.
     const stagedDb = path.join(payloadDir, opts.dbFileName);
     const stagedBooks = path.join(payloadDir, "books");
     const sha = await sha256File(stagedDb);
@@ -126,7 +164,7 @@ export async function restoreBackup(opts: {
       }
     }
 
-    // 换库前关连接释放锁，再整体替换
+    // Đóng kết nối để nhả khóa trước khi thay DB.
     const preRestoreTarget = path.join(opts.preRestoreDir, opts.stamp);
     opts.closeDb();
     try {

@@ -3,6 +3,7 @@ import { appService } from "@main/app";
 import { readBookFile } from "@main/library/book-files";
 import { getBook } from "@main/library/repository";
 import { resolveChatModel, resolveSummaryModel } from "@main/ai/assistant-model";
+import { requireAiDataConsent } from "@main/ai/consent";
 import { getPreference } from "@main/preferences/repository";
 import { Limiter } from "@main/ai/background-limiter";
 import { notifyRenderer } from "@main/notify";
@@ -18,17 +19,16 @@ import { createInvestigator } from "@main/reading-report/investigation-runner";
 import { ReadingReportRuntime } from "@main/reading-report/runtime";
 import type { ReadingReportServiceDeps } from "@main/reading-report/service";
 
-/** 进程级后台并发限流器。getLimit 惰性实时读 preference——改设置即时生效，模块加载期不碰 getDb。 */
+/** Bộ giới hạn tác vụ nền của tiến trình; đọc preference khi chạy, không truy cập DB lúc import module. */
 const backgroundLimiter = new Limiter(
   () => getPreference(getDb(), "backgroundConcurrency") ?? DEFAULT_BACKGROUND_CONCURRENCY,
 );
 
 const readingReportRuntime = new ReadingReportRuntime();
 
-/** (bookId) => 该书 app 自有副本字节；缺失抛 BookFileMissingError。注入 db/booksDir 以便单测。 */
+/** Đọc bytes bản sao sách theo bookId; thiếu tệp thì ném BookFileMissingError. */
 export function createLoadBytes(booksDir: string, db: DB): LoadBytes {
-  // async 闭包：让「book 不存在」的同步 throw 也统一成 rejected promise——
-  // 非 async 时 .catch()/Promise.allSettled 消费方接不住同步异常。
+  // Bọc async để lỗi đồng bộ khi thiếu sách cũng thành rejected Promise.
   return async (bookId: string) => {
     const book = getBook(db, bookId);
     if (!book) throw new Error(`send-deps: book ${bookId} not found`);
@@ -36,16 +36,16 @@ export function createLoadBytes(booksDir: string, db: DB): LoadBytes {
   };
 }
 
-/** 组装 runSend 所需的全部生产依赖（注入 Electron 侧单例）。 */
+/** Ghép các dependency thật cho runSend từ singleton phía Electron. */
 export function makeSendDeps(): SendDeps {
   const db = getDb();
   const loadBytes = createLoadBytes(appService.getPath("booksDir"), db);
-  const resolveModel = () => resolveChatModel(db);
+  const resolveModel = () => requireAiDataConsent(db) ?? resolveChatModel(db);
   return {
     db,
     loadBytes,
     resolveModel,
-    resolveSummaryModel: () => resolveSummaryModel(db),
+    resolveSummaryModel: () => requireAiDataConsent(db) ?? resolveSummaryModel(db),
     runBackground: backgroundLimiter.run,
     stepLimit: getPreference(db, "stepLimit") ?? DEFAULT_STEP_LIMIT,
     createSearchTools,
@@ -54,25 +54,24 @@ export function makeSendDeps(): SendDeps {
   };
 }
 
-/** 章摘懒生成所需依赖（供 content:generate-chapter-summary handler 用）。
- * 摘要（章节/全书）走独立 resolveSummaryModel（spec §5），不共享聊天模型。 */
+/** Dependency tạo tóm tắt chương; dùng model tóm tắt riêng, không tự dùng model chat. */
 export function makeSummaryDeps(): SummaryDeps {
   const db = getDb();
   return {
     db,
     loadBytes: createLoadBytes(appService.getPath("booksDir"), db),
-    resolveModel: () => resolveSummaryModel(db),
+    resolveModel: () => requireAiDataConsent(db) ?? resolveSummaryModel(db),
     runBackground: backgroundLimiter.run,
   };
 }
 
-/** 完成阅读报告使用唯一的进程内运行时，摘要模型与普通聊天模型严格分离。 */
+/** Báo cáo đọc dùng một runtime của tiến trình; model nền tách khỏi model chat. */
 export function makeReadingReportDeps(): ReadingReportServiceDeps {
   const db = getDb();
   return {
     db,
     loadBytes: createLoadBytes(appService.getPath("booksDir"), db),
-    resolveModel: () => resolveSummaryModel(db),
+    resolveModel: () => requireAiDataConsent(db) ?? resolveSummaryModel(db),
     runBackground: backgroundLimiter.run,
     runAgent: runReadingReportAgent,
     createInvestigator,

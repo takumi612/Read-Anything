@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { ProviderDto } from "@shared/providers";
-import { isModelConnected, isOnboardingComplete, summaryModelBackfill } from "./onboarding-logic";
+import { isModelConnected, isOnboardingComplete } from "./onboarding-logic";
 
 function provider(over: Partial<ProviderDto> = {}): ProviderDto {
   return {
@@ -38,27 +38,8 @@ describe("isModelConnected", () => {
 });
 
 describe("isOnboardingComplete", () => {
-  it("requires both model connected and auto-summarize on", () => {
-    expect(isOnboardingComplete(false, false)).toBe(false);
-    expect(isOnboardingComplete(true, false)).toBe(false);
-    expect(isOnboardingComplete(false, true)).toBe(false);
-    expect(isOnboardingComplete(true, true)).toBe(true);
-  });
-});
-
-describe("summaryModelBackfill", () => {
-  it("returns null when summaryModel already set (don't clobber)", () => {
-    expect(
-      summaryModelBackfill({ providerId: "x", model: "y" }, { providerId: "p1", model: "m1" }),
-    ).toBeNull();
-  });
-  it("returns the chat model when summaryModel unset", () => {
-    expect(summaryModelBackfill(null, { providerId: "p1", model: "m1" })).toEqual({
-      providerId: "p1",
-      model: "m1",
-    });
-  });
-  it("returns null when chat model not configured", () => {
-    expect(summaryModelBackfill(null, null)).toBeNull();
+  it("requires an AI model only for reader Q&A", () => {
+    expect(isOnboardingComplete(false)).toBe(false);
+    expect(isOnboardingComplete(true)).toBe(true);
   });
 });

@@ -8,7 +8,7 @@ const log = createLogger("library");
 
 export type BookFormat = "epub" | "pdf";
 
-/** 书籍文件缺失（app 自有副本不在派生位置）——供派生 missing 态 / relink 提示。 */
+/** Báo tệp sách bản sao của ứng dụng bị thiếu để UI gợi ý nối lại. */
 export class BookFileMissingError extends Error {
   constructor(public readonly bookId: string) {
     super(`book file missing for book ${bookId}`);
@@ -17,18 +17,16 @@ export class BookFileMissingError extends Error {
 }
 
 /**
- * app 自有书籍副本的**派生**路径：`booksDir/<sha256(bookId)>.<format>`。
- * 不入库（位置由 bookId+format 确定性派生）。编码函数须**永久稳定**——
- * 改了旧文件即失联；epub 派生与历史 storedEpubPath 逐字节一致。
- * format 是派生键的一部分：若未来允许就地修改 books.format，须先删旧格式文件再写新，
- * 否则旧后缀文件成孤儿（当前 importBook 幂等不改 format，无此问题）。
+ * Đường dẫn bản sao sách: `booksDir/<sha256(bookId)>.<format>`.
+ * Không lưu đường dẫn vào DB vì có thể suy ra từ bookId và format. Công thức này phải ổn định
+ * để sách cũ luôn tìm được tệp. Nếu sau này cho đổi books.format, phải xử lý tệp đuôi cũ.
  */
 export function storedBookPath(booksDir: string, bookId: string, format: BookFormat): string {
   const name = createHash("sha256").update(bookId).digest("hex");
   return path.join(booksDir, `${name}.${format}`);
 }
 
-/** 复制书籍字节进 app 自有位置（覆盖写；relink/重导即重写）。 */
+/** Ghi bytes sách vào thư mục ứng dụng; nối lại hoặc nhập lại sẽ ghi đè bản sao. */
 export async function writeBookFile(
   booksDir: string,
   bookId: string,
@@ -40,9 +38,8 @@ export async function writeBookFile(
 }
 
 /**
- * 重连：仅当选回文件的内容哈希等于原 bookId（= 同一文件）才写回副本。
- * 不匹配返回 "mismatch" 且不写任何东西，绝不污染库。format 由调用方从 books 行取并传入
- * （不调 detectFormat，避免 book-files ↔ repository 循环依赖）。
+ * Chỉ nối lại khi hash của tệp được chọn bằng bookId gốc. Nếu khác, trả mismatch
+ * và không ghi gì. Bên gọi truyền format từ DB để tránh phụ thuộc vòng với repository.
  */
 export async function relinkBookFile(
   booksDir: string,
@@ -56,7 +53,7 @@ export async function relinkBookFile(
   return "ok";
 }
 
-/** 读 app 自有副本；缺失抛 BookFileMissingError。 */
+/** Đọc bản sao của ứng dụng; thiếu tệp thì ném BookFileMissingError. */
 export async function readBookFile(
   booksDir: string,
   bookId: string,
@@ -70,7 +67,7 @@ export async function readBookFile(
   }
 }
 
-/** 读副本并把「文件缺失」收敛为 safe-return；其余意外错误原样 rethrow（交 handler/registry）。 */
+/** Đọc bản sao và trả kết quả an toàn nếu thiếu tệp; lỗi khác để handler xử lý. */
 export async function readBookFileResult(
   booksDir: string,
   bookId: string,
@@ -85,7 +82,7 @@ export async function readBookFileResult(
   }
 }
 
-/** best-effort 删除自有副本（删书时调；缺失无害，仅记日志）。 */
+/** Cố xóa bản sao khi xóa sách; tệp đã thiếu không phải lỗi nghiêm trọng. */
 export async function deleteBookFile(
   booksDir: string,
   bookId: string,

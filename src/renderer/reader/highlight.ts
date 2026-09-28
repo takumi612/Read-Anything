@@ -1,10 +1,10 @@
 import type { AnnotationStyle } from "@shared/annotations";
 
-/** 5 个填充色键（下划线单独处理，不在色点里）。 */
+/** Năm khóa màu tô nền; gạch dưới được xử lý riêng và không có chấm màu. */
 export const FILL_COLORS = ["yellow", "green", "blue", "pink", "purple"] as const;
 export type FillColor = (typeof FILL_COLORS)[number];
 
-/** 主文档内（Tailwind 生效）：工具栏色点 swatch + 侧栏列表色条 stripe。 */
+/** Trong tài liệu chính có Tailwind: chấm màu trên thanh công cụ và vạch màu ở danh sách bên. */
 export const FILL_SWATCH: Record<FillColor, string> = {
   yellow: "bg-yellow-300",
   green: "bg-green-300",
@@ -13,7 +13,7 @@ export const FILL_SWATCH: Record<FillColor, string> = {
   purple: "bg-purple-300",
 };
 
-export const STYLE_STRIPE: Record<AnnotationStyle, string> = {
+export const STYLE_STRIPE: Record<string, string> = {
   yellow: "bg-yellow-400",
   green: "bg-green-400",
   blue: "bg-sky-400",
@@ -23,11 +23,11 @@ export const STYLE_STRIPE: Record<AnnotationStyle, string> = {
 };
 
 /**
- * PDF 高亮 overlay 矩形样式（主文档 Tailwind 生效；半透明色块叠在 canvas 上、
- * textLayer 之下）。underline 不填充、画底边线。暗色下 canvas 反色但 overlay
- * 不反（在 canvas 元素之外），45% 透明度两种模式均可读。
+ * Kiểu hình chữ nhật tô sáng PDF trong tài liệu chính có Tailwind: màu bán trong suốt
+ * nằm trên canvas và dưới textLayer. Kiểu underline chỉ vẽ đường dưới, không tô nền.
+ * Chế độ tối đảo màu canvas nhưng không đảo lớp phủ; độ mờ 45% vẫn đọc được ở cả hai chế độ.
  */
-export const OVERLAY_FILL: Record<AnnotationStyle, string> = {
+export const OVERLAY_FILL: Record<string, string> = {
   yellow: "bg-yellow-300/45",
   green: "bg-green-300/45",
   blue: "bg-sky-300/45",
@@ -37,29 +37,32 @@ export const OVERLAY_FILL: Record<AnnotationStyle, string> = {
 };
 
 /**
- * 「有笔记」判定：ePub 的 `.anno-noted`（apply-annotations.ts）与 PDF overlay 的
- * 点状底边（overlayClass）共用此谓词——语义改这里一处。
+ * Kiểm tra có ghi chú dùng chung cho .anno-noted của ePub và viền chấm của lớp phủ PDF.
+ * Nếu đổi nghĩa của ghi chú, chỉ cần sửa điều kiện ở đây.
  */
 export function hasNote(note: string): boolean {
   return note.trim().length > 0;
 }
 
 /**
- * PDF overlay 矩形类（含笔记记号）：有笔记 → 底边点状线，与 ePub `.anno-noted`
- * 的 dotted text-decoration 同一约定（见下 ANNO_IFRAME_CSS——改一侧必改另一侧）；
- * underline 样式则把实线底边换成点状（不叠两条线，沿用其原 /60 浓度）；填充色上的
- * 点状线用更深的 /70 以在色块上保持对比。border-foreground 明暗自适应。
+ * Class hình chữ nhật PDF thêm viền chấm khi có ghi chú, đồng bộ với .anno-noted của ePub.
+ * Nếu đổi cách hiển thị ở đây, cập nhật cả ANNO_IFRAME_CSS bên dưới.
+ * Với underline, thay viền liền bằng chấm và giữ độ đậm /60. Với nền màu, dùng /70
+ * để đủ tương phản. border-foreground tự thích ứng với chế độ sáng tối.
  */
 export function overlayClass(style: AnnotationStyle, noted: boolean): string {
-  if (!noted) return OVERLAY_FILL[style];
+  if (style.startsWith("#")) {
+    return noted ? "bg-transparent border-b-2 border-dotted border-foreground/70" : "bg-transparent";
+  }
+  if (!noted) return OVERLAY_FILL[style]!;
   if (style === "underline") return "border-b-2 border-dotted border-foreground/60";
   return `${OVERLAY_FILL[style]} border-b-2 border-dotted border-foreground/70`;
 }
 
 /**
- * 注入每个 section iframe 的高亮 CSS（iframe 是 sandboxed srcdoc，主应用 Tailwind 不生效，
- * 故用具体 CSS）。`.anno` 可点击；5 色背景填充；underline 走 text-decoration；
- * `.anno-noted` 叠虚线下划表示有笔记（与 PDF 侧 overlayClass 同一约定，改一侧必改另一侧）。
+ * CSS tô sáng chèn vào iframe srcdoc của từng section vì Tailwind của ứng dụng không áp dụng ở đó.
+ * .anno có thể nhấn, năm màu dùng nền và underline dùng text-decoration.
+ * .anno-noted thêm gạch dưới dạng chấm khi có ghi chú, đồng bộ với overlayClass của PDF.
  */
 export const ANNO_IFRAME_CSS = [
   "mark.anno { background: transparent; cursor: pointer; }",
@@ -68,9 +71,10 @@ export const ANNO_IFRAME_CSS = [
   "mark.anno-blue { background: rgba(186,230,253,0.7); }",
   "mark.anno-pink { background: rgba(251,207,232,0.7); }",
   "mark.anno-purple { background: rgba(233,213,255,0.7); }",
+  "mark.anno-custom { background: color-mix(in srgb, var(--anno-custom-color) 70%, transparent); }",
   "mark.anno-underline { background: transparent; text-decoration: underline; text-decoration-color: rgba(120,120,120,0.9); text-decoration-thickness: 2px; }",
-  // 用 longhand 而非 text-decoration 简写：简写会把 .anno-underline 设的 color/thickness 重置掉。
-  // 显式 line:underline 让色块填充类（无下划线）也能显示「有笔记」的虚线提示，
-  // 同时让下划线类的灰色/2px 经 cascade 保留。
+  // Dùng thuộc tính riêng thay vì viết tắt text-decoration để giữ color và thickness của .anno-underline.
+  // Đặt line:underline rõ ràng để nền màu cũng có dấu chấm báo ghi chú,
+  // đồng thời giữ màu xám và độ dày 2px của kiểu gạch dưới qua cascade.
   "mark.anno-noted { text-decoration-line: underline; text-decoration-style: dotted; text-underline-offset: 3px; }",
 ].join("\n");

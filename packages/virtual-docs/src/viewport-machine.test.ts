@@ -10,7 +10,7 @@ import {
   type ViewportState,
 } from "./viewport-machine";
 
-/** 连喂 n 个对齐结果一致的 tick，返回末态。 */
+/** Gửi n tick liên tiếp có kết quả căn chỉnh giống nhau và trả về trạng thái cuối. */
 function tick(state: ViewportState, n: number, aligned: boolean): ViewportState {
   let s = state;
   for (let i = 0; i < n; i++) {
@@ -44,7 +44,7 @@ describe("reduceViewport", () => {
 
   it("settles only after the stability window and a full success streak", () => {
     const started = reduceViewport(initialViewportState(40), align).next;
-    // 提前凑满 streak 也不能提前 settle：必须先跨过最小观察次数。
+    // Đủ streak sớm vẫn chưa được settle; phải vượt số lần quan sát tối thiểu trước.
     const early = tick(started, ALIGN_SUCCESSES_REQUIRED, true);
     expect(early.phase.kind).toBe("aligning");
 
@@ -67,9 +67,9 @@ describe("reduceViewport", () => {
 
   it("resets the streak when an attempt misses", () => {
     const started = reduceViewport(initialViewportState(40), align).next;
-    // 停在最小观察次数前一步：再喂一个对齐的 tick 就会 settle，故此处只能喂未对齐的。
+    // Dừng trước số lần quan sát tối thiểu một bước; tick căn chỉnh tiếp theo sẽ settle nên dùng tick lệch.
     const hit = tick(started, ALIGN_MINIMUM_ATTEMPTS - 1, true);
-    // 已跨过最小观察次数但中途未对齐 → streak 归零，不得 settle。
+    // Đã vượt số lần quan sát tối thiểu nhưng có tick lệch nên streak về 0 và không được settle.
     const missed = reduceViewport(hit, { type: "ALIGN_TICK", runId: 1, aligned: false, offset: 5 });
     expect(missed.next.phase).toMatchObject({
       kind: "aligning",
@@ -187,13 +187,13 @@ describe("reduceViewport", () => {
 
   it("derives overscan from the navigation latch", () => {
     const initial = initialViewportState(40);
-    // 深处冷启、尚未发生过用户导航 → 顶部 overscan 强制为 0：上方 section 的迟到测高
-    // 会推走恢复目标，此时不能预挂载。
+    // Mở lại ở vị trí sâu, chưa có điều hướng người dùng: đặt overscan phía trên bằng 0
+    // để số đo muộn của section phía trên không đẩy lệch vị trí khôi phục.
     expect(overscanTop(initial, 40, 2400)).toBe(0);
-    // 从头开书（initialIndex=0）没有「上方 section 推走目标」的风险，照常双向 overscan。
+    // Mở sách từ đầu (initialIndex=0) không có rủi ro section phía trên đẩy lệch đích, dùng overscan hai chiều.
     expect(overscanTop(initial, 0, 2400)).toBe(2400);
 
-    // 一旦发生过用户级导航（即使仍是深处冷启的 initialIndex），latch 永久翻转，恢复双向 overscan。
+    // Sau điều hướng đầu tiên của người dùng, bật lại overscan hai chiều vĩnh viễn, kể cả initialIndex ở vị trí sâu.
     const owned = reduceViewport(initial, { type: "USER_INPUT", scrollIntent: true }).next;
     expect(overscanTop(owned, 40, 2400)).toBe(2400);
   });

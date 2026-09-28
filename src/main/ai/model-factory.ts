@@ -7,8 +7,8 @@ import type { LanguageModelV4, SharedV4ProviderOptions } from "@ai-sdk/provider"
 import type { AiProviderApiType } from "@shared/providers";
 
 /**
- * AI SDK 语言模型实例类型：四家 provider 工厂均返回 `@ai-sdk/provider` 的 `LanguageModelV4`
- * （可喂 generateText/streamText）。直接依赖该接口，不再经 `@ai-sdk/openai` 的返回类型推导，免大版本漂移。
+ * Kiểu model của AI SDK: bốn factory provider đều trả LanguageModelV4 của @ai-sdk/provider.
+ * Dùng trực tiếp giao diện này cho generateText/streamText, tránh lệch kiểu khi @ai-sdk/openai nâng bản.
  */
 export type ChatModel = LanguageModelV4;
 
@@ -20,46 +20,45 @@ export interface ResolveModelParams {
 }
 
 /**
- * 进程级注入的 fetch。主进程启动时注入 Electron `net.fetch`（经 Chromium 网络栈、**默认采用系统代理**），
- * 使所有 provider 出站请求默认走系统代理。未注入（如 headless 测试）则各 SDK 回退全局 fetch。
- * 模块级单点注入而非逐调用透传：fetch 是横切传输关切，且本工厂是 test/send 两路的唯一模型出口。
+ * Hàm fetch dùng cho cả tiến trình. Main truyền Electron net.fetch để các provider
+ * dùng mạng Chromium và proxy hệ thống. Nếu chưa truyền, SDK tự dùng global fetch.
+ * Factory là điểm tạo model chung cho kiểm tra kết nối và gửi chat.
  */
 let injectedFetch: typeof globalThis.fetch | undefined;
 
-/** 由主进程胶水层在 app ready 后调用一次（传 undefined 可复位，便于测试）。 */
+/** Main gọi một lần sau app.ready; truyền undefined để đặt lại trong kiểm thử. */
 export function setModelFetch(fetchImpl: typeof globalThis.fetch | undefined): void {
   injectedFetch = fetchImpl;
 }
 
 /**
- * provider 是否支持图像 tool result（file-data content part；spec §7 门控）。
- * openai-chat-completions 的 tool 消息只收纯文本（@ai-sdk/openai-compatible 不处理 file-data）；
- * 其余三家 SDK 均转换 file-data → 各自原生图像格式（对各包 dist 实证）。
- * undefined（测试 mock 未注入 providerType）按不支持处理——保守但 honest。
- * 刻意不做「模型是否视觉」启发式白名单：白名单必漏新视觉模型而静默剥夺能力（对齐
- * provider-models.ts「未知一律保留」原则）；误调 image 的失败以真实错误流回，模型自会改用 text。
+ * Kiểm tra provider có hỗ trợ ảnh trong kết quả công cụ không (spec §7).
+ * openai-chat-completions qua SDK compatible chỉ nhận văn bản trong tin nhắn tool;
+ * các SDK còn lại chuyển file-data thành định dạng ảnh riêng.
+ * providerType không có trong mock kiểm thử thì coi như không hỗ trợ.
+ * Không lập danh sách model nhìn được ảnh theo tên vì model mới dễ bị bỏ sót;
+ * nếu gọi ảnh thất bại, lỗi thật được trả về để model có thể thử dạng text.
  */
 export function supportsImageToolResults(type?: AiProviderApiType): boolean {
   return type === "anthropic" || type === "google-generate-content" || type === "openai-responses";
 }
 
 /**
- * 某 provider 在每次 streamText/generateText 调用时应附带的 providerOptions（无则 undefined）。
+ * providerOptions kèm mỗi lần gọi streamText/generateText; thiếu thì trả undefined.
  *
- * openai-responses → 强制 `store: false`。第三方中转/网关多为无状态、不持久化 Responses API 的
- * reasoning item（`rs_…`）。AI SDK 默认 `store: true`（@ai-sdk/openai dist:4871），多步工具循环里
- * 会把上一步 reasoning 以 `{ type: "item_reference", id: "rs_…" }` 回传（dist:2841/2890），在无状态
- * 端点上引用失效 → 「Item with id 'rs_…' not found. Items are not persisted when store is set to
- * false」。设 `store: false` 后 AI SDK 改走 encrypted_content 内联回传（reasoning 模型自动 include
- * `reasoning.encrypted_content`，dist:4906；端点未返回 encrypted_content 的裸 reasoning 会被过滤而非
- * 崩溃，dist:3331），故无状态端点也能跑完工具循环。官方 OpenAI 同样支持该路径。
+ * Với openai-responses, buộc `store: false`. Nhiều gateway trung gian không lưu reasoning item
+ * của Responses API. AI SDK mặc định store:true và có thể gửi lại item_reference của bước trước;
+ * gateway không lưu item đó sẽ báo lỗi "Item with id 'rs_…' not found".
+ * Khi store:false, SDK gửi reasoning đã mã hóa ngay trong yêu cầu tiếp theo; nếu endpoint không
+ * trả encrypted_content, SDK bỏ phần reasoning ấy thay vì làm hỏng vòng gọi công cụ.
+ * Endpoint OpenAI chính thức cũng hỗ trợ cách này.
  */
 export function providerCallOptions(type?: AiProviderApiType): SharedV4ProviderOptions | undefined {
   if (type === "openai-responses") return { openai: { store: false } };
   return undefined;
 }
 
-/** 把 (provider 配置 + 模型名) 解析为 AI SDK 语言模型。MA3 测连接与 MA4 对话共用此工厂。 */
+/** Tạo model AI SDK từ cấu hình provider và tên model; kiểm tra kết nối và chat dùng chung. */
 export function resolveLanguageModel(p: ResolveModelParams): ChatModel {
   const withBase = (base: string | null) => (base ? { baseURL: base } : {});
   const fetch = injectedFetch;
@@ -72,11 +71,10 @@ export function resolveLanguageModel(p: ResolveModelParams): ChatModel {
       return createGoogle({ apiKey: p.apiKey, fetch, ...withBase(p.baseUrl) })(p.model);
     case "openai-chat-completions": {
       if (!p.baseUrl) throw new Error("openai-chat-completions provider requires a baseUrl");
-      // 官方 DeepSeek 端点换用 @ai-sdk/deepseek 引擎（线上同为 chat completions 协议）：
-      // 它把 DeepSeek 私有的 insufficient_system_resource 映射为 finishReason "error"
-      // （openai-compatible 只给 "other"，会被当 complete 静默落库），并原生解析
-      // reasoning_content 思考流与 prompt_cache_hit/miss_tokens 缓存元数据。
-      // 其它兼容端点（自建网关等）仍走 openai-compatible。
+      // Endpoint DeepSeek chính thức dùng @ai-sdk/deepseek dù cùng giao thức chat completions.
+      // SDK này ánh xạ insufficient_system_resource thành finishReason "error" và đọc
+      // reasoning_content cùng số token cache; SDK compatible không cung cấp đủ thông tin đó.
+      // Gateway tương thích khác vẫn dùng openai-compatible.
       const normalized = p.baseUrl.replace(/\/+$/, "");
       if (/^https:\/\/api\.deepseek\.com(\/v1)?$/.test(normalized)) {
         return createDeepSeek({ apiKey: p.apiKey, fetch, baseURL: p.baseUrl })(p.model);

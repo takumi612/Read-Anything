@@ -1,12 +1,13 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useTranslation } from "react-i18next";
 
 /**
- * 临时 dev-only 性能监控：测量 AI 消息列表的渲染与滚动开销。
+ * Bộ theo dõi hiệu năng tạm thời trong dev, đo chi phí vẽ và cuộn danh sách tin AI.
  *
- * 用法：在 AIPanel 的 ScrollArea 附近挂载：
+ * Gắn gần ScrollArea trong AIPanel:
  *   <ChatPerfMonitor messages={messages} />
  *
- * 会在 DevTools console 每 5 秒输出一次汇总，并在面板右上角显示一个 mini overlay。
+ * In báo cáo vào console DevTools mỗi 5 giây và hiện lớp phủ nhỏ ở góc trên bên phải.
  */
 type AnyMessage = { id: string; role: string };
 
@@ -22,6 +23,7 @@ interface PerfSnapshot {
 }
 
 export function ChatPerfMonitor({ messages }: { messages: AnyMessage[] }) {
+  const { t } = useTranslation();
   const [snapshot, setSnapshot] = useState<PerfSnapshot>({
     messageCount: messages.length,
     lastRenderMs: null,
@@ -38,8 +40,8 @@ export function ChatPerfMonitor({ messages }: { messages: AnyMessage[] }) {
   const scrollStatsRef = useRef({ frames: 0, events: 0, lastEventTime: 0 });
   const reportIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // 1. 测量消息变化 → layout/paint 完成的耗时。
-  // 用 useLayoutEffect 捕获 DOM 已更新，再用 rAF 捕获首次 paint。
+  // Đo thời gian từ khi tin đổi tới khi layout và paint xong.
+  // useLayoutEffect nhận lúc DOM đã cập nhật, rAF nhận frame đầu được vẽ.
   useLayoutEffect(() => {
     const start = lastRenderStartRef.current ?? performance.now();
     const count = messages.length;
@@ -57,7 +59,7 @@ export function ChatPerfMonitor({ messages }: { messages: AnyMessage[] }) {
     lastRenderStartRef.current = performance.now();
   }, [messages]);
 
-  // 2. PerformanceObserver 监听 longtask（>50ms 主线程阻塞）。
+  // PerformanceObserver theo dõi long task chặn luồng chính trên 50 ms.
   useEffect(() => {
     if (typeof PerformanceObserver === "undefined") return;
     if (!("PerformanceLongTaskTiming" in window)) return;
@@ -79,13 +81,13 @@ export function ChatPerfMonitor({ messages }: { messages: AnyMessage[] }) {
     try {
       observer.observe({ entryTypes: ["longtask"] });
     } catch {
-      // 某些 Electron/DevTools 环境不支持 longtask
+      // Một số môi trường Electron hoặc DevTools không hỗ trợ longtask.
     }
 
     return () => observer.disconnect();
   }, []);
 
-  // 3. 滚动 FPS 计数器：用户滚动时，连续 rAF 计数；300ms 静止后结算一次。
+  // Đếm FPS khi cuộn qua rAF liên tục; tổng kết sau 300 ms không có cuộn.
   useEffect(() => {
     const viewport = document.querySelector(".ai-messages-viewport") as HTMLElement | null;
     if (!viewport) return;
@@ -147,7 +149,7 @@ export function ChatPerfMonitor({ messages }: { messages: AnyMessage[] }) {
     };
   }, []);
 
-  // 4. 每 5 秒向 console 输出一次结构化报告。
+  // In báo cáo có cấu trúc vào console mỗi 5 giây.
   useEffect(() => {
     reportIntervalRef.current = setInterval(() => {
       // eslint-disable-next-line no-console
@@ -160,13 +162,22 @@ export function ChatPerfMonitor({ messages }: { messages: AnyMessage[] }) {
 
   return (
     <div className="pointer-events-none fixed right-3 top-14 z-50 rounded-md border border-border bg-background/90 px-2 py-1 text-[10px] tabular-nums text-foreground shadow-sm backdrop-blur">
-      <div>msgs: {snapshot.messageCount}</div>
-      <div>render: {snapshot.lastRenderMs ?? "-"} ms</div>
       <div>
-        long: {snapshot.longTasks} / {snapshot.longTaskTotalMs} ms
+        {t("chatPerf.messages")}: {snapshot.messageCount}
       </div>
-      <div>max long: {snapshot.maxLongTaskMs} ms</div>
-      <div>scroll fps: {snapshot.avgScrollFps ?? "-"}</div>
+      <div>
+        {t("chatPerf.render")}: {snapshot.lastRenderMs ?? "-"} {t("chatPerf.milliseconds")}
+      </div>
+      <div>
+        {t("chatPerf.long")}: {snapshot.longTasks} / {snapshot.longTaskTotalMs}{" "}
+        {t("chatPerf.milliseconds")}
+      </div>
+      <div>
+        {t("chatPerf.longMax")}: {snapshot.maxLongTaskMs} {t("chatPerf.milliseconds")}
+      </div>
+      <div>
+        {t("chatPerf.scrollFps")}: {snapshot.avgScrollFps ?? "-"}
+      </div>
     </div>
   );
 }

@@ -8,8 +8,8 @@ import type { WebSearchConfig } from "@shared/web-search";
 const log = createLogger("search");
 
 /**
- * 软失败包装：execute 抛错会中断整条流式回复；转 { error } result 后进入对话流，
- * 模型可据错误信息换参重试（与 src/main/ai/tools.ts runTool 同一约定）。
+ * Trả lỗi công cụ thành `{ error }` để không ngắt luồng trả lời;
+ * model có thể đọc lỗi và thử lại với tham số khác.
  */
 async function runTool<T>(name: string, fn: () => Promise<T>): Promise<T | { error: string }> {
   try {
@@ -21,9 +21,9 @@ async function runTool<T>(name: string, fn: () => Promise<T>): Promise<T | { err
 }
 
 /**
- * 创建 web_search 工具实例。
- * @param service 搜索服务（注入，便于测试）
- * @param turnEnabled 本轮是否允许联网搜索；false 时立即软失败，不调用 service
+ * Tạo công cụ web_search.
+ * @param service Dịch vụ tìm kiếm được truyền vào để có thể kiểm thử.
+ * @param turnEnabled Lượt này có cho tìm kiếm mạng không; false trả lỗi nhẹ, không gọi service.
  */
 export function makeWebSearchTool(service: SearchService, turnEnabled: boolean) {
   return tool({
@@ -49,8 +49,8 @@ export function makeWebSearchTool(service: SearchService, turnEnabled: boolean) 
 }
 
 /**
- * 根据联网搜索偏好配置创建工具集与资源清理函数。
- * 调用方负责在 AI 流结束后调用 close() 释放 MCP 连接。
+ * Tạo công cụ và hàm dọn tài nguyên theo cài đặt tìm kiếm mạng.
+ * Bên gọi phải close() sau khi luồng AI kết thúc để giải phóng kết nối MCP.
  */
 export function createSearchTools(cfg: WebSearchConfig, turnEnabled: boolean) {
   const backends = cfg.backends

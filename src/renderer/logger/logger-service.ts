@@ -1,7 +1,7 @@
 /**
- * LoggerService（渲染层）：与主进程同形组织——类+单例不导出，barrel 仅 createLogger。
- * 双写：DevTools console（本进程可观测面）+ 经 log:write IPC 由主进程落 renderer-*.log。
- * 级别门槛（debug 仅 dev）统一在主进程侧判定——本层全量转发。
+ * LoggerService của renderer có cùng cấu trúc với main process: class và singleton không xuất ra,
+ * barrel chỉ xuất createLogger. Ghi vào console DevTools và gửi log:write IPC để main process
+ * ghi renderer-*.log. Main process quyết định ngưỡng cấp độ, renderer chuyển tiếp mọi log.
  */
 import type { LogWriteInput } from "@shared/ipc";
 
@@ -21,9 +21,9 @@ const CONSOLE_FN: Record<LogLevel, (...args: unknown[]) => void> = {
   debug: console.debug,
 };
 
-/** Error 展开为字符串供 IPC 传输（结构化对象过不了 contextBridge 的纯数据要求）
- * 健壮链：Error → stack/name+msg；string → 直传；其余 → JSON.stringify try/catch 兜底
- * 避免裸 JSON.stringify 对 circular/bigint throw、对 symbol/function 返回 undefined 的陷阱 */
+/** Chuyển lỗi thành chuỗi để truyền qua IPC vì contextBridge chỉ nhận dữ liệu thuần.
+ * Error dùng stack hoặc tên và thông báo; chuỗi giữ nguyên; kiểu khác thử JSON.stringify
+ * với nhánh dự phòng cho vòng tham chiếu, bigint, symbol và function. */
 function withErr(message: string, err?: unknown): string {
   if (err === undefined) return message;
   let text: string;
@@ -41,18 +41,18 @@ function withErr(message: string, err?: unknown): string {
   return `${message}\n${text}`;
 }
 
-/** schema 的 message.max 上限以内预截断——超长日志应截断落盘而非被校验整条拒收 */
+/** Cắt thông báo trước giới hạn message.max của schema để log dài vẫn được lưu. */
 const MESSAGE_MAX = 8192;
 const MODULE_MAX = 64;
 
 class LoggerService {
   log(level: LogLevel, module: string, message: string, err?: unknown): void {
-    // DevTools console：保留原始 err 对象（可展开 inspect），格式与文件侧四段式对齐
+    // Console DevTools giữ object lỗi gốc để inspect, với định dạng giống log trong tệp.
     CONSOLE_FN[level](
       `[renderer] [${level}] [${module}] ${message}`,
       ...(err === undefined ? [] : [err]),
     );
-    // IPC 落盘：fire-and-forget，失败静默——日志绝不搞崩 UI
+    // Gửi log qua IPC không chờ kết quả; lỗi ghi log không được làm hỏng UI.
     void window.api.log
       .write({
         level,

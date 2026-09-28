@@ -21,7 +21,7 @@ const BLOCK_TAGS = new Set([
   "TH",
 ]);
 
-/** 取 node 最近的块级祖先元素（含自身）。 */
+/** Lấy phần tử khối gần node nhất, kể cả chính node. */
 function blockAncestor(node: Node): Element | null {
   let el: Node | null = node.nodeType === Node.ELEMENT_NODE ? node : node.parentNode;
   while (el && el.nodeType === Node.ELEMENT_NODE) {
@@ -31,7 +31,7 @@ function blockAncestor(node: Node): Element | null {
   return null;
 }
 
-/** 相邻块级兄弟的文本（跳过空白文本节点）。 */
+/** Lấy văn bản của phần tử khối cùng cấp kế bên, bỏ text node chỉ có khoảng trắng. */
 function siblingBlockText(el: Element, dir: "previous" | "next"): string | null {
   let sib: Element | null = dir === "previous" ? el.previousElementSibling : el.nextElementSibling;
   while (sib) {
@@ -43,11 +43,10 @@ function siblingBlockText(el: Element, dir: "previous" | "next"): string | null 
 }
 
 /**
- * 把包的 onSelect 事件转成 SelectionInfo（AI 契约老形状 + locatorRange）。
- * 块级取段：当前段 = 选区**起点**的最近块级祖先文本；前/后段 = 其相邻块级兄弟。
- * 跨块选区（起点、终点在不同块）时不做精确切分——`paragraphCurrent` 仍取起点块，
- * 终点块自然落入 `paragraphAfter`；这是 best-effort 语义，足够给 AI 上下文。
- * 提取失败（取不到块级祖先）时退化为「只发选中文本」（绝不静默吞掉提问）。
+ * Đổi sự kiện onSelect thành SelectionInfo với locatorRange và cấu trúc AI hiện có.
+ * Đoạn hiện tại lấy từ phần tử khối chứa đầu vùng chọn; đoạn trước và sau lấy từ phần tử cùng cấp.
+ * Khi chọn qua nhiều khối, paragraphCurrent vẫn dùng khối đầu, khối cuối có thể nằm trong paragraphAfter.
+ * Ngữ cảnh này đủ cho AI. Nếu không tìm được phần tử khối, vẫn gửi văn bản được chọn.
  */
 export function sectionSelectToSelectionInfo(
   e: SectionSelectEvent,
@@ -62,7 +61,7 @@ export function sectionSelectToSelectionInfo(
     paragraphBefore,
     paragraphCurrent: paragraphCurrent.length > 0 ? paragraphCurrent : e.text,
     paragraphAfter,
-    rect: e.rect, // 包已平移为 viewport 坐标（ViewportRect 与 SelectionInfo.rect 同形）
+    rect: e.rect, // Package đã đổi sang tọa độ khung nhìn, cùng cấu trúc với SelectionInfo.rect.
     locatorRange,
   };
 }

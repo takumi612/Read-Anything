@@ -1,4 +1,4 @@
-// 假数据 + chip 构建 + token 粗估（原型一次性件）。
+// Dữ liệu giả lập + tạo chip + ước tính token sơ bộ (dùng riêng cho bản mẫu).
 
 import type {
   Annotation,
@@ -64,7 +64,7 @@ export const BOOK: Book = {
   summaryStatus: "ready",
 };
 
-// label 走 i18n（t(`preset.${id}`)）；template 是预填正文，留 fixtures（内容，不随 UI 语言变）。
+// label dùng i18n (t(`preset.${id}`)); template là nội dung điền sẵn, giữ trong fixtures (nội dung không đổi theo ngôn ngữ UI).
 export const PRESETS: { id: PresetId; template: string }[] = [
   { id: "explain", template: "请解释这段文字的含义。" },
   { id: "translate", template: "请把这段文字翻译成英文。" },
@@ -73,12 +73,12 @@ export const PRESETS: { id: PresetId; template: string }[] = [
 
 export const DEFAULT_PREFS: ReaderPrefs = { fontScale: 1, lineHeight: 1.9, maxWidth: 640 };
 
-/** token 粗估：按码位数 / 3（仅演示，不镜像 main 的 estimateTokens）。 */
+/** Ước tính token sơ bộ: số mã điểm / 3 (chỉ để minh họa, không sao chép estimateTokens của main). */
 export function estimateTokens(text: string): number {
   return Math.max(1, Math.ceil(Array.from(text).length / 3));
 }
 
-/** 由选区构建本轮 chips（selection + paragraph，Phase 1 均必备）。 */
+/** Tạo chips cho lượt này từ vùng chọn (selection + paragraph, cả hai đều bắt buộc trong Phase 1). */
 export function buildChips(sel: SelectionInfo): Chip[] {
   return [
     {
@@ -100,14 +100,14 @@ export function buildChips(sel: SelectionInfo): Chip[] {
   ];
 }
 
-/** 侧栏会话列表（仅视觉演示）。 */
+/** Danh sách hội thoại trên thanh bên (chỉ minh họa giao diện). */
 export const SAMPLE_CONVERSATIONS: ConversationMeta[] = [
   { id: "conv-1", title: "关于「灯塔的光」", chapterId: "ch1" },
   { id: "conv-2", title: "潮汐表的隐喻", chapterId: "ch2" },
   { id: "conv-indep", title: "跨章随想", chapterId: null },
 ];
 
-/** 首屏种子对话：一轮已完成的问答，让面板默认有内容（「新对话」可清空看空态）。 */
+/** Hội thoại mẫu ban đầu: một lượt hỏi đáp đã hoàn tất để bảng mặc định có nội dung ("Hội thoại mới" sẽ xóa nội dung để xem trạng thái trống). */
 export const SEED_MESSAGES: ChatMessage[] = [
   {
     id: "seed-u",
@@ -148,7 +148,7 @@ export const SEED_MESSAGES: ChatMessage[] = [
   },
 ];
 
-/** 由（章, 段下标, 原文片段）构建一条种子标注，自动算字符偏移。 */
+/** Tạo một mục đánh dấu mẫu từ (chương, chỉ số đoạn, trích đoạn gốc) và tự tính độ lệch ký tự. */
 function seedAnno(
   chapterId: string,
   paragraphIndex: number,
@@ -169,7 +169,7 @@ function seedAnno(
   };
 }
 
-/** 首屏种子标注：正文带高亮、标注列表非空、其中一条含笔记。 */
+/** Mục đánh dấu mẫu ban đầu: nội dung có tô sáng, danh sách đánh dấu không trống và một mục có ghi chú. */
 export const SEED_ANNOTATIONS: Annotation[] = [
   seedAnno(
     "ch1",

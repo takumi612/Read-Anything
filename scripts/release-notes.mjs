@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-// 从 CHANGELOG.md 抽取当前 package.json version 的段落,喂给 GitHub Release draft 的 notes。
-// 用法: node scripts/release-notes.mjs [--dry-run]
-// 防御:版本段缺失/为空、gh 失败(draft 不存在/未认证)都硬退出并透传真实错误;
-// 绝不创建 release——forge publish 是唯一创建入口。
+// Trích mục của phiên bản hiện tại trong package.json từ CHANGELOG.md để làm ghi chú cho bản phát hành GitHub.
+// Cách dùng: node scripts/release-notes.mjs [--dry-run]
+// Nếu thiếu mục phiên bản, mục rỗng hoặc gh lỗi (không có bản nháp/chưa xác thực), thoát với lỗi thật.
+// Không tạo bản phát hành; forge publish là lối duy nhất để tạo.
 import { execFileSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 
@@ -10,8 +10,8 @@ const dryRun = process.argv.includes("--dry-run");
 const { version } = JSON.parse(readFileSync("package.json", "utf8"));
 const changelog = readFileSync("CHANGELOG.md", "utf8");
 
-// 定位 "## <version>" 标题行,截到下一个 "## " 或 EOF
-// 精确匹配(或后跟空格),防 "## 0.2.0" 误命中手编的 "## 0.2.01"/"## 0.2.0-beta"
+// Tìm dòng tiêu đề "## <version>", lấy nội dung đến tiêu đề "## " tiếp theo hoặc hết tệp.
+// Khớp chính xác (hoặc theo sau bằng dấu cách) để "## 0.2.0" không khớp nhầm "## 0.2.01" hay "## 0.2.0-beta".
 const lines = changelog.split("\n");
 const start = lines.findIndex((l) => l === `## ${version}` || l.startsWith(`## ${version} `));
 if (start === -1) {
@@ -47,7 +47,7 @@ try {
     stdio: ["pipe", "inherit", "inherit"],
   });
 } catch (e) {
-  // gh 的真实报错已经 stderr inherit 直透;吞掉 node 的 stack 噪音,保留非零退出
+  // Lỗi thật từ gh đã được chuyển thẳng qua stderr; bỏ phần stack trace nhiễu của Node nhưng giữ mã thoát khác 0.
   process.exit(e.status ?? 1);
 }
 console.log(`Notes updated on release v${version}`);

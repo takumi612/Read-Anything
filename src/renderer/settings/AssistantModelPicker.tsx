@@ -4,9 +4,9 @@ import { usePrefsStore } from "@renderer/store/prefs-store";
 import { ModelPickerSection } from "./ModelPickerSection";
 
 /**
- * 对话模型区块（接替 assistants 表配置；spec 2026-06-10 §2.3）。
- * 偏好是原子 (provider, model) 对——切 provider 后的中间态（model 未选）不可落盘，
- * 故 draft 持本地，选定 model 才 setChatModel 原子落盘（镜像 SummaryModelPicker）。
+ * Khối chọn mô hình chat thay cấu hình bảng assistants.
+ * Tùy chọn là cặp provider/model; khi đổi provider mà chưa chọn model thì giữ bản nháp cục bộ.
+ * Chỉ lưu cả cặp qua setChatModel sau khi chọn model, giống SummaryModelPicker.
  */
 export function AssistantModelPicker() {
   const { t } = useTranslation();
@@ -15,25 +15,25 @@ export function AssistantModelPicker() {
   const [draftProvider, setDraftProvider] = useState<string | null>(null);
 
   const providerId = draftProvider ?? stored?.providerId ?? "";
-  // 切回已存 provider 时恢复已存 model；切到别家才显空 placeholder
+  // Quay lại provider đã lưu thì khôi phục model cũ; provider khác hiện placeholder rỗng.
   const model =
     draftProvider != null && draftProvider !== stored?.providerId ? "" : (stored?.model ?? "");
   const effort = stored?.reasoningEffort;
 
   return (
     <ModelPickerSection
-      title={t("settings.assistantModel", "对话模型")}
+      title={t("settings.assistantModel", "Model trò chuyện")}
       providerId={providerId}
       model={model}
       onProviderChange={setDraftProvider}
       onModelChange={(m) => {
         if (!providerId) return;
-        // 改模型保留当前档位（档位与 provider 无关，跨家沿用）。
+        // Đổi model vẫn giữ mức hiện tại vì mức này độc lập với provider.
         setChatModel({ providerId, model: m, reasoningEffort: effort });
         setDraftProvider(null);
       }}
       reasoningEffort={effort}
-      // 未落盘模型 / 正在切 provider（model 未定）时禁用——无处可挂。
+      // Tắt khi chưa lưu model hoặc đang chuyển provider mà chưa chọn model.
       reasoningEffortDisabled={stored == null || draftProvider != null}
       onReasoningEffortChange={(e) => {
         if (!stored) return;

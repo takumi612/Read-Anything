@@ -15,15 +15,15 @@ const config = defineConfig({
     alias: {
       "@marginalia/virtual-docs": path.resolve(__dirname, "../virtual-docs/src/index.ts"),
     },
-    // virtual-docs 以源码别名引入，其 import "react" 会从 ../virtual-docs 向上解析到根 node_modules，
-    // 而 ui-prototype 用隔离 node_modules 的副本——两份 React 实例会让 hooks 崩（白屏）。
-    // dedupe 强制全页 react/react-dom 收敛到单一副本。
+    // virtual-docs được thêm bằng alias tới mã nguồn; import "react" của nó sẽ phân giải ngược lên node_modules ở thư mục gốc.
+    // ui-prototype có bản node_modules riêng; hai bản React làm hooks lỗi và có thể khiến màn hình trắng.
+    // dedupe buộc toàn trang chỉ dùng một bản react/react-dom.
     dedupe: ["react", "react-dom"],
   },
   plugins: [
     devtools(),
     tailwindcss(),
-    // 原型为纯前端 UI，不需要 SSR：开 SPA 模式（应用内容纯客户端渲染，规避水合不匹配）
+    // Bản mẫu chỉ có giao diện frontend, không cần SSR: dùng chế độ SPA để nội dung được render ở client và tránh lệch hydration.
     tanstackStart({ spa: { enabled: true } }),
     viteReact(),
     babel({ presets: [reactCompilerPreset()] }),

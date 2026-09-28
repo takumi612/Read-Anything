@@ -23,20 +23,20 @@ export const readingReportProgressOutcomeSchema = z.enum(["ok", "skipped"]);
 export type ReadingReportProgressOutcome = z.infer<typeof readingReportProgressOutcomeSchema>;
 
 export const readingReportProgressStepSchema = z.object({
-  /** 一次生成内自增的序号，仅用作渲染层列表 key。 */
+  /** Số thứ tự tăng trong một lần tạo, chỉ dùng làm key danh sách UI. */
   id: z.string().min(1),
-  /** 工具名，渲染层据此查 i18n 文案；未知工具名回退到通用文案。 */
+  /** Tên công cụ để renderer tìm bản dịch; công cụ lạ dùng câu chung. */
   tool: z.string().min(1),
   startedAt: z.number().int(),
-  /** null = 仍在进行中。 */
+  /** null nghĩa là vẫn đang chạy. */
   endedAt: z.number().int().nullable(),
   outcome: readingReportProgressOutcomeSchema.nullable(),
-  /** 可从工具输出里抽到的条目数，抽不到为 null。 */
+  /** Số mục lấy được từ kết quả công cụ; không xác định được thì null. */
   count: z.number().int().nullable(),
 });
 export type ReadingReportProgressStep = z.infer<typeof readingReportProgressStepSchema>;
 
-/** 只读：它是主进程时间线的快照，渲染层不得改。 */
+/** Snapshot timeline chỉ đọc từ main; renderer không được sửa. */
 const progress = z.array(readingReportProgressStepSchema).readonly();
 
 export const readingReportStateSchema = z.discriminatedUnion("status", [

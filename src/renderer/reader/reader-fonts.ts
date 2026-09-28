@@ -1,7 +1,7 @@
-// @fontsource 切片 @font-face CSS(?inline 取字符串),注入 section iframe 用。
-// iframe 是独立 document,主文档的 @font-face 对其不可见,必须随 styleCss 注入;
-// 仅拼当前选中档(中文切片 CSS 文本约 100 KB/weight,每档两 weight≈200 KB,每个 iframe srcdoc 内联一份,勿全量塞)。
-// 切片按 unicode-range 声明,浏览器只下载文本实际命中的 woff2,声明数百条几乎零成本。
+// Lấy chuỗi CSS @font-face đã chia phần từ @fontsource qua ?inline để chèn vào iframe section.
+// Iframe là tài liệu riêng nên không thấy @font-face của tài liệu chính; phải đưa vào styleCss.
+// Chỉ ghép mức phông đang chọn vì CSS cho chữ Hán khoảng 100 KB mỗi độ đậm, mỗi iframe giữ một bản.
+// unicode-range giúp trình duyệt chỉ tải woff2 chứa ký tự thực sự dùng.
 import frauncesItalic from "@fontsource-variable/fraunces/wght-italic.css?inline";
 import frauncesWght from "@fontsource-variable/fraunces/wght.css?inline";
 import manropeWght from "@fontsource-variable/manrope/wght.css?inline";
@@ -15,12 +15,12 @@ import type { ReaderFontFamily } from "@renderer/types";
 
 const FONT_FACE_CSS: Record<Exclude<ReaderFontFamily, "default">, string> = {
   wenkai: [wenkaiRegular, wenkaiBold].join("\n"),
-  // 正文 <em> 常见,衬线档带上 Fraunces 的 italic 轴(中文无斜体,浏览器合成)
+  // Nội dung thường có <em>; mức serif thêm biến thể nghiêng Fraunces, chữ Hán để trình duyệt tự tổng hợp.
   serif: [frauncesWght, frauncesItalic, notoSerifSc400, notoSerifSc700].join("\n"),
   sans: [manropeWght, notoSansSc400, notoSansSc700].join("\n"),
 };
 
-/** 当前档需注入 iframe 的 @font-face CSS;default 档返回空串(零干预)。 */
+/** CSS @font-face cần chèn vào iframe cho mức phông hiện tại; default trả chuỗi rỗng. */
 export function fontFaceCss(fontFamily: ReaderFontFamily): string {
   return fontFamily === "default" ? "" : FONT_FACE_CSS[fontFamily];
 }

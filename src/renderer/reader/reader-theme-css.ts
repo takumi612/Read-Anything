@@ -1,16 +1,34 @@
+import type { ReaderColorMode } from "@shared/preferences";
+import type { ResolvedTheme } from "@shared/theme";
+
 /**
- * 暗色书页注入 iframe 的 CSS（由 VirtualDocs 拼在 ePub 自带样式**之前**）；
- * 亮色返回 "" 保留 ePub 原纸张样式。颜色写死十六进制（iframe 取不到父文档 CSS 变量），
- * 取护眼柔和暗（非纯黑）；`:where(...)` 0 特异性 + !important 救回带显式深色的正文元素。
- * 已知局限：带 `!important` 硬编码颜色的书无法被覆盖（注入在其样式之前）。
+ * CSS trang sách tối được VirtualDocs chèn vào iframe trước style của ePub.
+ * Chế độ sáng trả chuỗi rỗng để giữ giấy gốc. Màu dùng mã hex vì iframe không thấy biến CSS của tài liệu cha.
+ * Nền tối dịu; :where(...) có độ ưu tiên 0 và !important để ghi đè màu tối đặt trực tiếp.
+ * Sách có màu hardcoded với !important vẫn có thể thắng vì style của sách được chèn sau.
  */
-export function readerThemeCss(isDark: boolean): string {
-  if (!isDark) return "";
+export function readerThemeCss(mode: ReaderColorMode | boolean): string {
+  const theme = typeof mode === "boolean" ? (mode ? "dark" : "light") : mode;
+  if (theme === "light" || theme === "system") return "";
+
+  const colors = {
+    paper: { background: "#fffaf0", foreground: "#29261f", link: "#456777" },
+    sepia: { background: "#efe5ce", foreground: "#3a3227", link: "#315f71" },
+    sage: { background: "#e7efe8", foreground: "#29382e", link: "#2d6671" },
+    dark: { background: "#15181c", foreground: "#c9cdd1", link: "#6cb6d9" },
+  } as const;
+  const { background, foreground, link } = colors[theme];
   return [
-    `html { background-color: #15181c !important; }`,
-    `body { background-color: #15181c !important; color: #c9cdd1 !important; }`,
+    `html, body { background-color: ${background} !important; }`,
+    `body { color: ${foreground} !important; }`,
     `body :where(p,li,dd,dt,blockquote,span,div,h1,h2,h3,h4,h5,h6,td,th,figcaption) { color: inherit !important; }`,
-    `a { color: #6cb6d9 !important; }`,
-    `img { filter: brightness(0.9); }`,
+    `a { color: ${link} !important; }`,
+    ...(theme === "dark" ? [`img { filter: brightness(0.9); }`] : []),
   ].join("\n");
+}
+
+/** Resolve EPUB page styling from its own preference and the OS theme, never the app chrome theme. */
+export function readerThemeCssForMode(mode: ReaderColorMode, systemTheme: ResolvedTheme): string {
+  if (mode === "system") return readerThemeCss(systemTheme === "dark");
+  return readerThemeCss(mode);
 }

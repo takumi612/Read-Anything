@@ -7,6 +7,10 @@ describe("isAllowedExternalUrl", () => {
     expect(isAllowedExternalUrl("http://example.com/x")).toBe(true);
     expect(isAllowedExternalUrl("mailto:a@b.com")).toBe(true);
   });
+  it("allows only the Windows Default Apps settings page", () => {
+    expect(isAllowedExternalUrl("ms-settings:defaultapps")).toBe(true);
+    expect(isAllowedExternalUrl("ms-settings:other")).toBe(false);
+  });
   it("rejects file/javascript/data and garbage", () => {
     expect(isAllowedExternalUrl("file:///etc/passwd")).toBe(false);
     expect(isAllowedExternalUrl("javascript:alert(1)")).toBe(false);

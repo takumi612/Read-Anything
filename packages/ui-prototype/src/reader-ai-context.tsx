@@ -1,5 +1,5 @@
-// 把跨栏 UI 状态汇到一个小 context（替代状态库）：当前章、面板折叠、选区、
-// 草稿 chips/文本、对话(经 useMockChat)、本章摘要状态、阅读偏好。
+// Gom trạng thái UI giữa các cột vào một context nhỏ (thay cho thư viện quản lý trạng thái): chương hiện tại, trạng thái thu gọn bảng, vùng chọn,
+// chips/văn bản nháp, hội thoại (qua useMockChat), trạng thái tóm tắt chương và tùy chọn đọc.
 
 import {
   createContext,
@@ -54,50 +54,50 @@ interface ReaderAIValue {
   headerOpen: boolean;
   setHeaderOpen: (open: boolean) => void;
 
-  // 选区（由 Reader 写入；驱动浮动工具栏）
+  // Vùng chọn (được Reader ghi vào; điều khiển thanh công cụ nổi)
   selection: SelectionInfo | null;
   setSelection: (s: SelectionInfo | null) => void;
 
-  // 草稿（点 AI 动作后预填，等待发送）
+  // Bản nháp (được điền sẵn sau khi chọn thao tác AI, chờ gửi)
   draftChips: Chip[];
   draftText: string;
   setDraftText: (t: string) => void;
-  focusNonce: number; // 自增 → Composer 聚焦
+  focusNonce: number; // Tăng dần → đưa tiêu điểm vào Composer
   startAiAction: (preset: PresetId | null) => void;
-  /** 当前草稿选区触及的章节（length>1 = 跨章 → 独立会话）。 */
+  /** Các chương mà vùng chọn trong bản nháp hiện tại chạm tới (length > 1 = chọn xuyên chương → hội thoại riêng). */
   draftChapterIds: string[];
 
-  // 对话
+  // Hội thoại
   messages: ChatMessage[];
   isStreaming: boolean;
   sendDraft: () => void;
   stop: () => void;
   newConversation: () => void;
-  /** 已发送过的选区触及章节（驱动会话作用域：单章 / 跨章独立会话）。 */
+  /** Các chương có vùng chọn đã gửi chạm tới (xác định phạm vi hội thoại: một chương / hội thoại riêng xuyên chương). */
   conversationChapterIds: string[];
 
-  // 侧栏会话高亮（仅视觉）
+  // Đánh dấu hội thoại trên thanh bên (chỉ hiển thị)
   activeConversationId: string | null;
   setActiveConversationId: (id: string | null) => void;
 
-  // 本章摘要状态（可循环演示降级态）
+  // Trạng thái tóm tắt chương hiện tại (có thể luân phiên để minh họa các trạng thái dự phòng)
   summaryStatus: SummaryStatus;
   cycleSummaryStatus: (chapterId?: string) => void;
   summaryStatusOf: (chapterId: string) => SummaryStatus;
 
-  // 标注 / 笔记
+  // Đánh dấu / ghi chú
   annotations: Annotation[];
-  /** 从当前选区落一条标注；返回 id（无选区返回 null）。 */
+  /** Tạo một mục đánh dấu từ vùng chọn hiện tại; trả về id (trả về null nếu không có vùng chọn). */
   addAnnotation: (color: HighlightColor, note?: string) => string | null;
   updateAnnotation: (id: string, patch: Partial<Pick<Annotation, "color" | "note">>) => void;
   removeAnnotation: (id: string) => void;
-  /** 取某段落命中的标注片段（供正文渲染高亮）。 */
+  /** Lấy các đoạn đánh dấu khớp với một đoạn văn (để hiển thị tô sáng trong nội dung). */
   annotationsForParagraph: (chapterId: string, paragraphIndex: number) => ParagraphHighlight[];
   highlightPopover: HighlightPopoverState | null;
   openHighlightPopover: (id: string, x: number, y: number, autoFocusNote?: boolean) => void;
   closeHighlightPopover: () => void;
 
-  // 阅读偏好
+  // Tùy chọn đọc
   prefs: ReaderPrefs;
   updatePrefs: (patch: Partial<ReaderPrefs>) => void;
 }
@@ -143,7 +143,7 @@ export function ReaderAIProvider({ children }: { children: ReactNode }) {
       setPanelOpen(true);
       setFocusNonce((n) => n + 1);
       if (typeof window !== "undefined") window.getSelection()?.removeAllRanges();
-      setSelection(null); // 收起工具栏；chips 已捕获进草稿
+      setSelection(null); // Ẩn thanh công cụ; chips đã được đưa vào bản nháp
     },
     [setSelection],
   );
@@ -152,7 +152,7 @@ export function ReaderAIProvider({ children }: { children: ReactNode }) {
     if (draftChips.length === 0 && draftText.trim() === "") return;
     const text = draftText.trim() || "请就选中的文本展开说说。";
 
-    // 段落去重：与上一次插入的段落相同 → 本轮省略 paragraph chip
+    // Khử trùng lặp đoạn văn: nếu trùng với đoạn được thêm lần trước thì bỏ chip paragraph ở lượt này
     const para = draftChips.find((c) => c.id === "paragraph");
     const chips =
       para && para.content === lastParagraph.current
@@ -216,7 +216,7 @@ export function ReaderAIProvider({ children }: { children: ReactNode }) {
       };
       setAnnotations((prev) => [...prev, ann]);
       if (typeof window !== "undefined") window.getSelection()?.removeAllRanges();
-      setSelection(null); // 收起选区工具栏
+      setSelection(null); // Ẩn thanh công cụ vùng chọn
       return id;
     },
     [setSelection],

@@ -41,13 +41,14 @@ describe("createLibraryTools", () => {
     expect(b1.progressPercent).toBe(0.4);
     expect(b1.readingState).toBe("reading");
   });
-  it("getBook returns details; unknown id returns an error hint", async () => {
+  it("getBook returns details without an AI-generated summary; unknown id returns an error hint", async () => {
     const db = freshDb();
     db.insert(books).values({ id: "b1", title: "T", summary: "the gist" }).run();
     const tools = createLibraryTools({ db });
     const ok = (await run(tools.getBook, { bookId: "b1" })) as Record<string, unknown>;
     expect(ok.title).toBe("T");
-    expect(ok.summary).toBe("the gist");
+    expect(ok).not.toHaveProperty("summary");
+    expect(ok).not.toHaveProperty("summaryStatus");
     const bad = (await run(tools.getBook, { bookId: "nope" })) as Record<string, unknown>;
     expect(bad.error).toBeTypeOf("string");
   });

@@ -1,9 +1,9 @@
-import { useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useMachine, type VirtualDocsHandle } from "@marginalia/virtual-docs";
 import { createLogger } from "@renderer/logger";
-import { useNavigationStore } from "@renderer/store/navigation-store";
 import { qk } from "../query/keys";
+import type { ProgressDto, SaveProgressInput } from "@shared/library";
 import type { EpubBook } from "./epub-book";
 import {
   initialReadingPositionState,
@@ -24,11 +24,11 @@ interface Args {
   book: EpubBook | null;
   persistProgress: boolean;
   vRef: React.RefObject<VirtualDocsHandle | null>;
-  /** 把 CFI 解析成 section 内锚点元素；失败返回 null（退化为 section 顶）。 */
+  /** Đổi CFI thành phần tử neo trong section; trả null nếu thất bại để về đầu section. */
   resolveCfiElement: (cfi: string) => (doc: Document) => Element | null;
-  /** 章 id → { index, anchor }；章不存在或 href 无法定位时返回 null。 */
+  /** Đổi id chương thành { index, anchor }; trả null nếu thiếu chương hoặc không định vị được href. */
   resolveChapterTarget: (chapterId: string) => { index: number; anchor: string | null } | null;
-  /** 把位置快照写进 navigation store（当前章 / 阅读上下文 / 百分比）。 */
+  /** Ghi ảnh chụp vị trí vào navigation store: chương, ngữ cảnh đọc và phần trăm tiến độ. */
   reportPosition: (position: ReadingPosition) => void;
 }
 
@@ -45,23 +45,46 @@ export function useReadingPosition({
   raise: (event: ReadingPositionEvent) => void;
 } {
   const qc = useQueryClient();
-  const setReadingPercent = useNavigationStore((s) => s.setReadingPercent);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pendingProgress = useRef<SaveProgressInput | null>(null);
   const stateRef = useRef<ReadingPositionState>(initialReadingPositionState());
   const raiseRef = useRef<((event: ReadingPositionEvent) => void) | null>(null);
+
+  const flushProgress = useCallback(
+    (sync: boolean) => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+      const input = pendingProgress.current;
+      pendingProgress.current = null;
+      if (!input || stateRef.current.kind !== "following") return;
+      if (sync) {
+        if (!window.api.progress.saveSync(input)) log.warn("synchronous progress save failed");
+      } else {
+        void window.api.progress
+          .save(input)
+          .catch((err: unknown) => log.warn("save progress failed", err));
+      }
+      qc.setQueryData<ProgressDto | null>(qk.progress(input.bookId), (previous) => ({
+        locator: input.locator,
+        percent: previous?.percent ?? null,
+      }));
+    },
+    [qc],
+  );
 
   const runEffect = (effect: ReadingPositionEffect) => {
     switch (effect.kind) {
       case "restoreToCfi": {
         const handle = vRef.current;
-        // handle 缺失时必须自己发终结事件：可选链短路会让 RESTORE_FINISHED 永不到达，
-        // 状态永久卡在 restoring、进度从此不再保存——正是本次要消灭的那类缺陷。
+        // Nếu thiếu handle, tự phát sự kiện kết thúc. Optional chaining bỏ qua lời gọi sẽ khiến
+        // RESTORE_FINISHED không tới, state kẹt ở restoring và tiến độ không được lưu nữa.
         if (!handle) {
           raiseRef.current?.({ type: "RESTORE_FINISHED", result: "cancelled" });
           return;
         }
-        // owner: "restore" 表示这次定位由系统发起，不计作用户导航——据此保持顶部 overscan 为 0，
-        // 避免上方 section 的迟到测高把恢复目标推走。用户主动跳转则传 "user"。
+        // owner="restore" là định vị do hệ thống, không tính là người dùng điều hướng;
+        // giữ overscan phía trên bằng 0 để đo chiều cao section tới muộn không đẩy lệch vị trí.
+        // Khi người dùng chủ động chuyển, truyền "user".
         void handle
           .scrollToSectionElement(effect.targetIndex, resolveCfiElement(effect.locator), {
             owner: "restore",
@@ -88,23 +111,14 @@ export function useReadingPosition({
         ttsController.notifyUserNavigation();
         return;
       case "reportPosition":
-        setReadingPercent(effect.position.percent);
         reportPosition(effect.position);
         return;
       case "persistProgress": {
         if (!persistProgress || !effect.position.cfi) return;
-        const { cfi, percent } = effect.position;
+        const { cfi } = effect.position;
+        pendingProgress.current = { bookId, locator: cfi };
         if (saveTimer.current) clearTimeout(saveTimer.current);
-        saveTimer.current = setTimeout(() => {
-          // debounce 到期时重读状态：排队中的保存不得落在恢复期。
-          if (stateRef.current.kind !== "following") return;
-          void window.api.progress
-            .save({ bookId, locator: cfi, percent })
-            .catch((err: unknown) => log.warn("save progress failed", err));
-          // 同步写入查询缓存：progress 查询 staleTime=Infinity，不写缓存的话重开书会读到
-          // 首开时的旧值（通常是 null）→ initialIndex 永远 0 → 回到开头。
-          qc.setQueryData(qk.progress(bookId), { locator: cfi });
-        }, SAVE_DEBOUNCE_MS);
+        saveTimer.current = setTimeout(() => flushProgress(false), SAVE_DEBOUNCE_MS);
         return;
       }
     }
@@ -122,19 +136,19 @@ export function useReadingPosition({
   stateRef.current = state;
   raiseRef.current = raise;
 
-  // 换书：回到 loading 并丢弃在途存盘。
+  // Switch to the next book after the previous book's effect cleanup has flushed its position.
   useEffect(() => {
-    if (saveTimer.current) clearTimeout(saveTimer.current);
-    saveTimer.current = null;
     raise({ type: "BOOK_CHANGED" });
   }, [bookId, raise]);
 
-  useEffect(
-    () => () => {
-      if (saveTimer.current) clearTimeout(saveTimer.current);
-    },
-    [],
-  );
+  useEffect(() => {
+    const onBeforeUnload = () => flushProgress(true);
+    window.addEventListener("beforeunload", onBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      flushProgress(false);
+    };
+  }, [bookId, flushProgress]);
 
   return { state, raise };
 }

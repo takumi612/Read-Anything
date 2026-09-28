@@ -1,12 +1,12 @@
 /**
- * MCP 搜索后端：通过 Streamable HTTP MCP 协议调用远端搜索工具（Exa 等）。
+ * Backend tìm kiếm MCP: gọi công cụ từ xa như Exa qua giao thức Streamable HTTP MCP.
  *
- * SDK API（@modelcontextprotocol/sdk 1.29.0，经 .d.ts 确认）：
+ * API của @modelcontextprotocol/sdk 1.29.0, đối chiếu từ định nghĩa kiểu:
  *   - new Client({ name, version }, options?)
  *   - client.connect(transport, requestOptions?)
  *   - client.callTool({ name, arguments }, resultSchema?, requestOptions?)
  *   - new StreamableHTTPClientTransport(url: URL, opts?: { requestInit?: RequestInit, ... })
- *     → requestInit.headers 传自定义请求头（含 API key）——与计划假设一致。
+ *     → requestInit.headers chứa header tùy chỉnh, gồm API key.
  */
 import { z } from "zod";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
@@ -17,7 +17,7 @@ import type { WebSearchBackendConfig } from "@shared/web-search";
 
 const log = createLogger("search");
 
-/** 创建 MCP 后端所需的运行时参数。 */
+/** Tham số cần để tạo backend MCP. */
 export interface McpBackendOpts {
   id: string;
   url: string;
@@ -33,25 +33,25 @@ const exaResultSchema = z.object({
 });
 
 /**
- * 将 MCP callTool 返回值映射为 SearchHit[]。
+ * Chuyển kết quả MCP callTool thành SearchHit[].
  *
- * 实测 Exa MCP (web_search_exa) 返回格式（structuredContent: NONE）：
+ * Định dạng trả về của Exa MCP web_search_exa đã kiểm tra; không có structuredContent:
  *   { content: [{ type:"text", text: <formatted plain text> }] }
  *
- * 每个结果块的文本格式（块间以 --- 分隔）：
+ * Các khối kết quả cách nhau bằng --- và có định dạng:
  *   Title: <title>
  *   URL: <url>
- *   Published: <ISO 日期 | N/A>
+ *   Published: <ngày ISO | N/A>
  *   Author: <name | N/A>
  *   Highlights:
- *   <多行 highlight 文本>
+ *   <văn bản nổi bật có thể nhiều dòng>
  */
 export function mapExaResult(raw: unknown): SearchHit[] {
-  // envelope 格式校验：失败时抛出（让 SearchService 走回退路径）
+  // Kiểm tra envelope; lỗi để SearchService dùng đường dự phòng.
   const { content } = exaResultSchema.parse(raw);
   const text = content[0]!.text;
 
-  // 块间分隔：--- 独占一行（允许前后空白）
+  // Dấu --- nằm trên một dòng riêng; chấp nhận khoảng trắng hai bên.
   const blocks = text.split(/\n[ \t]*-{3,}[ \t]*\n/);
 
   const hits: SearchHit[] = [];
@@ -63,13 +63,13 @@ export function mapExaResult(raw: unknown): SearchHit[] {
       const highlightsMatch = /^Highlights:\s*\n([\s\S]*)$/m.exec(block);
 
       const url = urlMatch?.[1]?.trim();
-      if (!url) continue; // 无 URL，跳过此块
+      if (!url) continue; // Bỏ kết quả không có URL.
 
       const title = titleMatch?.[1]?.trim() || url;
       const publishedRaw = publishedMatch?.[1]?.trim();
       const publishedDate = publishedRaw && publishedRaw !== "N/A" ? publishedRaw : undefined;
 
-      // highlight 文本：折叠多余空行，去首尾空白，限 600 字符
+      // Gộp dòng trống, bỏ khoảng trắng hai đầu và giới hạn highlight ở 600 ký tự.
       const highlightText = highlightsMatch?.[1] ?? "";
       const snippet = highlightText
         .replace(/\n{3,}/g, "\n\n")
@@ -78,13 +78,13 @@ export function mapExaResult(raw: unknown): SearchHit[] {
 
       hits.push({ title, url, snippet, ...(publishedDate ? { publishedDate } : {}) });
     } catch {
-      // 单块解析失败不影响其他块
+      // Một khối lỗi không ảnh hưởng các khối còn lại.
     }
   }
   return hits;
 }
 
-/** 构造 Exa MCP 预设后端配置。apiKey 可选——Exa 免费层无 key 可用。 */
+/** Tạo cấu hình Exa MCP; apiKey tùy chọn vì gói miễn phí có thể dùng không cần khóa. */
 export function exaBackendOpts(apiKey?: string): McpBackendOpts {
   return {
     id: "exa-mcp",
@@ -96,11 +96,11 @@ export function exaBackendOpts(apiKey?: string): McpBackendOpts {
 }
 
 /**
- * 构造通用 MCP 后端配置（支持自定义请求头与工具名）。
+ * Tạo cấu hình MCP chung với header và tên công cụ tùy chỉnh.
  *
- * 备用 `kind:"mcp"` server 复用 `mapExaResult`，即假设其 MCP tool 返回 Exa 兼容的
- * 格式化文本（块间 ---，每块含 Title/URL/Published/Highlights 行）；
- * 返回异形结构的后端属未来扩展（spec 非目标），届时再为其特化 `mapResult`。
+ * Server `kind:"mcp"` khác dùng lại mapExaResult, nên cần trả văn bản theo dạng Exa:
+ * các khối cách nhau bằng ---, mỗi khối có Title/URL/Published/Highlights.
+ * Backend trả dạng khác cần hàm mapResult riêng trong lần mở rộng sau.
  */
 export function genericBackendOpts(
   cfg: Extract<WebSearchBackendConfig, { kind: "mcp" }>,
@@ -115,14 +115,14 @@ export function genericBackendOpts(
   };
 }
 
-/** 根据偏好配置选取合适的 opts 构造函数。 */
+/** Chọn cách tạo tùy chọn backend từ cấu hình người dùng. */
 export function backendOptsFor(cfg: WebSearchBackendConfig): McpBackendOpts {
   return cfg.kind === "exa-mcp" ? exaBackendOpts(cfg.apiKey) : genericBackendOpts(cfg);
 }
 
 /**
- * 创建一个惰性连接的 MCP SearchBackend。
- * 首次 search() 调用时建立连接；close() 时释放。
+ * Tạo MCP SearchBackend kết nối khi cần: search() đầu tiên mở kết nối,
+ * close() giải phóng tài nguyên.
  */
 export function makeMcpBackend(opts: McpBackendOpts): SearchBackend {
   let client: Client | undefined;
@@ -133,7 +133,7 @@ export function makeMcpBackend(opts: McpBackendOpts): SearchBackend {
     if (!connecting) {
       connecting = (async () => {
         try {
-          const c = new Client({ name: "marginalia", version: "1.0.0" });
+          const c = new Client({ name: "read-anything", version: "0.1.0" });
           const transport = new StreamableHTTPClientTransport(new URL(opts.url), {
             requestInit: { headers: opts.headers },
           });

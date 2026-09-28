@@ -9,7 +9,7 @@ export interface BookNoteDto {
   updatedAt: number;
 }
 
-// content：.trim() 是转换——校验且落库的都是 trim 后的 Markdown 源码
+// content được trim trước khi kiểm tra và lưu dưới dạng Markdown.
 export const createBookNoteInput = z.object({
   bookId: z.string().min(1),
   content: z.string().trim().min(1),

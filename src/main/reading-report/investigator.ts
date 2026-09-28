@@ -1,5 +1,5 @@
-// src/main/reading-report/investigator.ts —— 报告 agent 的会话调查 subagent（spec 2026-08-10）。
-// 纯逻辑 + 注入端口（读页、生成），不碰 Electron，可 headless 单测。
+// Tác vụ điều tra hội thoại để tạo báo cáo đọc (spec 2026-08-10).
+// Chỉ có logic và các hàm được truyền vào để đọc trang/gọi model; có thể kiểm thử không cần Electron.
 import { z } from "zod";
 import { parseJsonOutput } from "@main/ai/structured-output";
 import { createLogger } from "@main/logger";
@@ -12,17 +12,17 @@ import {
 
 const log = createLogger("report");
 
-/** 单页读取的正文 token 预算：subagent 的上下文只装一个会话，可比主 agent 吃得更粗。 */
+/** Giới hạn token cho một trang hội thoại; tác vụ này chỉ xử lý một hội thoại. */
 export const INVESTIGATION_PAGE_TOKEN_BUDGET = 40_000;
-/** 单次调查累计读取的 token 上限；触顶即停并如实上报 truncated。 */
+/** Tổng số token tối đa cho một lần điều tra; hết mức thì dừng và báo truncated. */
 export const INVESTIGATION_TOTAL_TOKEN_BUDGET = 150_000;
-/** 拿不到后台并发额度多久后放弃外派、让主 agent 自己翻页。 */
+/** Thời gian chờ suất chạy nền trước khi để tác vụ chính tự đọc từng trang. */
 export const INVESTIGATION_SLOT_TIMEOUT_MS = 45_000;
 /**
- * 单页取回的条数上限。刻意远大于给主 agent 的 SESSION_CONVERSATION_MAX_LIMIT：subagent 的
- * 页大小应当由 token 预算封顶，条数上限若先触发，会把一页切成远小于预算的碎片——短问短答的
- * 会话尤甚（50 条可能只有几千 token），页数与模型调用次数随之翻数倍，跨轮因果也更容易断。
- * 仍保留一个上限，纯粹是防单页取回量失控。
+ * Số tin nhắn tối đa mỗi trang lớn hơn giới hạn của tác vụ chính.
+ * Ngân sách token mới là giới hạn chính; nếu giới hạn số tin nhắn quá thấp,
+ * hội thoại gồm nhiều lượt ngắn sẽ bị chia nhỏ, tăng số lần gọi model và mất ngữ cảnh.
+ * Vẫn giữ một mức tối đa để tránh đọc quá nhiều tin trong một lần.
  */
 export const INVESTIGATION_PAGE_MESSAGE_LIMIT = 500;
 
@@ -48,17 +48,17 @@ export interface ConversationInvestigation {
     fromSeq: number | null;
     toSeq: number | null;
     messagesRead: number;
-    /** 因累计预算触顶或分页未走完而未覆盖全部会话。 */
+    /** Chưa bao phủ toàn bộ hội thoại vì hết ngân sách hoặc chưa đọc hết trang. */
     truncated: boolean;
   };
 }
 
 export interface InvestigateConversationDeps {
-  /** 读一页会话证据（生产实现绑定 db + session + conversationId）。 */
+  /** Đọc một trang bằng chứng hội thoại; bản thật gắn với DB và phiên đọc. */
   readPage: (options: SessionConversationReadOptions) => SessionConversationReadResult;
-  /** 单发模型调用，返回模型原始文本（生产实现走 generateText + 全局后台限流）。 */
+  /** Gọi model một lần và trả văn bản gốc; bản thật dùng generateText và giới hạn nền. */
   generate: (prompt: string) => Promise<string>;
-  /** 主 agent 传下来的关注点，可为空。 */
+  /** Chủ đề cần chú ý do tác vụ chính truyền xuống; có thể rỗng. */
   focus?: string;
   totalTokenBudget?: number;
   pageTokenBudget?: number;
@@ -99,7 +99,7 @@ function buildPagePrompt(input: {
   return sections.filter((section) => section !== null).join("\n\n");
 }
 
-/** 模型偶发给出越界 seq；夹到本页真实范围内，避免主 agent 据此回读到空片段。 */
+/** Giới hạn seq model trả về trong trang hiện tại để không đọc lại khoảng trống. */
 function clampToPage(point: InvestigationPoint, seqs: number[]): InvestigationPoint {
   const low = Math.min(...seqs);
   const high = Math.max(...seqs);
@@ -109,13 +109,12 @@ function clampToPage(point: InvestigationPoint, seqs: number[]): InvestigationPo
 }
 
 /**
- * 分页读完一个会话并逐页抽取读者动作，最后合并成一份要点清单。
+ * Đọc từng trang của một hội thoại, trích hành động của người đọc rồi gộp thành danh sách ý chính.
  *
- * 刻意不做成「给 subagent 一套翻页工具、让它自己循环」：那样每页原文都会累积进 subagent 的
- * 上下文，长会话照样爆——只是把爆点从主 agent 挪到 subagent。逐页抽取则只让要点跨页累积，
- * 单次调用的上下文恒等于「一页 + 已有 topic」，与会话长度无关。
+ * Mỗi trang được xử lý riêng để văn bản gốc không tích tụ trong ngữ cảnh model.
+ * Chỉ các ý chính được chuyển sang trang sau; mỗi lần gọi luôn chứa một trang và chủ đề đã có.
  *
- * 单页解析失败不整体失败：记 warn 后跳过该页；全部页均失败才抛错（工具层转 failed 降级）。
+ * Nếu phân tích một trang lỗi, ghi cảnh báo và tiếp tục; chỉ báo lỗi khi mọi trang đều lỗi.
  */
 export async function investigateConversation(
   deps: InvestigateConversationDeps,

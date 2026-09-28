@@ -2,8 +2,8 @@ import type { UIMessage } from "ai";
 import type { Chip } from "@shared/chat";
 
 /**
- * 渲染层活跃对话 UIMessage 的元数据：随用户消息携带本轮上下文 chips（live 形态），
- * 并携带消息时刻（历史由 MessageDto.createdAt 水合；live 消息渲染时回退到当前时刻）。
+ * Metadata của UIMessage đang dùng trong renderer: tin người dùng mang chip ngữ cảnh hiện tại
+ * và thời điểm gửi. Tin cũ lấy thời điểm từ MessageDto.createdAt; tin đang stream tạm dùng giờ hiện tại.
  */
 export interface ChatMetadata {
   contextChips?: Chip[];
@@ -11,5 +11,5 @@ export interface ChatMetadata {
   createdAt?: number;
 }
 
-/** useChat / transport 全程使用的消息类型。 */
+/** Kiểu tin nhắn dùng xuyên suốt useChat và transport. */
 export type ChatUIMessage = UIMessage<ChatMetadata>;

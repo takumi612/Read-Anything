@@ -23,19 +23,44 @@ import { t } from "@main/i18n";
 import { type ResendInput, type SendInput } from "@shared/chat";
 import type { AppNotification } from "@shared/chat";
 import { streamAssistantReply, type OkSendResult } from "@main/ai/stream-assistant";
+import { formatPdfEvidence, retrievePdfEvidence } from "@main/ai/pdf-retrieval";
+import { createLogger } from "@main/logger";
 export type { SendInput };
+
+const log = createLogger("pdf-retrieval");
+
+async function pdfEvidenceForTurn(
+  deps: SendDeps,
+  bookId: string | null,
+  chips: ReadonlyArray<{ id: string; content: string }>,
+  question: string,
+  currentPage?: number,
+): Promise<string | null> {
+  if (!bookId) return null;
+  const book = getBook(deps.db, bookId);
+  if (book?.format !== "pdf" || !book.hasTextLayer) return null;
+  try {
+    const selection = chips.find((chip) => chip.id === "selection")?.content ?? "";
+    return formatPdfEvidence(
+      await retrievePdfEvidence(bookId, deps.loadBytes, selection, question, currentPage),
+    );
+  } catch (err) {
+    log.warn("could not retrieve PDF excerpts", err);
+    return null;
+  }
+}
 
 export interface SendDeps {
   db: DB;
   loadBytes: LoadBytes;
   resolveModel: () => ResolvedModel;
-  /** 摘要模型解析器（auto naming 用；章节/全书摘要在 makeSummaryDeps 注入同一解析器）。不回退聊天模型——未配置则 naming/摘要跳过。 */
+  /** Chọn model nền cho đặt tên/tóm tắt; nếu chưa cấu hình thì bỏ qua, không tự dùng model chat. */
   resolveSummaryModel: () => ResolvedModel;
-  /** 后台并发限流端口：透传给 auto-naming / 压缩；摘要在 makeSummaryDeps 注入同一单例。 */
+  /** Giới hạn tác vụ AI nền dùng chung cho đặt tên, nén ngữ cảnh và tóm tắt. */
   runBackground: RunBackground;
-  /** agent 多步上限（默认 DEFAULT_STEP_LIMIT=10）；0 = 不限制（永不主动刹车，靠模型自然停止 + abort）。 */
+  /** Số bước AI tối đa; 0 nghĩa là không giới hạn và chỉ dừng khi model kết thúc hoặc bị hủy. */
   stepLimit?: number;
-  /** 联网搜索工具工厂（注入式，便于测试 mock）；未配置则跳过注入。 */
+  /** Factory tìm kiếm mạng có thể thay bằng mock; chưa cấu hình thì không thêm công cụ. */
   createSearchTools?: (
     cfg: WebSearchConfig,
     turnEnabled: boolean,
@@ -43,15 +68,15 @@ export interface SendDeps {
     tools: Record<string, unknown>;
     close: () => Promise<unknown>;
   };
-  /** 当前联网搜索配置快照（settings 级）。 */
+  /** Snapshot cấu hình tìm kiếm mạng hiện tại. */
   webSearchConfig?: WebSearchConfig;
-  /** main→renderer 通知端口（后台记忆整理完成的 toast）。 */
+  /** Thông báo từ main sang renderer khi tác vụ bộ nhớ nền hoàn tất. */
   notify: (n: AppNotification) => void;
 }
 
 export type SendResult = OkSendResult | { ok: false; reason: string };
 
-/** 选区 → AI 发送编排（设计文档 §9）。 */
+/** Điều phối gửi đoạn đã chọn tới AI (thiết kế §9). */
 export async function runSend(
   deps: SendDeps,
   input: SendInput,
@@ -59,11 +84,11 @@ export async function runSend(
 ): Promise<SendResult> {
   const { db, resolveModel } = deps;
 
-  // 1. 先解析模型——未配置即返回错误，不落库
+  // 1. Chọn model trước; nếu thiếu thì báo lỗi và không ghi DB.
   const resolved = resolveModel();
   if (!resolved.ok) return { ok: false, reason: resolved.reason };
 
-  // 1b. 校验会话存在且属于本书（spec §5：只校验不分配，绝不默默新建）
+  // 1b. Kiểm tra hội thoại thuộc sách này; không tự tạo hội thoại mới.
   const convo = db
     .select({
       bookId: conversations.bookId,
@@ -74,18 +99,25 @@ export async function runSend(
     .where(eq(conversations.id, input.conversationId))
     .get();
   if (!convo || convo.bookId !== input.bookId) {
-    return { ok: false, reason: t("errors.conversationNotFound", "会话不存在或不属于本书") };
+    return { ok: false, reason: t("errors.conversationNotFound", "Không tìm thấy cuộc trò chuyện hoặc cuộc trò chuyện thuộc sách khác") };
   }
   const conversationId = input.conversationId;
 
-  // 2. 防御过滤 off chip（正常路径 renderer 已过滤）+ 段落去重
+  // 2. Lọc chip đã tắt và bỏ đoạn văn trùng, dù renderer thường đã làm.
   const activeChips = input.chips.filter((c) => c.state !== "off");
   const deduped = dedupeParagraph(activeChips, getLastParagraphContent(db, conversationId));
+  const pdfEvidence = await pdfEvidenceForTurn(
+    deps,
+    input.bookId,
+    deduped,
+    input.userText,
+    input.readingContext?.format === "pdf" ? input.readingContext.page : undefined,
+  );
 
-  // 3. 取尾轮历史（seq > S；S=null 取全量。在落入本轮 user 消息之前）
+  // 3. Lấy lịch sử sau mốc S, hoặc toàn bộ nếu S=null, trước khi lưu lượt mới.
   const history = listMessagesAfterSeq(db, conversationId, convo.summarizedThroughSeq);
 
-  // 4. 落 user 消息（chips 快照入 metadata）
+  // 4. Lưu tin nhắn người dùng kèm snapshot chip trong metadata.
   appendMessage(db, {
     conversationId,
     role: "user",
@@ -93,7 +125,7 @@ export async function runSend(
     metadata: { contextChips: toContextChips(deduped), model: resolved.modelId },
   });
 
-  // 5. 组装 prompt：①内置模板+②instructions+③SOUL+④记忆索引（会话快照冻结）+⑤PDF 注记
+  // 5. Ghép prompt từ mẫu gốc, instructions, SOUL, chỉ mục bộ nhớ và ghi chú PDF.
   const book = input.bookId ? getBook(db, input.bookId) : undefined;
   const imageToolResults = supportsImageToolResults(resolved.providerType);
   let systemPromptText = buildSystemPrompt(db, conversationId, input.bookId ? "book" : "library");
@@ -118,12 +150,13 @@ export async function runSend(
       chips: deduped,
       userText: input.userText,
       readingContext: input.readingContext,
+      pdfEvidence,
       currentDateTime: formatCurrentDateTime(Temporal.Now.zonedDateTimeISO()),
       webSearchEnabled,
     },
   });
 
-  // 将首个 system 消息提取出来，通过 instructions: 参数传给 streamText（避免 allowSystemInMessages 警告）
+  // Đưa system prompt qua tham số instructions của streamText để tránh cảnh báo.
   let systemPrompt: string | undefined;
   let messages: ModelMessage[];
   if (allMessages.length > 0 && allMessages[0].role === "system") {
@@ -134,7 +167,7 @@ export async function runSend(
     messages = allMessages;
   }
 
-  // 6. 流式回复（共享尾段）
+  // 6. Trả lời dạng stream qua phần xử lý chung.
   return streamAssistantReply(
     deps,
     { conversationId, bookId: input.bookId, resolved, userText: input.userText, webSearchTurn },
@@ -144,7 +177,7 @@ export async function runSend(
   );
 }
 
-/** 编辑重发 / 直接重发：设 user 文本 + 截断其后 + 从持久化消息重组 prompt + 流式。 */
+/** Gửi lại sau khi sửa hoặc giữ nguyên tin: cắt các lượt sau, dựng lại prompt rồi stream. */
 export async function runResend(
   deps: SendDeps,
   input: ResendInput,
@@ -165,18 +198,18 @@ export async function runResend(
     .where(eq(conversations.id, input.conversationId))
     .get();
   if (!convo) {
-    return { ok: false, reason: t("errors.conversationNotFound", "会话不存在或不属于本书") };
+    return { ok: false, reason: t("errors.conversationNotFound", "Không tìm thấy cuộc trò chuyện hoặc cuộc trò chuyện thuộc sách khác") };
   }
 
   const target = getMessage(db, input.userMessageId);
   if (!target || target.conversationId !== input.conversationId || target.role !== "user") {
-    return { ok: false, reason: t("errors.messageNotResendable", "消息不存在或不可重发") };
+    return { ok: false, reason: t("errors.messageNotResendable", "Không thể gửi lại tin nhắn này") };
   }
 
-  // 事务：设文本 + 截断其后 + 按需重置摘要
+  // Transaction: lưu văn bản mới, cắt lịch sử phía sau và đặt lại tóm tắt khi cần.
   resetUserTurnForResend(db, input.conversationId, input.userMessageId, input.userText);
 
-  // 重读摘要态（可能刚被重置）
+  // Đọc lại trạng thái tóm tắt sau transaction.
   const c2 = db
     .select({
       contextSummary: conversations.contextSummary,
@@ -186,15 +219,22 @@ export async function runResend(
     .where(eq(conversations.id, input.conversationId))
     .get();
 
-  // 窗口历史（末条 = 目标 user 轮）
+  // Lịch sử trong cửa sổ ngữ cảnh, kết thúc ở lượt người dùng cần gửi lại.
   const window = listMessagesAfterSeq(db, input.conversationId, c2?.summarizedThroughSeq ?? null);
   const current = window.at(-1);
   if (!current) {
-    return { ok: false, reason: t("errors.messageNotResendable", "消息不存在或不可重发") };
+    return { ok: false, reason: t("errors.messageNotResendable", "Không thể gửi lại tin nhắn này") };
   }
   const history = window.slice(0, -1);
+  const currentText = textOfParts(current.parts);
+  const pdfEvidence = await pdfEvidenceForTurn(
+    deps,
+    convo.bookId,
+    current.metadata?.contextChips ?? [],
+    currentText,
+  );
 
-  // system（同 runSend：五层组装 + PDF 注记）
+  // System prompt dùng cùng năm lớp ngữ cảnh và ghi chú PDF như runSend.
   const book = convo.bookId ? getBook(db, convo.bookId) : undefined;
   const imageToolResults = supportsImageToolResults(resolved.providerType);
   let systemPromptText = buildSystemPrompt(
@@ -222,8 +262,9 @@ export async function runResend(
     history,
     current: {
       chips: current.metadata?.contextChips ?? [],
-      userText: textOfParts(current.parts),
+      userText: currentText,
       readingContext: null,
+      pdfEvidence,
       currentDateTime: formatCurrentDateTime(Temporal.Now.zonedDateTimeISO()),
       webSearchEnabled,
     },

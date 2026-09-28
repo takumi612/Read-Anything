@@ -17,7 +17,7 @@ export const chatBindings: Binding[] = [
   bind(C.conversationsCreate, (input) => createConversation(getDb(), input)),
   bind(C.conversationsGet, (input) => getConversation(getDb(), input.id)),
   bind(C.conversationsDelete, (input) => {
-    // 先中止该会话的在跑流（防删行后继续推送/落库），再删行（messages 级联）。
+    // Hủy luồng đang chạy trước khi xóa hội thoại và tin nhắn liên quan.
     abortConversationStreams(input.id);
     deleteConversation(getDb(), input.id);
   }),

@@ -17,7 +17,7 @@ export function ModelsSettings() {
     queryKey: qk.providers,
     queryFn: () => window.api.settings.providers.list(),
   });
-  const [editing, setEditing] = useState<ProviderDto | null | "new">(null); // null=无, "new"=新建, dto=编辑
+  const [editing, setEditing] = useState<ProviderDto | null | "new">(null); // null: đóng; "new": tạo; DTO: sửa.
 
   const remove = useMutation({
     mutationFn: (id: string) => window.api.settings.providers.remove({ id }),
@@ -26,7 +26,7 @@ export function ModelsSettings() {
 
   return (
     <section className="space-y-6">
-      <h2 className="font-serif text-lg">{t("settings.models", "模型")}</h2>
+      <h2 className="font-serif text-lg">{t("settings.models", "Model")}</h2>
       <AssistantModelPicker />
       <SummaryModelPicker />
       <div className="space-y-2">
@@ -35,7 +35,7 @@ export function ModelsSettings() {
             {t("settings.provider.title", "$t(terms.provider)")}
           </h3>
           <Button variant="outline" size="sm" onClick={() => setEditing("new")}>
-            <Plus className="size-4" /> {t("settings.provider.add", "添加$t(terms.provider)")}
+            <Plus className="size-4" /> {t("settings.provider.add", "Thêm $t(terms.provider)")}
           </Button>
         </div>
         {editing === "new" && <ProviderForm provider={null} onDone={() => setEditing(null)} />}

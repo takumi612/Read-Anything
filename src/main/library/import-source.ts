@@ -3,7 +3,7 @@ import { readFile, stat } from "node:fs/promises";
 import path from "node:path";
 import { zipSync, type Zippable } from "fflate";
 
-/** 递归列出 root 下所有文件的相对路径（posix `/` 分隔），跳过点文件（.DS_Store 等）。 */
+/** Liệt kê đường dẫn tương đối dưới root, dùng dấu / và bỏ tệp ẩn. */
 function listFilesRel(root: string): string[] {
   const walk = (abs: string): string[] => {
     const out: string[] = [];
@@ -18,8 +18,11 @@ function listFilesRel(root: string): string[] {
   return walk(root);
 }
 
-/** 把未打包的 EPUB 目录（OCF 解包形态）打包成标准 EPUB zip 字节；mimetype 居首且不压缩。 */
-export function packEpubDir(dirPath: string): Uint8Array {
+/** Đóng thư mục EPUB đã giải nén thành ZIP chuẩn; mimetype đứng đầu và không nén. */
+export function packEpubDir(
+  dirPath: string,
+  readEntry: (filePath: string) => Buffer = readFileSync,
+): Uint8Array {
   const hasContainer = (() => {
     try {
       return statSync(path.join(dirPath, "META-INF", "container.xml")).isFile();
@@ -40,7 +43,7 @@ export function packEpubDir(dirPath: string): Uint8Array {
   for (const rel of ordered) {
     let bytes: Uint8Array;
     try {
-      bytes = new Uint8Array(readFileSync(path.join(dirPath, rel)));
+      bytes = new Uint8Array(readEntry(path.join(dirPath, rel)));
     } catch {
       throw new Error(
         `Cannot read EPUB directory contents (a file may be a non-materialized iCloud/Apple Books placeholder; download it locally and retry): "${path.join(dirPath, rel)}"`,
@@ -51,7 +54,7 @@ export function packEpubDir(dirPath: string): Uint8Array {
   return zipSync(entries);
 }
 
-/** 导入入口取字节：普通文件→readFile；目录→当未打包 EPUB 打包；其它→报错。 */
+/** Đọc bytes từ tệp, hoặc đóng thư mục EPUB thành ZIP; đầu vào khác báo lỗi. */
 export async function readBookBytes(filePath: string): Promise<Uint8Array> {
   let st;
   try {

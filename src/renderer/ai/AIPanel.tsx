@@ -9,6 +9,7 @@ import { ScrollArea } from "@renderer/components/ui/scroll-area";
 import { useChatStore, useActiveConversationId } from "@renderer/store/chat-store";
 import { usePrefsStore } from "@renderer/store/prefs-store";
 import { createIpcChatTransport } from "@renderer/ai/ipc-chat-transport";
+import { ensureAiDataConsent } from "@renderer/ai/ai-consent";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { MessageList } from "@renderer/ai/MessageList";
 import { Composer } from "@renderer/ai/Composer";
@@ -43,24 +44,24 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
   const { messages, sendMessage, status, stop, setMessages, regenerate, error } =
     useChat<ChatUIMessage>({
       transport: createIpcChatTransport(context),
-      // 合批 messages 通知：不节流时每个 chunk 都触发一次同步渲染，渲染侧实测 ~9ms/块，快模型
-      // （~200 块/秒）下 IPC 事件在渲染主线程积压到落后主进程近 10s；且连续的紧急渲染会不断打断
-      // Streamdown 放进 startTransition 的正文更新——工具参数流式期间正文完全停更、最后一次性刷出。
+      // Gom các thông báo messages: nếu mỗi chunk đều render đồng bộ thì mất khoảng 9 ms/chunk.
+      // Với mô hình nhanh khoảng 200 chunk/giây, sự kiện IPC có thể dồn trên renderer gần 10 giây.
+      // Các lần render ưu tiên cao còn ngắt cập nhật nội dung Streamdown trong startTransition.
       throttle: 50,
-      // 流式错误此前只塞进 error 字段弹 banner、从不落日志；补一条 warn 使渲染侧失败也有痕迹可查。
+      // Ghi warn cho lỗi stream để có dấu vết trong log; banner lỗi vẫn hiển thị như trước.
       onError: (err) => log.warn("chat stream error", err),
     });
   const agentName = usePrefsStore((s) => s.soul.name);
   const openCommand = useChatStore((s) => s.openCommand);
   const activeConversationId = useActiveConversationId(context);
   const bookId = context.kind === "book" ? context.bookId : null;
-  // 会话列表内嵌于面板（仅 library 上下文；阅读器的列表在 Sidebar）：header 切换 chat ↔ 列表。
-  const isLibrary = context.kind === "library";
+  // Trong thư viện, danh sách hội thoại nằm trong bảng và header chuyển giữa chat với danh sách.
+  // Ở trình đọc, danh sách nằm trong Sidebar.
   const [showList, setShowList] = useState(false);
   const convosQuery = useQuery(conversationsQuery(context));
   const activeTitle = activeConversationId
     ? convosQuery.data?.find((c) => c.id === activeConversationId)?.title?.trim() ||
-      t("reader.conversation.untitled", "未命名会话")
+      t("reader.conversation.untitled", "Cuộc trò chuyện chưa đặt tên")
     : null;
   const qc = useQueryClient();
   const scrollRef = useRef<HTMLDivElement | null>(null);
@@ -111,8 +112,8 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
     }
   }, [messages, status]);
 
-  // 用户离开底部后暂停 streaming 跟随；只有真正回到底部才恢复。
-  // showList 切换会卸载/重建 viewport，依赖它以确保监听器挂到新元素。
+  // Tạm dừng tự cuộn theo stream khi người dùng rời cuối danh sách; chỉ tiếp tục khi họ thật sự quay lại cuối.
+  // showList tháo rồi tạo lại viewport nên cần làm mới listener cho phần tử mới.
   useEffect(() => {
     if (showList) return;
     const el = scrollRef.current;
@@ -125,18 +126,18 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
     return () => el.removeEventListener("scroll", updateFollowState);
   }, [showList]);
 
-  // 重开会话：openCommand.nonce 变 → 先中止在跑的流（避免增量灌入将被替换的历史、streamId 串台）→ 载历史 → setMessages。
-  // 只认 openCommand（一次性命令信号），不认 activeConversationId——后者也被发消息 ack 写入，监听它会在发完消息后误重载。
-  // 经 resolveOpenCommandTarget 守卫：跨 context 的残留命令（如读书时的 book 会话）不属于本面板 ⇒ 不载入。
-  // 依赖稳定的 contextKey 字符串而非 context 对象：ReaderView 每 render 新建 { kind, bookId }，
-  // 入依赖会致每渲染重载（甚至 stop() 杀流）；不能靠 React Compiler 记忆化保正确性。
+  // Khi openCommand.nonce đổi, dừng stream hiện tại trước rồi tải lịch sử và đặt lại messages.
+  // Chỉ nghe lệnh dùng một lần openCommand; activeConversationId còn đổi khi gửi tin được xác nhận,
+  // nên nghe nó sẽ tải lại sai sau khi gửi. resolveOpenCommandTarget bỏ lệnh cũ thuộc context khác.
+  // Dùng chuỗi contextKey ổn định: ReaderView tạo object context mới mỗi lần render;
+  // phụ thuộc vào object đó sẽ tải lại liên tục và có thể dừng stream.
   const ctxKey = contextKey(context);
   useEffect(() => {
     const conversationId = resolveOpenCommandTarget(openCommand, ctxKey);
     if (!conversationId) return;
     let cancelled = false;
     followBottomRef.current = true;
-    setShowList(false); // 从列表选中一条会话 → 回到聊天视图
+    setShowList(false); // Chọn hội thoại trong danh sách thì quay về màn hình chat.
     resetPagination();
     isOpeningRef.current = true;
     void stop();
@@ -147,8 +148,8 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
         updateSeqMap(dtos);
         setMessages(messagesToUI(dtos));
         setPagination({ hasMore, loadingMore: false, oldestSeq: dtos[0]?.seq ?? null });
-        // 等 React 渲染 + Streamdown/markdown 高度基本稳定后再单次 smooth 滚底；
-        // 该路径已停止当前流，不会与 chunk 跟随竞争。
+        // Chờ React vẽ và chiều cao Streamdown/markdown ổn định rồi cuộn mượt xuống cuối một lần.
+        // Stream hiện tại đã dừng nên không cạnh tranh với cuộn theo chunk.
         setTimeout(() => {
           if (cancelled) return;
           const el = scrollRef.current;
@@ -166,9 +167,9 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
     };
   }, [openCommand, ctxKey, stop, setMessages]);
 
-  // 一轮发送结束（曾 streaming/submitted → 回 ready/error）→ 刷新会话列表（新会话 / 标题 / updatedAt）。
-  // 同时从 DB 重载最新一页消息以同步 UI message ids 到持久化 ids（resend 截断后 id 会变）。
-  // 用前缀 ["conversations"] 失效（不需 bookId），匹配 qk.conversations(bookId)=["conversations",bookId]。
+  // Sau một lượt gửi, làm mới danh sách hội thoại để cập nhật hội thoại mới, tiêu đề và updatedAt.
+  // Tải lại trang tin nhắn mới nhất từ DB để đồng bộ id UI với id đã lưu; resend có thể đổi id.
+  // Vô hiệu hóa theo tiền tố ["conversations"] để khớp mọi qk.conversations(bookId).
   useEffect(() => {
     if (prevStatus.current !== "ready" && (status === "ready" || status === "error")) {
       void qc.invalidateQueries({ queryKey: ["conversations"] });
@@ -188,7 +189,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
             });
             setPagination((p) => ({
               ...p,
-              // 若此前已加载全部历史，resync 只取最新一页不应把 hasMore 重新打开
+              // Nếu đã tải hết lịch sử, đồng bộ trang mới nhất không được bật lại hasMore.
               hasMore: p.hasMore ? hasMore : false,
               oldestSeq: dtos[0]?.seq ?? p.oldestSeq,
             }));
@@ -199,7 +200,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
     prevStatus.current = status;
   }, [status, qc, activeConversationId, setMessages]);
 
-  // active 置空（开书无会话 / 切书）→ 清面板；初始即空时为 no-op。
+  // Khi active rỗng vì mở hoặc đổi sách không có hội thoại, xóa nội dung bảng; rỗng sẵn thì bỏ qua.
   useEffect(() => {
     if (activeConversationId === null) {
       setMessages([]);
@@ -209,14 +210,13 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
 
   const newConversation = async () => {
     try {
-      // 显式创建空会话（spec §2/§7）；防堆积由主进程兜底（复用既有空会话）
+      // Tạo hội thoại rỗng theo spec §2/§7; main process tái dùng hội thoại rỗng cũ để tránh tích tụ.
       const convo = await window.api.chat.conversations.create({
         bookId: context.kind === "book" ? context.bookId : null,
       });
       setMessages([]);
-      setShowList(false); // 新建后回到聊天视图
+      setShowList(false); // Sau khi tạo, quay về màn hình chat.
       useChatStore.getState().setActiveConversation(context, convo.id);
-      useChatStore.getState().setSummaryChipsPreset();
       openPanelAndFocusComposer();
       void qc.invalidateQueries({ queryKey: ["conversations"] });
     } catch (err) {
@@ -237,8 +237,8 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
       return;
     }
 
-    // 加载前记录锚点：第一条可见消息到 viewport 顶部的距离，
-    // 加载完成后恢复该距离，避免跳动和连续误触发 loadMore。
+    // Trước khi tải thêm, ghi khoảng cách từ tin nhắn nhìn thấy đầu tiên tới đỉnh viewport.
+    // Khôi phục khoảng cách đó sau khi tải để tránh nhảy vị trí và kích hoạt loadMore liên tục.
     const el = scrollRef.current;
     const anchorId = messages[0]?.id;
     const anchorEl = anchorId
@@ -266,7 +266,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
           loadingMore: false,
           oldestSeq: dtos[0]?.seq ?? beforeSeq,
         });
-        // 恢复锚定位置：让原来在 viewport 顶部的消息仍保持在原位。
+        // Giữ tin nhắn vốn ở đầu viewport tại đúng vị trí cũ.
         requestAnimationFrame(() => {
           const newEl = scrollRef.current;
           if (anchorOffset == null || !anchorId || !newEl) return;
@@ -283,7 +283,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
       });
   };
 
-  // 滚动到顶部附近时加载更早一页。
+  // Tải một trang lịch sử cũ hơn khi cuộn gần tới đầu danh sách.
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || !pagination.hasMore || pagination.loadingMore) return;
@@ -299,32 +299,41 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
   const actions: ChatActions = {
     regenerate: (a) => {
       followBottomRef.current = true;
-      void regenerate({ messageId: a.id });
+      void ensureAiDataConsent().then((allowed) => {
+        if (allowed) void regenerate({ messageId: a.id });
+      });
     },
     resend: (u) => {
       followBottomRef.current = true;
       const aId = nextAssistantId(messages, u.id);
-      void regenerate(aId ? { messageId: aId } : undefined);
+      void ensureAiDataConsent().then((allowed) => {
+        if (allowed) void regenerate(aId ? { messageId: aId } : undefined);
+      });
     },
     editAndResend: (u, newText) => {
       followBottomRef.current = true;
-      flushSync(() =>
-        setMessages((ms) =>
-          ms.map((m) => (m.id === u.id ? { ...m, parts: [{ type: "text", text: newText }] } : m)),
-        ),
-      );
-      const aId = nextAssistantId(messages, u.id);
-      void regenerate(aId ? { messageId: aId } : undefined);
+      void ensureAiDataConsent().then((allowed) => {
+        if (!allowed) return;
+        flushSync(() =>
+          setMessages((ms) =>
+            ms.map((m) => (m.id === u.id ? { ...m, parts: [{ type: "text", text: newText }] } : m)),
+          ),
+        );
+        const aId = nextAssistantId(messages, u.id);
+        void regenerate(aId ? { messageId: aId } : undefined);
+      });
     },
     busy: status === "streaming" || status === "submitted",
   };
 
-  const handleSend = (text: string, chips: Chip[]) => {
+  const handleSend = async (text: string, chips: Chip[]): Promise<boolean> => {
+    if (!(await ensureAiDataConsent())) return false;
     followBottomRef.current = true;
     void sendMessage({
       text,
       metadata: { contextChips: chips, createdAt: Temporal.Now.instant().epochMilliseconds },
     });
+    return true;
   };
 
   return (
@@ -339,23 +348,21 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
           )}
         </div>
         <div className="ms-auto flex shrink-0 items-center gap-1.5">
-          {isLibrary && (
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              onClick={() => setShowList((v) => !v)}
-              aria-label={t("ai.conversationList", "会话列表")}
-              aria-pressed={showList}
-              className={showList ? "text-foreground" : "text-muted-foreground"}
-            >
-              <MessagesSquare />
-            </Button>
-          )}
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            onClick={() => setShowList((v) => !v)}
+            aria-label={t("ai.conversationList", "Danh sách cuộc trò chuyện")}
+            aria-pressed={showList}
+            className={showList ? "text-foreground" : "text-muted-foreground"}
+          >
+            <MessagesSquare />
+          </Button>
           <Button
             variant="ghost"
             size="icon-sm"
             onClick={() => void newConversation()}
-            aria-label={t("ai.newConversation", "新对话")}
+            aria-label={t("ai.newConversation", "Cuộc trò chuyện mới")}
             className="text-muted-foreground"
           >
             <Plus />
@@ -364,7 +371,7 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
             variant="ghost"
             size="icon-sm"
             onClick={onClose}
-            aria-label={t("ai.closePanel", "关闭面板")}
+            aria-label={t("ai.closePanel", "Đóng bảng")}
             className="text-muted-foreground"
           >
             <X />
@@ -398,14 +405,14 @@ export function AIPanel({ context, onClose }: { context: ChatContext; onClose: (
 
           {error && (
             <div className="shrink-0 border-t border-border bg-destructive/10 px-3 py-2 text-xs text-destructive">
-              {t("ai.sendFailed", "发送失败：{{message}}", { message: error.message })}
+              {t("ai.sendFailed", "Gửi thất bại: {{message}}", { message: error.message })}
               <span className="text-muted-foreground">
-                {t("ai.sendFailedHint", "（请确认已在「设置」配置 API Key 与模型）")}
+                {t("ai.sendFailedHint", "(Kiểm tra API key và model trong phần Cài đặt.)")}
               </span>
             </div>
           )}
 
-          <Composer status={status} onStop={stop} onSend={handleSend} context={context} />
+          <Composer status={status} onStop={stop} onSend={handleSend} />
         </>
       )}
       {import.meta.env.DEV && <ChatPerfMonitor messages={messages} />}

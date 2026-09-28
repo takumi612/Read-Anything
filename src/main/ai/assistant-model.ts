@@ -13,31 +13,31 @@ export type ResolvedModel =
       model: ChatModel;
       modelId: string;
       providerType?: AiProviderApiType;
-      /** 推理强度（v7 顶层 reasoning）；undefined = 未设置 = provider 默认。透传给调用点。 */
+      /** Mức reasoning của AI SDK v7; undefined dùng mặc định provider. */
       reasoningEffort?: ReasoningEffort;
     }
   | { ok: false; reason: string };
 
 /**
- * 把「聊天模型」偏好解析为可调用模型（spec 2026-06-10 §2.3：接替 assistants 表配置）。
- * 未配置 / provider 已删 / 无密钥一律结构化错误——显式报错，不静默回退。
+ * Chuyển tùy chọn model chat thành model có thể gọi.
+ * Thiếu cấu hình, provider bị xóa hoặc thiếu khóa đều trả lỗi có cấu trúc.
  */
 export function resolveChatModel(db: DB): ResolvedModel {
   const pref = getPreference(db, "chatModel");
   if (!pref) {
-    return { ok: false, reason: t("errors.chatModelNotConfigured", "未配置对话模型") };
+    return { ok: false, reason: t("errors.chatModelNotConfigured", "Chưa cấu hình model trò chuyện") };
   }
   const provider = loadProvider(db, pref.providerId);
   if (!provider) {
     return {
       ok: false,
-      reason: t("errors.configuredProviderNotFound", "未找到所配置的$t(terms.provider)"),
+      reason: t("errors.configuredProviderNotFound", "Không tìm thấy $t(terms.provider) đã cấu hình"),
     };
   }
   if (!provider.apiKey) {
     return {
       ok: false,
-      reason: t("errors.configuredProviderNoApiKey", "$t(terms.provider)未设置密钥"),
+      reason: t("errors.configuredProviderNoApiKey", "$t(terms.provider) chưa có API key"),
     };
   }
   try {
@@ -57,31 +57,31 @@ export function resolveChatModel(db: DB): ResolvedModel {
   } catch (err) {
     return {
       ok: false,
-      reason: err instanceof Error ? err.message : t("errors.failedToBuildModel", "构建模型失败"),
+      reason: err instanceof Error ? err.message : t("errors.failedToBuildModel", "Không thể khởi tạo model"),
     };
   }
 }
 
 /**
- * 把「摘要模型」偏好解析为可调用模型（章节/全书摘要 + auto naming 共用；spec §4）。
- * 未配置 / provider 已删 / 无密钥一律返回结构化错误——显式报错，绝不回退聊天模型。
+ * Chọn model nền cho tóm tắt và đặt tên hội thoại.
+ * Nếu thiếu cấu hình/provider/khóa, trả lỗi rõ ràng thay vì tự dùng model chat.
  */
 export function resolveSummaryModel(db: DB): ResolvedModel {
   const pref = getPreference(db, "summaryModel");
   if (!pref) {
-    return { ok: false, reason: t("errors.summaryModelNotConfigured", "未配置摘要模型") };
+    return { ok: false, reason: t("errors.summaryModelNotConfigured", "Chưa cấu hình model tóm tắt") };
   }
   const provider = loadProvider(db, pref.providerId);
   if (!provider) {
     return {
       ok: false,
-      reason: t("errors.configuredProviderNotFound", "未找到所配置的$t(terms.provider)"),
+      reason: t("errors.configuredProviderNotFound", "Không tìm thấy $t(terms.provider) đã cấu hình"),
     };
   }
   if (!provider.apiKey) {
     return {
       ok: false,
-      reason: t("errors.configuredProviderNoApiKey", "$t(terms.provider)未设置密钥"),
+      reason: t("errors.configuredProviderNoApiKey", "$t(terms.provider) chưa có API key"),
     };
   }
   try {
@@ -101,7 +101,7 @@ export function resolveSummaryModel(db: DB): ResolvedModel {
   } catch (err) {
     return {
       ok: false,
-      reason: err instanceof Error ? err.message : t("errors.failedToBuildModel", "构建模型失败"),
+      reason: err instanceof Error ? err.message : t("errors.failedToBuildModel", "Không thể khởi tạo model"),
     };
   }
 }

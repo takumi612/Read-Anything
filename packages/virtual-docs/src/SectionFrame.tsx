@@ -16,40 +16,40 @@ interface Props {
   styleCss?: string;
   onSelect?: (e: SectionSelectEvent) => void;
   onSelectionCleared?: () => void;
-  /** iframe 内容加载后（及 decorateNonce 变化时）回调，供消费方在文档上贴装饰（如高亮 mark）。 */
+  /** Gọi sau khi iframe tải xong hoặc decorateNonce đổi để vẽ lại dấu highlight. */
   decorate?: (index: number, doc: Document) => void;
-  /** 点击带 data-anno-id 的装饰元素时回调（rect 为视口坐标）。 */
+  /** Gọi khi click phần tử có data-anno-id; rect tính theo viewport. */
   onHighlightClick?: (annoId: string, rect: ViewportRect) => void;
-  /** 悬停带笔记的高亮 mark（class 含 anno-noted）时回调；rect 为视口坐标。 */
+  /** Gọi khi hover highlight có ghi chú; rect tính theo viewport. */
   onHighlightHover?: (annoId: string, rect: ViewportRect) => void;
-  /** 离开带笔记高亮（移到非 noted 区域 / 移出 iframe）时回调。 */
+  /** Gọi khi rời highlight có ghi chú hoặc rời iframe. */
   onHighlightLeave?: () => void;
-  /** 变化即对已加载文档重跑 decorate（标注增删改后由 VirtualDocs 递增）。 */
+  /** Tăng giá trị để trang đã tải chạy lại decorate sau khi annotation đổi. */
   decorateNonce?: number;
-  /** iframe 内任意 mousedown 时回调；同源 iframe 内部事件不冒泡到父文档，消费方借此关闭浮层。 */
+  /** Báo mousedown trong iframe để bên dùng đóng popup ở tài liệu cha. */
   onContentMouseDown?: () => void;
-  /** iframe 内普通指针操作；父滚动容器收不到这些跨文档事件。 */
+  /** Báo thao tác pointer trong iframe vì container cha không nhận sự kiện xuyên tài liệu. */
   onUserNavigation?: () => void;
-  /** iframe 内明确会推动阅读位置的输入；用于渐进开放前置 section。 */
+  /** Báo input làm thay đổi vị trí đọc để dần mở các section phía trước. */
   onUserScrollNavigation?: () => void;
-  /** 点 iframe 内站内 <a>（相对路径 / #fragment）时回调；消费方据此 resolve 到 section+anchor 跳转。 */
+  /** Báo click liên kết nội bộ để bên dùng chuyển sang section và anchor tương ứng. */
   onInternalLink?: (e: { index: number; href: string }) => void;
-  /** 点 iframe 内外链（http/https/mailto）时回调；消费方开系统浏览器。 */
+  /** Báo click liên kết ngoài để mở bằng trình duyệt hệ thống. */
   onExternalLink?: (url: string) => void;
-  /** 就绪前的占位高度（来自 VirtualDocs 测高缓存）；避免就绪前 0/默认高度造成跳变。 */
+  /** Chiều cao tạm từ cache trước khi nội dung sẵn sàng, tránh nhảy bố cục. */
   estimatedHeight?: number;
-  /** 内容就绪、测得稳定高度后回调（index, heightPx），供 VirtualDocs 写测高缓存。 */
+  /** Báo chiều cao thật sau khi đo ổn định để VirtualDocs cập nhật cache. */
   onMeasured?: (index: number, height: number) => void;
 }
 
 const STYLE_ID = "vd-style";
 
-/** 等待图片/字体就绪的整体超时（ms），到时即用当前高度兜底，绝不无限等。 */
+/** Thời gian tối đa chờ ảnh và font; hết hạn dùng chiều cao hiện tại. */
 const READY_TIMEOUT_MS = 2000;
-/** 就绪后真实内容变化（如改字号偏好）重测的 debounce（ms）。 */
+/** Khoảng debounce khi đo lại sau thay đổi nội dung hoặc cỡ chữ. */
 const RO_DEBOUNCE_MS = 100;
 
-/** 把（可能是片段或完整文档的）HTML 包成带注入 style 的完整文档串。 */
+/** Bọc HTML đoạn hoặc trang đầy đủ thành tài liệu có CSS cần thiết. */
 function buildSrcDoc(html: string, styleCss?: string): string {
   const style = `<style id="${STYLE_ID}">${styleCss ?? ""}</style>`;
   if (/<head[\s>]/i.test(html)) return html.replace(/<head([^>]*)>/i, `<head$1>${style}`);
@@ -76,7 +76,7 @@ export function SectionFrame({
   onExternalLink,
 }: Props) {
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
-  // 用 ref 持最新回调，避免回调身份变化触发 effect 重挂
+  // Giữ callback mới nhất trong ref để không gắn lại effect mỗi lần render.
   const cbRef = useRef({
     onSelect,
     onSelectionCleared,
@@ -143,7 +143,7 @@ export function SectionFrame({
       const fr = iframe.getBoundingClientRect();
       cbRef.current.onHighlightClick?.(id, toViewportRect(r, fr));
     };
-    // (clientX, clientY 为 iframe 视口坐标) 是否落在当前非塌缩选区内。
+    // Kiểm tra điểm theo viewport iframe có nằm trong vùng chọn hiện tại không.
     const pointInSelection = (x: number, y: number): boolean => {
       if (!doc) return false;
       const sel = doc.getSelection();
@@ -158,8 +158,8 @@ export function SectionFrame({
       }
     };
     const onContentDown = (e: MouseEvent) => {
-      // 点在已有选区内部：阻止默认塌缩、保留选区，让随后的 mouseup 照常触发 onSelect
-      // （滚动隐藏工具栏后，点回选区即在新位置重弹工具栏）。点在选区外则照常上报（关闭浮层）。
+      // Click trong vùng chọn: ngăn trình duyệt thu hẹp vùng chọn, để mouseup mở lại toolbar.
+      // Click ngoài vùng chọn được báo như bình thường để đóng popup.
       if (pointInSelection(e.clientX, e.clientY)) {
         e.preventDefault();
         return;
@@ -168,7 +168,7 @@ export function SectionFrame({
     };
     const onUserNavigationInput = () => cbRef.current.onUserNavigation?.();
     const onUserScrollNavigationInput = () => cbRef.current.onUserScrollNavigation?.();
-    // 上次命中的带笔记高亮 id（仅在变化时上报，减少无谓 store 写入与重渲染）。
+    // Chỉ báo khi ID highlight có ghi chú thay đổi để giảm cập nhật store.
     let lastNotedId: string | null = null;
     const reportLeaveIfNeeded = () => {
       if (lastNotedId !== null) {
@@ -176,7 +176,7 @@ export function SectionFrame({
         cbRef.current.onHighlightLeave?.();
       }
     };
-    // 悬停在选区上 → 手型；并检测带笔记高亮 → 上报 hover/leave。
+    // Hover vùng chọn đổi con trỏ; hover/leave highlight có ghi chú được báo lên.
     const onContentMove = (e: MouseEvent) => {
       if (!doc?.body) return;
       const cursor = pointInSelection(e.clientX, e.clientY) ? "pointer" : "";
@@ -193,30 +193,29 @@ export function SectionFrame({
         cbRef.current.onHighlightLeave?.();
       }
     };
-    // 鼠标移出 iframe（含移向主文档的卡片）→ 上报 leave，起关闭窗口（移到卡片会被 enterCard 取消）。
+    // Rời iframe thì bắt đầu đóng thẻ ghi chú; vào thẻ sẽ hủy thao tác đóng.
     const onContentOut = (e: MouseEvent) => {
-      // relatedTarget 为 null = 离开 iframe 文档边界。
+      // relatedTarget null nghĩa là đã ra ngoài tài liệu iframe.
       if (e.relatedTarget === null) reportLeaveIfNeeded();
     };
     const onLinkClick = (e: MouseEvent) => {
       const a = (e.target as Element | null)?.closest?.("a[href]") as HTMLAnchorElement | null;
       if (!a) return;
-      // 取原始 href 属性（非 a.href——后者会被 about:srcdoc 解析成绝对无效地址）。
+      // Dùng thuộc tính href gốc; a.href có thể bị about:srcdoc biến thành URL sai.
       const raw = a.getAttribute("href") ?? "";
       const target = classifyLink(raw);
       if (!target) {
-        e.preventDefault(); // 裸 "#"：阻止默认导航即可，不白屏
+        e.preventDefault(); // Liên kết "#" chỉ cần chặn điều hướng mặc định.
         return;
       }
-      e.preventDefault(); // 关键：阻止 iframe 自身导航（否则白屏）
+      e.preventDefault(); // Chặn iframe tự điều hướng gây trang trắng.
       if (target.type === "external") cbRef.current.onExternalLink?.(target.url);
       else cbRef.current.onInternalLink?.({ index, href: target.href });
     };
     const detach = () => {
       ro?.disconnect();
       ro = undefined;
-      // 清理可能挂起的 debounce / 超时计时器：virtuoso 回收 item DOM 后，
-      // 已排期的 measure 会把错高度写进被复用的 iframe（正是要消除的跳变）。
+      // Dọn timer đo chiều cao khi Virtuoso tái sử dụng DOM để không ghi kích thước sai.
       if (roTimer) {
         clearTimeout(roTimer);
         roTimer = undefined;
@@ -245,8 +244,8 @@ export function SectionFrame({
       detach();
       doc = iframe.contentDocument;
       if (!doc) return;
-      const d = doc; // 窄化给闭包
-      // 占位：就绪前先用估高，避免 iframe 默认高度造成的跳变。
+      const d = doc; // Giữ tài liệu đã được kiểm tra cho closure.
+      // Dùng chiều cao ước tính trước khi sẵn sàng, thay vì chiều cao mặc định của iframe.
       iframe.style.height = `${cbRef.current.estimatedHeight ?? 0}px`;
 
       const measure = () => {
@@ -259,7 +258,7 @@ export function SectionFrame({
         const h = d.documentElement.scrollHeight;
         iframe.style.height = `${h}px`;
         cbRef.current.onMeasured?.(index, h);
-        // 就绪后才挂 ResizeObserver，服务后续真实内容变化（如改字号偏好），debounce 抑抖。
+        // Gắn ResizeObserver sau khi sẵn sàng để đo lại khi nội dung/cỡ chữ đổi.
         ro = new ResizeObserver(() => {
           if (roTimer) clearTimeout(roTimer);
           roTimer = setTimeout(measure, RO_DEBOUNCE_MS);
@@ -267,7 +266,7 @@ export function SectionFrame({
         ro.observe(d.documentElement);
       };
 
-      // 等所有图片 decode + 字体就绪；整体超时兜底，绝不无限等。
+      // Chờ ảnh giải mã và font sẵn sàng; timeout ngăn chờ vô hạn.
       const imgs = Array.from(d.images);
       const ready = Promise.all([
         ...imgs.map((img) => img.decode().catch(() => undefined)),
@@ -313,10 +312,9 @@ export function SectionFrame({
       sandbox="allow-same-origin"
       title={`section-${index}`}
       scrolling="no"
-      // height 初值必须随首次渲染就位：iframe 从挂载到 load 事件之间若无 height，会以 Chromium
-      // 默认 150px 参与布局——视口上方的 section 重挂时高度瞬时塌缩再恢复，virtuoso 的 scrollTop
-      // 补偿与用户滚动竞争，正是「向上翻大跳」的主根因。load 后由 measure 手写真高接管（React
-      // 仅在 estimatedHeight 值变化时重写该属性，且届时缓存值已等于真高，不会回退）。
+      // Đặt height ngay từ lần render đầu. Chromium mặc định iframe cao 150px trước load;
+      // section phía trên co rồi giãn sẽ khiến Virtuoso bù scrollTop và làm trang nhảy.
+      // Sau load, phép đo thật thay chiều cao ước tính.
       style={{ width: "100%", border: 0, display: "block", height: estimatedHeight ?? 0 }}
     />
   );

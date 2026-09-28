@@ -1,9 +1,9 @@
 import { z } from "zod";
 
-/** AI 侧统一标识符：英文 kebab-case 短名（spec 2026-06-10 §2.1）。 */
+/** ID bộ nhớ phía AI: tên ngắn tiếng Anh dạng kebab-case. */
 export const memorySlug = z.string().regex(/^[a-z0-9]+(-[a-z0-9]+)*$/, "kebab-case slug expected");
 
-/** 管理面板用的记忆视图。 */
+/** Dữ liệu bộ nhớ cho bảng quản lý. */
 export interface MemoryDto {
   id: string;
   slug: string;
@@ -14,7 +14,7 @@ export interface MemoryDto {
   updatedAt: number;
 }
 
-/** memories:update 入参（管理面板按 id 操作；slug 不可改）。 */
+/** Đầu vào memories:update; bảng quản lý dùng ID và không cho sửa slug. */
 export const updateMemoryInput = z.object({
   id: z.string().min(1),
   title: z.string().min(1).optional(),
@@ -23,6 +23,6 @@ export const updateMemoryInput = z.object({
 });
 export type UpdateMemoryInput = z.infer<typeof updateMemoryInput>;
 
-/** memories:delete 入参。 */
+/** Đầu vào memories:delete. */
 export const deleteMemoryInput = z.object({ id: z.string().min(1) });
 export type DeleteMemoryInput = z.infer<typeof deleteMemoryInput>;

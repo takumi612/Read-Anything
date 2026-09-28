@@ -14,7 +14,7 @@ export function ReaderPane() {
   const containerRef = useRef<HTMLDivElement | null>(null);
   useSelection(containerRef, setSelection);
 
-  // 滚动监听：把视口顶部附近的章节标记为“当前章”（驱动摘要 pill / 会话路由感）
+  // Theo dõi cuộn: đánh dấu chương gần đầu khung nhìn là "chương hiện tại" (điều khiển pill tóm tắt / cảm giác điều hướng hội thoại)
   useEffect(() => {
     const root = containerRef.current;
     if (!root) return;

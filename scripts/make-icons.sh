@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
-# 从 assets/icon.svg 生成 macOS .icns(零外部依赖:sips + iconutil,均为 macOS 自带)。
-# 用法:scripts/make-icons.sh
-# 产物:assets/icons/icon.icns(forge.config.ts packagerConfig.icon 引用,提交进 git)
+# Tạo .icns cho macOS từ assets/icon.svg (không cần phụ thuộc ngoài; sips và iconutil có sẵn trên macOS).
+# Cách dùng: scripts/make-icons.sh
+# Đầu ra: assets/icons/icon.icns (được tham chiếu trong packagerConfig.icon của forge.config.ts và lưu trong Git).
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -10,13 +10,13 @@ OUT_DIR="$ROOT/assets/icons"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-[ -f "$SRC" ] || { echo "缺少源文件:$SRC" >&2; exit 1; }
+[ -f "$SRC" ] || { echo "Thiếu tệp nguồn: $SRC" >&2; exit 1; }
 mkdir -p "$OUT_DIR"
 
-# SVG → 1024 PNG(sips 经 CoreSVG 栅格化,保留透明通道)
+# SVG → PNG 1024 px (sips dùng CoreSVG để raster hóa và giữ kênh trong suốt).
 sips -s format png -z 1024 1024 "$SRC" --out "$TMP/icon-1024.png" >/dev/null
 
-# iconset:Apple 规定的 10 个尺寸(5 档 × @1x/@2x)
+# Bộ iconset gồm 10 kích thước theo quy định của Apple (5 mức × @1x/@2x).
 ICONSET="$TMP/icon.iconset"
 mkdir "$ICONSET"
 for size in 16 32 128 256 512; do
@@ -26,4 +26,4 @@ for size in 16 32 128 256 512; do
 done
 
 iconutil -c icns "$ICONSET" -o "$OUT_DIR/icon.icns"
-echo "生成完毕:$OUT_DIR/icon.icns"
+echo "Đã tạo: $OUT_DIR/icon.icns"

@@ -10,14 +10,14 @@ describe("buildSampleEpub", () => {
     expect(parsed.toc.length).toBe(3);
   });
 
-  it("builds a valid 3-chapter Chinese book", () => {
-    const parsed = parseEpub(buildSampleEpub("zh-CN"));
-    expect(parsed.title).toMatch(/页边/);
+  it("builds a valid 3-chapter Vietnamese book", () => {
+    const parsed = parseEpub(buildSampleEpub("vi"));
+    expect(parsed.title).toMatch(/Bên lề/);
     expect(parsed.spine.length).toBe(3);
     expect(parsed.toc.length).toBe(3);
   });
 
-  it("English and Chinese builds differ", () => {
-    expect(buildSampleEpub("en")).not.toEqual(buildSampleEpub("zh-CN"));
+  it("English and Vietnamese builds differ", () => {
+    expect(buildSampleEpub("en")).not.toEqual(buildSampleEpub("vi"));
   });
 });

@@ -4,22 +4,21 @@ import type { UIMessage, UIMessageChunk } from "ai";
 import { chipIdSchema } from "@shared/types";
 import type { MessageMetadata, MessageRole, MessageStatus } from "@shared/types";
 
-/** 上下文 chip（live 形态，供 renderer 渲染；持久化快照只取 {id,content,tokenCount}，见 messageMetadataSchema） */
+/** Chip ngữ cảnh cho renderer; snapshot lưu DB chỉ giữ id, content và tokenCount. */
 export const chipSchema = z.object({
   id: chipIdSchema,
   labelKey: z.string(),
   content: z.string(),
   tokenCount: z.number().int().nonnegative(),
   /**
-   * 三态闭合联合：required=历史水合产出（落库即已发送、不可交互）；
-   * on/off=live 态（摘要 toggle 开关；选区/段落构建为 on、UI 可整体删除）。
-   * off 的 chip 发送前由 renderer 过滤。
+   * Ba trạng thái: required là chip cũ đã gửi và không thể chỉnh;
+   * on/off là chip hiện tại có thể bật tắt. Renderer bỏ chip off trước khi gửi.
    */
   state: z.enum(["required", "on", "off"]),
 });
 export type Chip = z.infer<typeof chipSchema>;
 
-/** ai:build-chips 入参——renderer 提取的选区原句 + 前1/当前/后1 段原始文本 */
+/** Đầu vào ai:build-chips: đoạn chọn và ba đoạn văn liền kề do renderer trích xuất. */
 export const buildChipsInput = z.object({
   selection: z.string().min(1),
   paragraphBefore: z.string().nullish(),
@@ -27,6 +26,16 @@ export const buildChipsInput = z.object({
   paragraphAfter: z.string().nullish(),
 });
 export type BuildChipsInput = z.infer<typeof buildChipsInput>;
+
+/** Inline translation sends only the selection and its local paragraph to the configured provider. */
+export const translateSelectionInput = z.object({
+  selection: z.string().trim().min(1).max(4000),
+  context: z.string().trim().max(1200),
+});
+
+export interface TranslateSelectionResult {
+  translation: string;
+}
 
 export const readingContextSchema = z.discriminatedUnion("format", [
   z.object({
@@ -48,23 +57,23 @@ export const readingContextSchema = z.discriminatedUnion("format", [
 ]);
 export type ReadingContext = z.infer<typeof readingContextSchema>;
 
-/** conversations:create 入参。bookId 省略/为 null ⇒ 书库（library）会话（spec 2026-06-16 §4.1）。 */
+/** Đầu vào tạo hội thoại; bookId null hoặc thiếu là hội thoại ở thư viện (spec §4.1). */
 export const createConversationInput = z.object({
   bookId: z.string().min(1).nullable().optional(),
 });
 export type CreateConversationInput = z.infer<typeof createConversationInput>;
 
-/** conversations:list-by-book 入参。bookId 为 null ⇒ 列出书库会话（bookId IS NULL）。 */
+/** Đầu vào liệt kê hội thoại; bookId null liệt kê hội thoại ở thư viện. */
 export const listConversationsInput = z.object({
   bookId: z.string().min(1).nullable(),
 });
 export type ListConversationsInput = z.infer<typeof listConversationsInput>;
 
-/** conversations:get 入参 */
+/** Đầu vào lấy một hội thoại. */
 export const conversationIdInput = z.object({ id: z.string().min(1) });
 export type ConversationIdInput = z.infer<typeof conversationIdInput>;
 
-/** messages:list-by-conversation 入参 */
+/** Đầu vào lấy tin nhắn của hội thoại. */
 export const messagesByConversationInput = z.object({
   conversationId: z.string().min(1),
   beforeSeq: z.number().int().positive().optional(),
@@ -72,18 +81,18 @@ export const messagesByConversationInput = z.object({
 });
 export type MessagesByConversationInput = z.infer<typeof messagesByConversationInput>;
 
-/** messages:list-by-conversation 出参 */
+/** Kết quả lấy tin nhắn của hội thoại. */
 export interface MessagesByConversationOutput {
   messages: MessageDto[];
   hasMore: boolean;
 }
 
-/** 会话视图。bookId 为 null ⇒ 书库会话（spec 2026-06-16 §3）；isNaming 为主进程内存瞬态合成（spec §5）。 */
+/** Dữ liệu hội thoại cho UI; bookId null là hội thoại thư viện; isNaming lấy từ trạng thái tạm ở main. */
 export interface ConversationDto {
   id: string;
   bookId: string | null;
   title: string | null;
-  /** auto naming 进行中（下一任务接线真状态前恒 false）。 */
+  /** Đang tự đặt tên hội thoại. */
   isNaming: boolean;
   createdAt: number;
   updatedAt: number;
@@ -100,9 +109,9 @@ export interface MessageDto {
   createdAt: number;
 }
 
-/** runSend 的业务入参（不含传输层 streamId）。conversationId 必传：send 只校验不分配（spec §5）。 */
+/** Đầu vào nghiệp vụ của runSend, chưa có streamId; conversationId phải được tạo trước. */
 export const sendInputSchema = z.object({
-  bookId: z.string().min(1).nullable(), // null ⇒ 书库上下文
+  bookId: z.string().min(1).nullable(), // null là ngữ cảnh thư viện.
   conversationId: z.string().min(1),
   chips: z.array(chipSchema),
   userText: z.string().min(1),
@@ -111,28 +120,28 @@ export const sendInputSchema = z.object({
 });
 export type SendInput = z.infer<typeof sendInputSchema>;
 
-/** ai:send 入站载体 = 业务入参 + 渲染层铸的 streamId。 */
+/** Dữ liệu IPC ai:send: đầu vào nghiệp vụ và streamId do renderer tạo. */
 export const sendRequest = sendInputSchema.extend({ streamId: z.string().min(1) });
 export type SendRequest = z.infer<typeof sendRequest>;
 
-/** ai:send invoke 的同步 ack（增量走 ai:chunk 事件流，故不含 stream/finished）。 */
+/** Phản hồi xác nhận của ai:send; nội dung tăng dần đi qua sự kiện ai:chunk. */
 export const sendAck = z.discriminatedUnion("ok", [
   z.object({ ok: z.literal(true), conversationId: z.string() }),
   z.object({ ok: z.literal(false), reason: z.string() }),
 ]);
 export type SendAck = z.infer<typeof sendAck>;
 
-/** ai:abort 入参。 */
+/** Đầu vào ai:abort. */
 export const abortInput = z.object({ streamId: z.string().min(1) });
 export type AbortInput = z.infer<typeof abortInput>;
 
-/** ai:chunk 出站事件（main→renderer，不 Zod；UIMessageChunk 为 AI SDK 复杂联合）。 */
+/** Sự kiện ai:chunk từ main sang renderer; UIMessageChunk do AI SDK định nghĩa. */
 export type AiStreamEvent =
   | { streamId: string; type: "chunk"; chunk: UIMessageChunk }
   | { streamId: string; type: "finish" }
   | { streamId: string; type: "error"; message: string };
 
-/** main→renderer 通知载荷（判别联合，按 kind 扩展）。renderer 据此本地化成 toast。 */
+/** Thông báo từ main sang renderer; renderer chuyển từng kind thành toast theo ngôn ngữ. */
 export type AppNotification = {
   kind: "memoryConsolidated";
   saved: number;
@@ -140,7 +149,7 @@ export type AppNotification = {
   deleted: number;
 };
 
-/** ai:resend 业务入参（不含传输层 streamId）。 */
+/** Đầu vào nghiệp vụ của ai:resend, chưa có streamId. */
 export const resendInputSchema = z.object({
   conversationId: z.string().min(1),
   userMessageId: z.string().min(1),
@@ -148,6 +157,6 @@ export const resendInputSchema = z.object({
   webSearch: z.boolean().optional(),
 });
 export type ResendInput = z.infer<typeof resendInputSchema>;
-/** ai:resend 入站载体 = 业务入参 + streamId。 */
+/** Dữ liệu IPC ai:resend: đầu vào nghiệp vụ và streamId. */
 export const resendRequest = resendInputSchema.extend({ streamId: z.string().min(1) });
 export type ResendRequest = z.infer<typeof resendRequest>;

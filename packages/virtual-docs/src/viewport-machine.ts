@@ -1,20 +1,20 @@
 /**
- * 视口所有权状态机（纯逻辑，无 DOM / React）。
+ * Máy trạng thái quyền điều khiển viewport; chỉ có logic, không phụ thuộc DOM/React.
  *
- * 描述「此刻谁拥有滚动视口，命令式定位收敛到哪一步」。所有副作用以 effect 描述返回，
- * 由 VirtualDocs 内的执行器施行；reducer 本身可直接单测。
+ * Xác định ai đang điều khiển vùng cuộn và thao tác định vị đã ổn định đến đâu.
+ * Reducer trả về effect để VirtualDocs thực thi; bản thân reducer có thể kiểm thử độc lập.
  */
 
-/** 收敛的终态。三者都会兑现 scrollToSectionElement 返回的 Promise，不存在悬挂路径。 */
+/** Ba trạng thái kết thúc đều hoàn tất Promise của scrollToSectionElement. */
 export type AlignResult = "settled" | "timeout" | "cancelled";
 
 /**
- * 收敛判定阈值。超长 section 的首次对齐可能是假象——前方 iframe 的迟到测高会在数秒后
- * 再次推开目标——故要求至少观察 6 秒（60 × 100ms）且连续 5 次对齐才认定稳定。
+ * Ngưỡng xác nhận vị trí ổn định. Section dài có thể lệch lại khi iframe phía trước
+ * đo chiều cao muộn, nên cần quan sát ít nhất 6 giây và 5 lần căn chỉnh liên tiếp.
  */
 export const ALIGN_MINIMUM_ATTEMPTS = 60;
 export const ALIGN_SUCCESSES_REQUIRED = 5;
-/** 上限 30 秒，覆盖冷启超长 section 的迟到测量；到顶即报 timeout，不卡死。 */
+/** Giới hạn 30 giây để chờ section dài đo xong; hết hạn báo timeout. */
 export const ALIGN_MAX_ATTEMPTS = 300;
 
 export type ViewportPhase =
@@ -31,9 +31,9 @@ export type ViewportPhase =
 
 export interface ViewportState {
   phase: ViewportPhase;
-  /** 已开放加载的 section 下界；小于它的保持轻量占位。只减不增。 */
+  /** Chỉ số section thấp nhất được phép tải; section trước đó giữ placeholder nhẹ. */
   loadedFromIndex: number;
-  /** 是否发生过用户级导航（含命令式跳章）。只进不退；恢复不计。 */
+  /** Đã có điều hướng của người dùng, kể cả nhảy chương; khôi phục vị trí không tính. */
   everUserNavigated: boolean;
   nextRunId: number;
 }
@@ -41,9 +41,9 @@ export interface ViewportState {
 export type ViewportEvent =
   | { type: "ALIGN_REQUESTED"; index: number; owner: "restore" | "user" }
   | { type: "JUMP_REQUESTED"; index: number }
-  /** offset = 目标元素相对 section 顶的偏移；null 表示元素尚不可解析。 */
+  /** Độ lệch của phần tử đích so với đầu section; null khi chưa tìm thấy. */
   | { type: "ALIGN_TICK"; runId: number; aligned: boolean; offset: number | null }
-  /** scrollIntent 区分「明确推动阅读位置的输入」（wheel/touch/key）与裸 pointerdown。 */
+  /** Phân biệt thao tác cuộn thật (wheel/touch/key) với pointerdown đơn lẻ. */
   | { type: "USER_INPUT"; scrollIntent: boolean }
   | { type: "VISIBLE_TOP_CHANGED"; index: number };
 
@@ -68,7 +68,7 @@ export function initialViewportState(initialIndex: number): ViewportState {
   };
 }
 
-/** 进行中的收敛被抢占/取消时要发的效果（顺序：先兑现结果，再停表）。 */
+/** Effect khi thao tác định vị bị thay thế hoặc hủy: hoàn tất kết quả trước rồi dừng timer. */
 function cancelEffects(state: ViewportState): ViewportEffect[] {
   return state.phase.kind === "aligning"
     ? [{ kind: "reportAlignResult", result: "cancelled" }, { kind: "stopTicker" }]
@@ -113,7 +113,7 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
       };
 
     case "ALIGN_TICK": {
-      // 旧 runId 的在途 tick 不得污染新一轮定位。
+      // Tick của runId cũ không được ảnh hưởng đến lần định vị mới.
       if (state.phase.kind !== "aligning" || state.phase.runId !== event.runId)
         return { next: state, effects: [] };
       const attempts = state.phase.attempts + 1;
@@ -138,8 +138,8 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
         effects: event.aligned
           ? []
           : [
-              // 元素不可解析时退回 section 级定位：目标 iframe 尚未挂载，用最新高度表
-              // 重发一次把它带进渲染窗口，下一 tick 再解析元素。
+              // Chưa tìm thấy phần tử: định vị theo section trước để iframe được render;
+              // tick kế tiếp sẽ thử tìm lại phần tử.
               event.offset == null
                 ? { kind: "scrollToIndex", index: target }
                 : { kind: "scrollToIndex", index: target, offset: event.offset },
@@ -149,7 +149,7 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
 
     case "USER_INPUT": {
       const effects = cancelEffects(state);
-      // 裸 pointerdown 只取消进行中的定位，不转移视口所有权（与既有行为一致）。
+      // pointerdown đơn lẻ chỉ hủy định vị đang chạy, không chuyển quyền điều khiển viewport.
       if (!event.scrollIntent)
         return {
           next:
@@ -172,8 +172,9 @@ export function reduceViewport(state: ViewportState, event: ViewportEvent): View
 }
 
 /**
- * 深处冷启且用户尚未导航过时禁用顶部预挂载：上方 section 的迟到测高会推走恢复目标。
- * 一旦发生用户级导航即永久恢复双向 overscan。
+ * Khi mở lại ở vị trí sâu và người dùng chưa điều hướng, không render trước section phía trên:
+ * đo chiều cao muộn ở phía trên có thể đẩy lệch vị trí cần khôi phục.
+ * Sau điều hướng đầu tiên của người dùng, bật lại overscan hai chiều.
  */
 export function overscanTop(state: ViewportState, initialIndex: number, fullTop: number): number {
   return initialIndex > 0 && !state.everUserNavigated ? 0 : fullTop;

@@ -3,8 +3,8 @@ import { persist } from "zustand/middleware";
 import { safeStorage } from "@renderer/store/lazy-storage";
 
 /**
- * 各面板的宽度约束（px）与默认值。default 与改造前的静态类一致（侧栏 w-64=256、
- * AI 面板 w-96=384），老用户首启无观感变化。min 保住内容不挤爆；max 防把正文挤没。
+ * Giới hạn và chiều rộng mặc định của từng bảng theo px. Giá trị mặc định giữ kích thước cũ:
+ * thanh bên 256px và bảng AI 384px. min giữ nội dung đủ chỗ, max giữ vùng đọc còn hiển thị.
  */
 export const PANE_LIMITS = {
   sidebar: { min: 200, max: 480, default: 256 },
@@ -12,7 +12,7 @@ export const PANE_LIMITS = {
 } as const;
 export type PaneId = keyof typeof PANE_LIMITS;
 
-/** 拖拽宽度收敛到该面板的合法区间（纯函数，单测覆盖）；非有限值回落默认宽。 */
+/** Giới hạn chiều rộng sau khi kéo vào phạm vi hợp lệ; giá trị không hữu hạn về mặc định. */
 export function clampPaneWidth(pane: PaneId, width: number): number {
   const { min, max, default: fallback } = PANE_LIMITS[pane];
   if (!Number.isFinite(width)) return fallback;
@@ -20,9 +20,9 @@ export function clampPaneWidth(pane: PaneId, width: number): number {
 }
 
 interface PaneSizeState {
-  /** 阅读器左侧栏宽度（px）。 */
+  /** Chiều rộng thanh bên trái của trình đọc, tính bằng px. */
   sidebarWidth: number;
-  /** 阅读器右侧 AI 面板宽度（px）。 */
+  /** Chiều rộng bảng trợ lý AI trong trình đọc, tính bằng px. */
   panelWidth: number;
 }
 interface PaneSizeActions {
@@ -31,8 +31,8 @@ interface PaneSizeActions {
 }
 
 /**
- * 面板尺寸是纯 UI 状态：走 localStorage（zustand persist），不进主进程 preferences 表。
- * 开关类布局态（sidebarOpen 等）仍在 prefs-store——两者真相源有意分开。
+ * Kích thước bảng là state giao diện, lưu bằng zustand persist trong localStorage.
+ * Trạng thái bật tắt như sidebarOpen vẫn nằm ở prefs-store.
  */
 export const usePaneSizeStore = create<PaneSizeState & PaneSizeActions>()(
   persist(

@@ -1,15 +1,12 @@
 // src/main/ai/tools.test.ts
 import path from "node:path";
 import { z } from "zod";
-import { beforeEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { makeFixtureEpub, type ChapterTextSlice } from "@marginalia/epub-parser";
 import { makeScannedPdf, makeTextPdf } from "@marginalia/pdf-parser/fixture";
-import { eq } from "drizzle-orm";
-import { books } from "@main/db/schema";
 import { createDb, runMigrations } from "@main/db/client";
 import { importBook, resolveChapterByHref } from "@main/library/repository";
 import { createReadingTools, resolveChapterRef, type LoadBytes } from "@main/ai/tools";
-import { __resetBookSummaryRuntime } from "@main/ai/summary";
 
 const MIGRATIONS = path.resolve(__dirname, "../db/migrations");
 
@@ -71,35 +68,6 @@ describe("createReadingTools", () => {
     expect(slice.nextOffset).toBe(5);
   });
 
-  it("getChapterSummary returns the cached summary state", async () => {
-    const { tools, ch1 } = await setup();
-    expect(await tools.getChapterSummary.execute!({ chapterId: ch1.id }, opts)).toEqual({
-      status: "pending",
-      summary: null,
-    });
-  });
-
-  describe("getBookSummary", () => {
-    beforeEach(() => __resetBookSummaryRuntime());
-
-    it("returns the whole-book summary state (pending when none)", async () => {
-      const { tools } = await setup();
-      expect(await tools.getBookSummary.execute!({}, opts)).toEqual({
-        status: "pending",
-        summary: null,
-      });
-    });
-
-    it("returns the stored whole-book summary when present", async () => {
-      const { db, book, tools } = await setup();
-      db.update(books).set({ summary: "the whole-book gist" }).where(eq(books.id, book.id)).run();
-      expect(await tools.getBookSummary.execute!({}, opts)).toEqual({
-        status: "ready",
-        summary: "the whole-book gist",
-      });
-    });
-  });
-
   it("readChapterText returns an { error } result on an unknown chapterId (no throw — a thrown tool error would abort the whole stream)", async () => {
     const { tools } = await setup();
     const out = (await tools.readChapterText.execute!({ chapterId: "nope" }, opts)) as {
@@ -108,14 +76,6 @@ describe("createReadingTools", () => {
     expect(out.error).toMatch(/not found/);
     // 自愈数据：错误信息附带真实章节清单，模型可据此换参重试
     expect(out.error).toMatch(/Known chapters include/);
-  });
-
-  it("getChapterSummary returns an { error } result on an unknown chapterId", async () => {
-    const { tools } = await setup();
-    const out = (await tools.getChapterSummary.execute!({ chapterId: "nope" }, opts)) as {
-      error?: string;
-    };
-    expect(out.error).toMatch(/not found/);
   });
 
   it("readChapterText inputSchema rejects an empty chapterId", async () => {

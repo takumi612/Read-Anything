@@ -5,7 +5,7 @@ import { type ChatContext, contextKey } from "@renderer/ai/chat-context";
 
 type IntervalQuery = { state: { data?: ConversationDto[] } };
 
-/** 会话列表 query（按上下文）；book→bookId，library→null。key 用 contextKey 区分。 */
+/** Truy vấn danh sách hội thoại theo context: book dùng bookId, library dùng null; khóa phân biệt bằng contextKey. */
 export function conversationsQuery(ctx: ChatContext) {
   const bookId = ctx.kind === "book" ? ctx.bookId : null;
   return {

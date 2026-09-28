@@ -1,6 +1,6 @@
 import type { HighlightColor } from "#/mock/types";
 
-/** 高亮配色（Apple Books 风）：swatch=工具栏色点、mark=正文高亮底色、stripe=列表色条。 */
+/** Bảng màu tô sáng (phong cách Apple Books): swatch = chấm màu trên thanh công cụ, mark = nền tô sáng nội dung, stripe = vạch màu trong danh sách. */
 export const HIGHLIGHT: Record<
   HighlightColor,
   { label: string; swatch: string; mark: string; stripe: string }

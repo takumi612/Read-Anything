@@ -14,7 +14,7 @@ describe("renderPageImage", () => {
 
   it("computes scale from targetWidth", async () => {
     const bytes = await makeTextPdf({ outline: false });
-    // fixture 页宽 400pt → targetWidth 200 = scale 0.5；PNG IHDR 宽度字段应为 200
+    // Trang mẫu rộng 400pt; targetWidth 200 tương ứng scale 0.5, nên chiều rộng PNG IHDR là 200.
     const png = await renderPageImage(bytes, 1, { targetWidth: 200 });
     // PNG IHDR: bytes 16-19 = width (big-endian u32)
     const width = (png[16]! << 24) | (png[17]! << 16) | (png[18]! << 8) | png[19]!;

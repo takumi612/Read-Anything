@@ -47,15 +47,15 @@ describe("reading sessions repository", () => {
     ).toThrow(/already has an active reading session/);
   });
 
-  it("preserves progress for continue and clears it for restart", () => {
+  it("preserves the locator for continue and clears it for restart", () => {
     const db = freshDb();
-    saveProgress(db, "b1", "epubcfi(/6/2)", 0.6);
+    saveProgress(db, "b1", "epubcfi(/6/2)");
     startReading(db, {
       bookId: "b1",
       mode: "continue",
       startedAt: Temporal.Instant.from("2026-07-01T00:00:00Z"),
     });
-    expect(getProgress(db, "b1")?.percent).toBe(0.6);
+    expect(getProgress(db, "b1")).toMatchObject({ locator: "epubcfi(/6/2)", percent: null });
     completeReading(db, "b1", Temporal.Instant.from("2026-07-02T00:00:00Z"));
     startReading(db, {
       bookId: "b1",

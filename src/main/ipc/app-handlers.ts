@@ -6,15 +6,23 @@ import { bind, register, type Binding } from "@main/ipc/registry";
 import { isAllowedExternalUrl } from "@main/app/external-url";
 import { checkForUpdate } from "@main/app/update-check";
 import { createLogger } from "@main/logger";
+import { getWindowsPdfAssociationStatus } from "@main/app/windows-pdf-association";
+import {
+  resetApplicationBackground,
+  storeApplicationBackground,
+} from "@main/app/application-background";
 
 const log = createLogger("app");
 
-// net.fetch 走系统代理（同 settings-handlers）；annotated binding 免去结果 cast。
+// net.fetch dùng proxy hệ thống; binding có kiểu nên không cần ép kiểu kết quả.
 const netFetch: typeof fetch = (url, init) => net.fetch(url as string, init);
 
 export const appBindings: Binding[] = [
   bind(C.ping, ping),
   bind(C.appGetInfo, () => getAppInfo(getDb(), app.getVersion())),
+  bind(C.appPdfAssociationStatus, () => getWindowsPdfAssociationStatus()),
+  bind(C.appResetBackground, () => resetApplicationBackground(getDb())),
+  bind(C.appSetBackground, (bytes) => storeApplicationBackground(getDb(), bytes)),
   bind(C.appOpenExternal, (input) => {
     if (!isAllowedExternalUrl(input.url)) {
       log.warn(`refused to open external url with disallowed protocol: ${input.url}`);
@@ -28,13 +36,13 @@ export const appBindings: Binding[] = [
 export function registerAppHandlers(): void {
   register(appBindings);
 
-  // 同步通道：preload 首帧前取系统 locale（供 i18n init 决定默认语言）。
-  // 故意绕开异步 register；app.getLocale() 在极少数情况下可能抛，整体兜底返回 "en"，绝不让 i18n init 崩。
+  // Preload lấy locale hệ thống đồng bộ trước khung hình đầu để khởi tạo i18n.
+  // Nếu app.getLocale lỗi, trả "en" để ứng dụng vẫn khởi động.
   ipcMain.on(C.appGetLocaleSync.channel, (e) => {
     try {
       e.returnValue = app.getLocale();
     } catch {
-      e.returnValue = "en"; // 安全回退：取系统 locale 失败时默认英文
+      e.returnValue = "en"; // Dùng tiếng Anh khi không đọc được locale hệ thống.
     }
   });
 }

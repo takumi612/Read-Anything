@@ -8,7 +8,7 @@ export function BookRanking({ perBook }: { perBook: BookReadingTotal[] }) {
   const m = t("stats.unitMin", "m");
   return (
     <div className="rounded-xl border border-border bg-card p-4">
-      <div className="mb-2 text-sm font-semibold">{t("stats.ranking", "各书时长排行")}</div>
+      <div className="mb-2 text-sm font-semibold">{t("stats.ranking", "Thời gian theo sách")}</div>
       <ul>
         {perBook.map((b, i) => (
           <li
@@ -18,7 +18,7 @@ export function BookRanking({ perBook }: { perBook: BookReadingTotal[] }) {
             <span className="text-center text-sm font-semibold text-muted-foreground">{i + 1}</span>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold">
-                {b.title ?? t("library.untitled", "未命名")}
+                {b.title ?? t("library.untitled", "Chưa đặt tên")}
               </div>
               {b.author && <div className="truncate text-xs text-muted-foreground">{b.author}</div>}
             </div>

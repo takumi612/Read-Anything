@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { cn } from "@renderer/lib/utils";
 
-/** 三向收起的物理类映射（DD-6：定位/位移/边框统一物理坐标——transform 无逻辑变体）。 */
+/** Ánh xạ class vật lý cho ba hướng thu gọn; vị trí, dịch chuyển và viền dùng cùng hệ tọa độ. */
 const PEEK = {
   left: {
     pinned: "border-r",
@@ -31,33 +31,40 @@ const PEEK = {
 
 interface CollapsiblePaneProps {
   side: "left" | "right" | "top";
-  /** 钉住（true=文档流占位；false=收起为边缘 peek 抽屉）。 */
+  /** Ghim bảng: true giữ chỗ trong luồng tài liệu, false thu thành ngăn kéo ở mép. */
   open: boolean;
-  /** 面板尺寸类（如 "w-64" / "w-96" / "h-12"）；传了 width 时省略。 */
+  /** Class kích thước bảng như "w-64" hoặc "h-12"; bỏ qua khi đã truyền width. */
   sizeClass?: string;
   /**
-   * 受控宽度（px，运行时连续值故走 inline style）；钉住与抽屉两种模式共用。
-   * 与 onWidthChange 同时提供时，钉住态在内缘渲染拖拽 handle（仅 left/right）。
+   * Chiều rộng có điều khiển theo px, dùng inline style vì thay đổi liên tục lúc chạy.
+   * Áp dụng cho cả chế độ ghim và ngăn kéo. Nếu có onWidthChange, bảng ghim có tay kéo ở mép trong.
    */
   width?: number;
-  /** 拖拽回调（原始 px，clamp 由调用方/store 负责）。 */
+  /** Callback kéo với giá trị px gốc; bên gọi hoặc store chịu trách nhiệm giới hạn. */
   onWidthChange?: (width: number) => void;
-  /** 收起态边缘热区的 aria-label。 */
+  /** aria-label cho vùng kích hoạt ở mép khi bảng thu gọn. */
   label: string;
+  /** When true, an open side pane overlays the document below this viewport width. */
+  overlayOnSmallScreen?: boolean;
+  /** Close callback and accessible label for the small-screen backdrop. */
+  onOverlayClose?: () => void;
+  overlayCloseLabel?: string;
+  /** Disable edge-hover peek when the pane should open only from its explicit toolbar control. */
+  peekOnHover?: boolean;
   /**
-   * 追加到面板元素的类（两种模式都生效）。**勿传半透明背景**（如 bg-muted/30）——
-   * tailwind-merge 会用它顶掉收起态抽屉的不透明 bg-background 底，浮层将透出正文；
-   * 装饰性背景放 children 根元素（见 Sidebar / AIPanel）。
+   * Class thêm vào bảng ở cả hai chế độ. Tránh nền bán trong suốt như bg-muted/30:
+   * tailwind-merge sẽ thay nền bg-background của ngăn kéo, khiến nội dung phía sau xuyên qua.
+   * Đặt nền trang trí ở phần tử gốc của children như Sidebar hoặc AIPanel.
    */
   className?: string;
   children: ReactNode;
 }
 
 /**
- * 三向可收起面板（UP1 PeekDrawer 的单挂载点版）：钉住时在文档流占位；收起时同一元素
- * 切为贴边浮层抽屉——hover 3px 边缘热区滑出、移开 200ms 收回。children 树位置不变，
- * 开合不卸载（AIPanel 的 useChat 流式状态、Sidebar 滚动位置得以保活）。
- * 收起且未唤出时面板置 inert，挡掉离屏内容的 Tab 焦点与指针事件。
+ * Bảng thu gọn theo ba hướng, chỉ gắn DOM một lần. Khi ghim, nó giữ chỗ trong luồng tài liệu;
+ * khi thu gọn, cùng phần tử trở thành ngăn kéo nổi ở mép. Có thể rê lên vùng mép để mở,
+ * rồi tự thu sau 200 ms rời chuột. children không bị tháo nên giữ trạng thái stream và vị trí cuộn.
+ * Khi ngăn kéo chưa mở, đặt inert để nội dung ngoài màn hình không nhận Tab hay pointer.
  */
 export function CollapsiblePane({
   side,
@@ -66,6 +73,10 @@ export function CollapsiblePane({
   width,
   onWidthChange,
   label,
+  overlayOnSmallScreen = false,
+  onOverlayClose,
+  overlayCloseLabel,
+  peekOnHover = true,
   className,
   children,
 }: CollapsiblePaneProps) {
@@ -74,6 +85,7 @@ export function CollapsiblePane({
   const panelRef = useRef<HTMLDivElement | null>(null);
   const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const c = PEEK[side];
+  const smallScreenOverlay = open && overlayOnSmallScreen && side !== "top";
 
   const cancelClose = () => {
     if (closeTimer.current) {
@@ -86,14 +98,14 @@ export function CollapsiblePane({
     closeTimer.current = setTimeout(() => setPeekOpen(false), 200);
   };
 
-  // 钉住时复位 peek 态；开合切换与卸载时清掉未决的收回计时器。
+  // Khi ghim, đặt lại trạng thái peek; dọn timer thu gọn khi đổi chế độ hoặc tháo bảng.
   useEffect(() => {
     if (open) setPeekOpen(false);
     return cancelClose;
   }, [open]);
 
-  // 拖拽改宽（事件驱动命令式：mousedown 起监听、mouseup 收）。锚定拖拽起始时的对缘
-  // （left 面板左缘 / right 面板右缘在拖拽中不动），用指针位置与对缘的差作新宽度。
+  // Khi kéo đổi chiều rộng, bắt đầu nghe ở mousedown và dừng ở mouseup.
+  // Giữ cố định mép đối diện rồi tính chiều rộng mới từ khoảng cách tới vị trí con trỏ.
   const startResize = (e: React.MouseEvent) => {
     if (!onWidthChange || side === "top") return;
     e.preventDefault();
@@ -116,8 +128,16 @@ export function CollapsiblePane({
 
   return (
     <>
-      {/* 收起态：边缘 3px 热区 + 1px 常驻把手（hover 高亮并唤出抽屉） */}
-      {!open && (
+      {smallScreenOverlay && onOverlayClose && (
+        <button
+          type="button"
+          aria-label={overlayCloseLabel ?? label}
+          onClick={onOverlayClose}
+          className="absolute inset-0 z-30 hidden bg-background/45 max-[900px]:block"
+        />
+      )}
+      {/* Khi thu gọn: vùng kích hoạt 3px ở mép và tay nắm 1px; rê lên để mở ngăn kéo. */}
+      {!open && peekOnHover && (
         <div
           aria-label={label}
           onMouseEnter={() => {
@@ -135,16 +155,24 @@ export function CollapsiblePane({
         </div>
       )}
 
-      {/* 面板本体：单挂载点，仅切 className（钉住=文档流；收起=贴边抽屉浮层） */}
+      {/* Cùng một phần tử bảng; chỉ đổi className giữa chế độ ghim và ngăn kéo nổi. */}
       <div
         ref={panelRef}
         inert={!open && !peekOpen}
-        onMouseEnter={open ? undefined : cancelClose}
-        onMouseLeave={open ? undefined : scheduleClose}
+        onMouseEnter={open || !peekOnHover ? undefined : cancelClose}
+        onMouseLeave={open || !peekOnHover ? undefined : scheduleClose}
         className={cn(
           "border-border",
           open
-            ? cn("relative shrink-0", c.pinned)
+            ? cn(
+                "relative shrink-0",
+                c.pinned,
+                smallScreenOverlay &&
+                  cn(
+                    "max-[900px]:absolute max-[900px]:inset-y-0 max-[900px]:z-40 max-[900px]:max-w-[420px] max-[520px]:max-w-[88vw] max-[900px]:shadow-xl",
+                    side === "left" ? "max-[900px]:left-0" : "max-[900px]:right-0",
+                  ),
+              )
             : cn(
                 "absolute z-40 bg-background shadow-xl transition-transform duration-200 ease-out",
                 c.drawer,
@@ -153,11 +181,11 @@ export function CollapsiblePane({
           sizeClass,
           className,
         )}
-        // 受控宽度是用户拖拽的运行时连续值，无法用静态类表达
+        // Chiều rộng do người dùng kéo thay đổi liên tục nên không biểu diễn được bằng class tĩnh.
         style={width != null ? { width } : undefined}
       >
         {children}
-        {/* 钉住态内缘拖拽 handle：宽 1px、hover/拖拽中高亮（镜像收起态把手观感） */}
+        {/* Tay kéo 1px ở mép trong khi ghim, sáng lên lúc rê hoặc kéo. */}
         {resizable && (
           <div
             role="separator"
@@ -173,7 +201,7 @@ export function CollapsiblePane({
         )}
       </div>
 
-      {/* 拖拽期间的全屏遮罩：iframe（ePub 阅读器）会吞 mousemove，盖住统一接管指针与光标 */}
+      {/* Lớp phủ toàn màn hình khi kéo nhận pointer thay cho iframe ePub vốn chặn mousemove. */}
       {resizing && <div className="fixed inset-0 z-50 cursor-col-resize select-none" />}
     </>
   );

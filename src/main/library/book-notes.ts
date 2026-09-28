@@ -15,7 +15,7 @@ function toDto(row: BookNoteRow): BookNoteDto {
   };
 }
 
-/** 列出某书的全部笔记（按 createdAt 降序，最近创建在前；此即渲染层的展示顺序）。 */
+/** Liệt kê ghi chú của sách theo thời gian tạo giảm dần, mới nhất trước. */
 export function listBookNotesByBook(db: DB, bookId: string): BookNoteDto[] {
   return db
     .select()
@@ -26,7 +26,7 @@ export function listBookNotesByBook(db: DB, bookId: string): BookNoteDto[] {
     .map(toDto);
 }
 
-/** 建笔记；缺书抛可读错误（镜像 createAnnotation 的 FK 预检）。 */
+/** Tạo ghi chú; sách không tồn tại thì ném lỗi dễ đọc. */
 export function createBookNote(db: DB, input: CreateBookNoteInput): BookNoteDto {
   const book = db.select({ id: books.id }).from(books).where(eq(books.id, input.bookId)).get();
   if (!book) throw new Error(`createBookNote: book ${input.bookId} not found`);
@@ -38,7 +38,7 @@ export function createBookNote(db: DB, input: CreateBookNoteInput): BookNoteDto 
   return toDto(row);
 }
 
-/** 改内容并刷新 updatedAt；缺行抛可读错误。 */
+/** Sửa nội dung và updatedAt; thiếu ghi chú thì ném lỗi dễ đọc. */
 export function updateBookNote(db: DB, input: UpdateBookNoteInput): BookNoteDto {
   const row = db
     .update(bookNotes)
@@ -50,7 +50,7 @@ export function updateBookNote(db: DB, input: UpdateBookNoteInput): BookNoteDto 
   return toDto(row);
 }
 
-/** 删笔记；缺行抛可读错误（有意区别于 deleteAnnotation 的幂等语义，勿向任一侧「修齐」）。 */
+/** Xóa ghi chú; thiếu dòng thì báo lỗi, khác với hành vi idempotent của annotation. */
 export function deleteBookNote(db: DB, id: string): void {
   const res = db.delete(bookNotes).where(eq(bookNotes.id, id)).run();
   if (res.changes === 0) throw new Error(`deleteBookNote: book note ${id} not found`);

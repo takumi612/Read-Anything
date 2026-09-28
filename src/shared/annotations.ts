@@ -1,8 +1,26 @@
 // src/shared/annotations.ts
 import { z } from "zod";
 
-export const annotationStyle = z.enum(["yellow", "green", "blue", "pink", "purple", "underline"]);
-export type AnnotationStyle = z.infer<typeof annotationStyle>;
+const builtInAnnotationStyle = z.enum([
+  "yellow",
+  "green",
+  "blue",
+  "pink",
+  "purple",
+  "underline",
+]);
+/** Hex colors are stored directly as styles so existing annotations keep their exact color. */
+export const annotationStyle = z.union([
+  builtInAnnotationStyle,
+  z.string().regex(/^#[0-9a-fA-F]{6}$/),
+]) as z.ZodType<z.infer<typeof builtInAnnotationStyle> | `#${string}`>;
+export type AnnotationStyle = z.infer<typeof builtInAnnotationStyle> | `#${string}`;
+
+export const annotationFillStyle = z.union([
+  z.enum(["yellow", "green", "blue", "pink", "purple"]),
+  z.string().regex(/^#[0-9a-fA-F]{6}$/),
+]) as z.ZodType<Exclude<AnnotationStyle, "underline">>;
+export type AnnotationFillStyle = Exclude<AnnotationStyle, "underline">;
 
 export interface AnnotationDto {
   id: string;

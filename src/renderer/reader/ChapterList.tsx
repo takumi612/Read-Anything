@@ -19,17 +19,17 @@ export function ChapterList({ bookId }: { bookId: string }) {
       <nav className="flex flex-col gap-0.5 p-2 font-sans">
         {chapters.isPending && (
           <p className="p-2 text-sm text-muted-foreground">
-            {t("reader.toc.loading", "加载目录…")}
+            {t("reader.toc.loading", "Đang tải mục lục…")}
           </p>
         )}
         {chapters.isError && (
           <p className="p-2 text-sm text-destructive">
-            {t("reader.toc.loadError", "目录读取失败")}
+            {t("reader.toc.loadError", "Không thể tải mục lục")}
           </p>
         )}
         {chapters.data?.length === 0 && (
           <p className="p-2 text-sm text-muted-foreground">
-            {t("reader.toc.empty", "（本书无目录章节）")}
+            {t("reader.toc.empty", "(Sách này không có mục lục)")}
           </p>
         )}
         {chapters.data?.map((ch) => (
@@ -47,7 +47,7 @@ export function ChapterList({ bookId }: { bookId: string }) {
                   : "text-muted-foreground hover:bg-muted",
             )}
           >
-            {ch.title ?? t("reader.toc.chapterFallback", "第 {{n}} 章", { n: ch.orderIndex + 1 })}
+            {ch.title ?? t("reader.toc.chapterFallback", "Chương {{n}}", { n: ch.orderIndex + 1 })}
           </button>
         ))}
       </nav>

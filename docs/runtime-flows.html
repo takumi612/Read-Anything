@@ -1,0 +1,267 @@
+<!doctype html>
+<html lang="vi">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Luồng hoạt động Read-Anything</title>
+    <link rel="stylesheet" href="source-guide.css" />
+  </head>
+  <body>
+    <header class="site-header">
+      <a class="brand" href="code-map.html">Read-Anything · hướng dẫn mã nguồn</a>
+      <nav class="site-nav" aria-label="Tài liệu">
+        <a href="code-map.html">Bản đồ code</a><a href="architecture.html">Kiến trúc</a
+        ><a href="runtime-flows.html" aria-current="page">Luồng chạy</a
+        ><a href="run-from-source.html">Chạy từ source</a
+        ><a href="build-windows-exe.html">Tạo EXE</a>
+      </nav>
+    </header>
+    <div class="layout">
+      <main class="content">
+        <div class="eyebrow">Giải thích theo thao tác</div>
+        <h1>Ứng dụng chạy như thế nào</h1>
+        <p class="lead">
+          Mỗi mục bắt đầu từ thao tác người dùng và đi qua những file thực sự tham gia. Dùng các
+          liên kết để review từng đoạn mã; xem <a href="architecture.html">kiến trúc</a> khi cần
+          hiểu trách nhiệm của một lớp.
+        </p>
+        <h2 id="startup">1. Mở ứng dụng</h2>
+        <ol>
+          <li>
+            Electron vào <a href="../src/main.ts"><code>src/main.ts</code></a
+            >, lấy single-instance lock, đăng ký scheme và chờ <code>app.ready</code>.
+          </li>
+          <li>
+            <a href="../src/main/db/instance.ts"><code>initDb</code></a> mở SQLite, chạy migration
+            từ <a href="../src/main/db/migrations-path.ts"><code>migrations-path.ts</code></a
+            >, chuẩn bị provider tích hợp. Main đăng ký các IPC bindings trong
+            <code>src/main/ipc/</code>.
+          </li>
+          <li>
+            Main cài giao thức cover/media, đồng hồ đọc và sách mẫu nếu là lần đầu. Ở bản đóng gói,
+            <a href="../src/main/app/renderer-server.ts"><code>renderer-server.ts</code></a> phục vụ
+            renderer qua loopback; khi dev, Forge dùng Vite URL.
+          </li>
+          <li>
+            Preload lấy snapshot cài đặt ban đầu rồi mở <code>window.api</code>.
+            <a href="../src/renderer.tsx"><code>renderer.tsx</code></a> nạp giao diện, React Query
+            và <a href="../src/renderer/App.tsx"><code>App.tsx</code></a
+            >.
+          </li>
+        </ol>
+        <p>
+          Nếu hệ điều hành mở một PDF bằng Read-Anything, <code>src/main.ts</code> nhận đường dẫn, gửi
+          <code>appOpenFile</code> tới renderer và <code>App.tsx</code> import rồi mở sách.
+        </p>
+        <h2 id="import">2. Nhập sách vào thư viện</h2>
+        <div class="diagram">
+          <span>LibraryView</span><b>→</b><span>window.api.library.import</span><b>→</b
+          ><span>library-handlers</span><b>→</b><span>repository + parser + book-files</span>
+        </div>
+        <ol>
+          <li>
+            <a href="../src/renderer/library/LibraryView.tsx"><code>LibraryView.tsx</code></a> nhận
+            tệp từ hộp thoại hoặc kéo thả. UI chuyển đường dẫn tệp qua preload.
+          </li>
+          <li>
+            <a href="../src/main/ipc/library-handlers.ts"><code>library-handlers.ts</code></a> đọc
+            bytes bằng
+            <a href="../src/main/library/import-source.ts"><code>import-source.ts</code></a
+            >. <a href="../src/main/library/repository.ts"><code>repository.ts</code></a> chọn
+            parser theo định dạng, lưu metadata, TOC/chapter và cover trong SQLite.
+          </li>
+          <li>
+            <a href="../src/main/library/book-files.ts"><code>book-files.ts</code></a> giữ bản tệp
+            sách trong thư mục ứng dụng. Danh sách sách trả về UI qua <code>library.list</code>;
+            shelf gần đây dùng bảng tiến độ và phiên đọc.
+          </li>
+        </ol>
+        <p>
+          PDF dùng <code>packages/pdf-parser/</code>; EPUB dùng <code>packages/epub-parser/</code>.
+          PDF lấy ID từ hash bytes. Tệp EPUB cũ có thể được đánh chỉ mục lại khi mở nếu phiên bản
+          parser đã thay đổi.
+        </p>
+        <h2 id="read">3. Mở sách, đọc và nhớ vị trí</h2>
+        <ol>
+          <li>
+            <a href="../src/renderer/store/navigation-store.ts"><code>navigation-store.ts</code></a>
+            nhận book ID.
+            <a href="../src/renderer/reading/BookRoute.tsx"><code>BookRoute.tsx</code></a> chọn màn
+            bắt đầu, reader hoặc báo cáo theo reading state.
+          </li>
+          <li>
+            <a href="../src/renderer/reader/ReaderView.tsx"><code>ReaderView.tsx</code></a> chọn
+            <a href="../src/renderer/reader/PdfReader.tsx"><code>PdfReader</code></a> hay
+            <a href="../src/renderer/reader/EpubReader.tsx"><code>EpubReader</code></a
+            >. Sidebar hiển thị nội dung, PDF có chế độ trang/thumbnail. Công cụ bên phải chứa AI và
+            dữ liệu theo sách.
+          </li>
+          <li>
+            PDF đọc bytes qua <code>library.readBookBytes</code>,
+            <a href="../src/renderer/reader/pdf-book.ts"><code>pdf-book.ts</code></a> khởi tạo pdfjs
+            worker; <code>PdfReader</code> ảo hóa trang, vẽ canvas và text layer. EPUB render bằng
+            epubjs.
+          </li>
+          <li>
+            <a href="../src/renderer/reader/use-reading-position.ts"
+              ><code>use-reading-position.ts</code></a
+            >
+            và logic reader đổi vị trí thành locator + percent. <code>progress.save</code> đi qua
+            <a href="../src/main/library/progress.ts"><code>main/library/progress.ts</code></a
+            >. Lần mở sau đọc locator để khôi phục vị trí.
+          </li>
+        </ol>
+        <p>
+          Ở PDF, <a href="../src/renderer/reader/pdf-zoom.ts"><code>pdf-zoom.ts</code></a> và
+          <a href="../src/renderer/reader/pdf-scroll.ts"><code>pdf-scroll.ts</code></a> tính zoom và
+          điểm neo cuộn. <code>PdfReader.tsx</code> xử lý wheel/pinch để giữ vùng đọc. Reader chỉ
+          ghi trang đã đọc ở chế độ đọc chủ động.
+        </p>
+        <p>
+          Header reader tự ẩn khi người dùng cuộn xuống và hiện lại khi cuộn lên hoặc rê chuột vào
+          mép trên. Sự kiện khôi phục vị trí đọc bị bỏ qua để header không tự biến mất khi mở sách.
+          Vùng đọc giữ scrollbar mảnh để người dùng nhận biết vị trí cuộn; thao tác “Complete
+          reading” hiện tạm thời không có nút trong giao diện.
+        </p>
+        <p>
+          Trong PDF, menu Application theme có hai thanh độ sáng độc lập: độ sáng nội dung trang và
+          độ sáng nền bao quanh trang. Thay đổi nền chỉ áp dụng cho vùng ngoài canvas, nên không làm
+          đổi nội dung của PDF scan; hai giá trị được lưu riêng trong preferences.
+        </p>
+        <h2 id="search">4. Tìm kiếm trong PDF</h2>
+        <ol>
+          <li>
+            <a href="../src/renderer/reader/PdfSearchPanel.tsx"><code>PdfSearchPanel.tsx</code></a>
+            nhận từ khóa, tùy chọn phân biệt hoa thường và trọn từ.
+            <a href="../src/renderer/reader/pdf-search.ts"><code>pdf-search.ts</code></a> tìm trong
+            nội dung trang.
+          </li>
+          <li>
+            <a href="../src/renderer/reader/use-pdf-search-marks.ts"
+              ><code>use-pdf-search-marks.ts</code></a
+            >
+            đánh dấu kết quả trên text layer. Click một kết quả điều hướng đến trang và vị trí.
+          </li>
+          <li>
+            Ẩn panel giữ từ khóa hiện có để mở lại. <code>Ctrl+F</code> được bắt ở reader; vùng chọn
+            vẫn có thể trở thành từ khóa theo logic trong <code>PdfReader.tsx</code>.
+          </li>
+        </ol>
+        <p>
+          PDF scan không có text layer thì parser không cung cấp chữ để tìm. Đánh dấu kết quả phụ
+          thuộc tọa độ text layer của pdfjs, nên kiểm tra với PDF cụ thể nếu thấy vị trí sai.
+        </p>
+        <h2 id="selection">5. Chọn chữ, tra từ, chú thích và ghi chú</h2>
+        <ol>
+          <li>
+            Reader ghi nội dung, locator và đoạn lân cận vào
+            <a href="../src/renderer/store/annotation-store.ts"><code>annotation-store.ts</code></a
+            >.
+            <a href="../src/renderer/reader/SelectionToolbar.tsx"
+              ><code>SelectionToolbar.tsx</code></a
+            >
+            hiện thao tác tra từ, đánh dấu, thêm ghi chú và hỏi AI.
+          </li>
+          <li>
+            Tra từ gọi <code>window.api.vocabulary.lookup</code>.
+            <a href="../src/main/ipc/vocabulary-handlers.ts"><code>vocabulary-handlers.ts</code></a>
+            dùng
+            <a href="../src/main/vocabulary/dictionary-store.ts"
+              ><code>dictionary-store.ts</code></a
+            >
+            mở DB từ điển và
+            <a href="../src/main/vocabulary/local-dictionary.ts"
+              ><code>local-dictionary.ts</code></a
+            >
+            tìm nghĩa, dạng biến cách và thuật ngữ kỹ thuật. Popup có thể phát âm qua
+            <code>src/renderer/reader/tts/</code>.
+          </li>
+          <li>
+            Lưu từ vào
+            <a href="../src/main/vocabulary/repository.ts"><code>vocabulary/repository.ts</code></a
+            >. PDF có thể hiện từ đã lưu ở những chỗ khác trong cùng sách qua
+            <a href="../src/renderer/reader/use-pdf-vocabulary.ts"
+              ><code>use-pdf-vocabulary.ts</code></a
+            >. Annotation đi qua <code>main/library/annotations.ts</code>, note qua
+            <code>main/library/book-notes.ts</code>.
+          </li>
+          <li>
+            Bookmark PDF yêu cầu nội dung do người dùng nhập; UI ở <code>PdfReader.tsx</code> và
+            danh sách ở
+            <a href="../src/renderer/reader/PdfBookmarksList.tsx"
+              ><code>PdfBookmarksList.tsx</code></a
+            >. Main lưu qua <code>main/library/pdf-bookmarks.ts</code>.
+          </li>
+        </ol>
+        <p>
+          Mỗi danh mục có nút xóa riêng sau hộp thoại xác nhận.
+          <a href="../src/main/library/clear-book-category.ts"
+            ><code>clear-book-category.ts</code></a
+          >
+          xóa dữ liệu theo book ID và category trong transaction, không xóa tiến độ đọc.
+        </p>
+        <h2 id="ai">6. Hỏi AI theo ngữ cảnh sách</h2>
+        <ol>
+          <li>
+            <a href="../src/renderer/ai/use-ai-actions.ts"><code>use-ai-actions.ts</code></a> chuyển
+            đoạn đã chọn và đoạn lân cận thành context chips, đặt câu nháp, mở panel.
+            <a href="../src/renderer/ai/Composer.tsx"><code>Composer.tsx</code></a> gửi câu hỏi qua
+            <a href="../src/renderer/ai/ipc-chat-transport.ts"><code>ipc-chat-transport.ts</code></a
+            >.
+          </li>
+          <li>
+            Main kiểm tra nhà cung cấp và sự đồng ý gửi dữ liệu AI tại
+            <code>src/main/ai/consent.ts</code>.
+            <a href="../src/main/ai/send.ts"><code>send.ts</code></a> xác minh hội thoại, lấy lịch
+            sử từ DB, có thể lấy trích đoạn PDF liên quan và dựng prompt với <code>prompt.ts</code>.
+          </li>
+          <li>
+            <a href="../src/main/ai/stream-assistant.ts"><code>stream-assistant.ts</code></a> dùng
+            AI SDK và công cụ sách/memory/search.
+            <a href="../src/main/ipc/ai-handlers.ts"><code>ai-handlers.ts</code></a> gửi ACK trước,
+            rồi chuyển chunk về renderer.
+            <a href="../src/renderer/ai/AIPanel.tsx"><code>AIPanel.tsx</code></a> hiển thị stream,
+            lịch sử được lưu bởi <code>src/main/chat/</code>.
+          </li>
+        </ol>
+        <p>
+          Đường <code>ai.translateSelection</code> riêng dùng model đã cấu hình. Nó khác tra từ điển
+          ngoại tuyến. Nội dung gửi ra ngoài gồm câu hỏi và ngữ cảnh mà lượt hỏi bật.
+        </p>
+        <h2 id="streak">7. Ghi thời gian và chuỗi đọc</h2>
+        <p>
+          <a href="../src/renderer/reader/use-reading-clock.ts"
+            ><code>use-reading-clock.ts</code></a
+          >
+          theo dõi thời gian đọc.
+          <a href="../src/renderer/reader/use-record-reading-page.ts"
+            ><code>use-record-reading-page.ts</code></a
+          >
+          báo trang tới main.
+          <a href="../src/main/stats/page-streak.ts"><code>page-streak.ts</code></a> đếm mỗi trang
+          một lần mỗi ngày, cộng nhiều sách, giới hạn hiển thị tiến độ ở 10/10 và tính chuỗi ngày
+          liên tiếp đủ 10 trang. <code>src/renderer/stats/</code> hiển thị lịch tháng và thống kê.
+        </p>
+        <h2 id="backup">8. Sao lưu và khôi phục</h2>
+        <p>
+          <a href="../src/main/backup/backup-service.ts"><code>backup-service.ts</code></a> tạo
+          snapshot SQLite, bỏ thông tin khóa API khỏi bản sao, dựng manifest và đóng ZIP. Khi khôi
+          phục, <code>compat.ts</code> kiểm tra tương thích, <code>restore.ts</code> kiểm tra dữ
+          liệu rồi thay DB trước khi ứng dụng khởi động lại. UI ở
+          <code>src/renderer/settings/BackupExportButton.tsx</code> và
+          <code>AdvancedSettings.tsx</code>. Cần nhập lại API key sau khi khôi phục.
+        </p>
+      </main>
+      <aside class="toc">
+        <strong>Luồng</strong><a href="#startup">Mở ứng dụng</a><a href="#import">Nhập sách</a
+        ><a href="#read">Đọc và tiến độ</a><a href="#search">Search PDF</a
+        ><a href="#selection">Tra từ và ghi chú</a><a href="#ai">Hỏi AI</a
+        ><a href="#streak">Chuỗi đọc</a><a href="#backup">Sao lưu</a>
+      </aside>
+    </div>
+    <footer class="footer">
+      Các mô tả bám theo mã nguồn hiện có. Đối chiếu trực tiếp file liên kết khi review hành vi cụ
+      thể.
+    </footer>
+  </body>
+</html>

@@ -13,6 +13,25 @@ describe("pdf locator", () => {
     expect(parsePdfLocator(s)).toEqual({ page: 12, scrollRatio: 0.35 });
   });
 
+  it("round-trips saved zoom and reading view preferences", () => {
+    const locator = makePdfLocator({
+      page: 8,
+      scrollRatio: 0.2,
+      zoom: 1.25,
+      viewMode: "single",
+      fitMode: "page",
+      rotation: 180,
+    });
+    expect(parsePdfLocator(locator)).toEqual({
+      page: 8,
+      scrollRatio: 0.2,
+      zoom: 1.25,
+      viewMode: "single",
+      fitMode: "page",
+      rotation: 180,
+    });
+  });
+
   it("defaults missing scrollRatio to 0", () => {
     expect(parsePdfLocator('pdf:{"page":3}')).toEqual({ page: 3, scrollRatio: 0 });
   });

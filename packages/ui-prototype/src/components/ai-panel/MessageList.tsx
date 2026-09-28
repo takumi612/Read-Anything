@@ -35,7 +35,7 @@ function UserBubble({ m }: { m: Extract<ChatMessage, { role: "user" }> }) {
   );
 }
 
-/** 紧凑上下文摘要：只显示总 token；hover 弹 popover 列各 chip 明细。 */
+/** Tóm tắt ngữ cảnh gọn: chỉ hiển thị tổng số token; di chuột để mở popover liệt kê chi tiết từng chip. */
 function ContextSummary({ chips }: { chips: Chip[] }) {
   const { t } = useTranslation();
   const [rect, setRect] = useState<DOMRect | null>(null);

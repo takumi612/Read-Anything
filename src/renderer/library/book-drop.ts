@@ -1,4 +1,4 @@
-/** 仅当拖拽负载含「外部文件」时才响应——忽略选区文本拖拽、内部元素拖拽。 */
+/** Chỉ phản hồi khi dữ liệu kéo chứa tệp bên ngoài, bỏ qua chữ được chọn và phần tử nội bộ. */
 export function isFilesDrag(types: readonly string[]): boolean {
   return types.includes("Files");
 }
@@ -11,9 +11,9 @@ export interface SortedDrop<T> {
 }
 
 /**
- * 按受支持的书籍后缀（大小写不敏感）把拖入项分组：命中进 books，其余进 ignored。
- * 不依赖 MIME（type 上报不稳定）；文件夹/txt 等无匹配后缀 → ignored。
- * 泛型保留真实 File 类型；输入顺序保留，便于稳定断言。
+ * Nhóm tệp kéo vào theo đuôi sách hỗ trợ, không phân biệt hoa thường.
+ * Không dựa vào MIME vì type có thể không ổn định; thư mục hoặc tệp không khớp vào ignored.
+ * Giữ kiểu File và thứ tự đầu vào để kết quả có thể kiểm tra ổn định.
  */
 export function pickBookFiles<T extends { name: string }>(files: readonly T[]): SortedDrop<T> {
   const books: T[] = [];
@@ -26,7 +26,7 @@ export function pickBookFiles<T extends { name: string }>(files: readonly T[]): 
   return { books, ignored };
 }
 
-/** 取路径末段文件名（按钮导入路径的失败提示用）。兼容 / 与 \ 分隔。 */
+/** Lấy tên tệp cuối đường dẫn để báo lỗi nhập sách, hỗ trợ cả / và \. */
 export function fileNameOf(path: string): string {
   const seg = path.split(/[\\/]/);
   return seg[seg.length - 1] || path;

@@ -39,26 +39,25 @@ export function ConversationsTab({ context }: { context: ChatContext }) {
   const convos = useQuery(conversationsQuery(context));
   const [confirmTarget, setConfirmTarget] = useState<ConversationDto | null>(null);
 
-  // 删会话：abort 在跑流 + 级联删消息由主进程负责；成功后先清 active 再失效列表 + toast。
+  // Main process dừng stream và xóa tin liên quan; thành công thì xóa active, làm mới danh sách và hiện toast.
   const deleteConvo = useMutation({
     mutationFn: (c: ConversationDto) => window.api.chat.conversations.delete({ id: c.id }),
     onSuccess: (_r, c) => {
-      // 先清 active（防 dangling 窗口内向已删会话发送），再失效列表。
-      // 回落 = 新会话空状态（spec DD-3）：AIPanel 既有 effect 清面板，chips 预亮镜像「开书无会话」。
+      // Xóa active trước để cửa sổ không gửi vào hội thoại đã xóa, rồi làm mới danh sách.
+      // Quay về trạng thái hội thoại mới rỗng; effect của AIPanel sẽ dọn bảng.
       const s = useChatStore.getState();
       if (getActiveConversationId(context) === c.id) {
         s.setActiveConversation(context, null);
-        s.setSummaryChipsPreset();
       }
-      // 该会话的消息缓存整体移除（remove 非 invalidate——实体已没，不该 refetch；镜像 deleteBook）。
+      // Xóa cache tin nhắn của hội thoại, không refetch vì hội thoại đã không còn.
       qc.removeQueries({ queryKey: qk.messages(c.id) });
       void qc.invalidateQueries({ queryKey: qk.conversations(key) });
-      toast.success(t("reader.conversation.deleted", "已删除会话"));
+      toast.success(t("reader.conversation.deleted", "Đã xóa cuộc trò chuyện"));
     },
     onError: (e) => {
-      // 透传主进程真实错误（honest-error），不自动消失。
+      // Hiển thị lỗi thật từ main process và giữ toast cho tới khi người dùng đóng.
       toast.error(
-        t("reader.conversation.deleteFailed", "删除失败：{{error}}", {
+        t("reader.conversation.deleteFailed", "Không thể xóa: {{error}}", {
           error: (e as Error).message,
         }),
         { closeButton: true, duration: Infinity },
@@ -69,13 +68,13 @@ export function ConversationsTab({ context }: { context: ChatContext }) {
   if (convos.isPending)
     return (
       <p className="p-3 text-sm text-muted-foreground">
-        {t("reader.conversation.loading", "加载会话…")}
+        {t("reader.conversation.loading", "Đang tải cuộc trò chuyện…")}
       </p>
     );
   if (convos.isError)
     return (
       <p className="p-3 text-sm text-destructive">
-        {t("reader.conversation.loadError", "会话加载失败")}
+        {t("reader.conversation.loadError", "Không thể tải cuộc trò chuyện")}
       </p>
     );
   const list = convos.data ?? [];
@@ -83,13 +82,13 @@ export function ConversationsTab({ context }: { context: ChatContext }) {
     return (
       <p className="p-4 text-center text-xs text-muted-foreground">
         {context.kind === "library"
-          ? t("ai.conversation.libraryEmpty", "还没有会话，开一个聊聊吧～")
-          : t("reader.conversation.empty", "还没有会话。选段问 AI 试试～")}
+          ? t("ai.conversation.libraryEmpty", "Chưa có cuộc trò chuyện nào. Hãy bắt đầu một cuộc trò chuyện.")
+          : t("reader.conversation.empty", "Chưa có cuộc trò chuyện. Hãy chọn một đoạn và hỏi AI.")}
       </p>
     );
 
   const primaryLabel = (c: ConversationDto): string =>
-    c.title?.trim() ? c.title : t("reader.conversation.untitled", "未命名会话");
+    c.title?.trim() ? c.title : t("reader.conversation.untitled", "Cuộc trò chuyện chưa đặt tên");
   const now = Date.now();
 
   return (
@@ -118,19 +117,19 @@ export function ConversationsTab({ context }: { context: ChatContext }) {
       >
         <AlertDialogContent>
           <AlertDialogTitle>
-            {t("reader.conversation.deleteConfirm.title", "删除会话「{{title}}」？", {
+            {t("reader.conversation.deleteConfirm.title", "Xóa cuộc trò chuyện “{{title}}”?", {
               title: confirmTarget ? primaryLabel(confirmTarget) : "",
             })}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {t(
               "reader.conversation.deleteConfirm.body",
-              "将永久删除该会话及其全部消息。此操作不可撤销。",
+              "Cuộc trò chuyện và tất cả tin nhắn sẽ bị xóa vĩnh viễn. Bạn không thể hoàn tác thao tác này.",
             )}
           </AlertDialogDescription>
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => setConfirmTarget(null)}>
-              {t("reader.conversation.deleteConfirm.cancel", "取消")}
+              {t("reader.conversation.deleteConfirm.cancel", "Hủy")}
             </Button>
             <Button
               variant="destructive"
@@ -139,7 +138,7 @@ export function ConversationsTab({ context }: { context: ChatContext }) {
                 setConfirmTarget(null);
               }}
             >
-              {t("reader.conversation.deleteConfirm.confirm", "删除")}
+              {t("reader.conversation.deleteConfirm.confirm", "Xóa")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -148,7 +147,7 @@ export function ConversationsTab({ context }: { context: ChatContext }) {
   );
 }
 
-/** 单条会话行：行按钮 + hover 垃圾桶（绝对定位兄弟，不嵌套 button）+ 右键菜单，两条删除路径汇入同一确认。 */
+/** Một dòng hội thoại có nút mở, nút xóa khi rê và menu chuột phải; cả hai cách xóa dùng chung xác nhận. */
 function ConversationRow({
   convo,
   active,
@@ -185,7 +184,7 @@ function ConversationRow({
           >
             {label}
           </span>
-          {/* 保留布局占位（opacity 而非 hidden）防 hover 时行宽跳动 */}
+          {/* Dùng opacity để giữ chỗ, tránh chiều rộng dòng nhảy khi rê chuột. */}
           <span className="shrink-0 text-[10px] text-muted-foreground/70 group-hover:opacity-0">
             {time}
           </span>
@@ -194,9 +193,9 @@ function ConversationRow({
           variant="ghost"
           size="icon-sm"
           onClick={onDeleteRequest}
-          aria-label={t("reader.conversation.deleteAction", "删除会话")}
-          // 垂直居中用 inset-y-0+my-auto 而非 top-1/2+-translate-y-1/2：Button 的 active:translate-y-px
-          // 会在 :active 瞬间覆盖 translate 定位，按钮脱离鼠标点导致 click 无法合成（mouseup 落到行内时间戳）。
+          aria-label={t("reader.conversation.deleteAction", "Xóa cuộc trò chuyện")}
+          // Căn giữa bằng inset-y-0 và my-auto thay cho translate; trạng thái active của Button
+          // cũng dùng translate nên có thể đẩy nút khỏi con trỏ trước mouseup, làm mất click.
           className="absolute end-1 inset-y-0 z-10 my-auto hidden text-muted-foreground hover:text-destructive group-hover:flex"
         >
           <Trash2 />
@@ -204,7 +203,7 @@ function ConversationRow({
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuItem variant="destructive" onClick={onDeleteRequest}>
-          {t("reader.conversation.menu.delete", "删除")}
+          {t("reader.conversation.menu.delete", "Xóa")}
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>

@@ -21,7 +21,7 @@ const PRESET_ICON: Record<PresetId, LucideIcon> = {
   summarize: FileText,
 };
 
-/** 选区上方的浮动工具栏（fixed 定位到选区指针）。 */
+/** Thanh công cụ nổi phía trên vùng chọn (định vị fixed tại vị trí con trỏ trong vùng chọn). */
 export function SelectionToolbar() {
   const { t } = useTranslation();
   const { selection, startAiAction, addAnnotation, openHighlightPopover } = useReaderAI();
@@ -34,7 +34,7 @@ export function SelectionToolbar() {
   const above = anchor.y > 96;
   const copy = () => void navigator.clipboard?.writeText(selection.selectionText);
   const note = () => {
-    const at = anchor; // addAnnotation 会清空选区，先存锚点
+    const at = anchor; // addAnnotation xóa vùng chọn, nên lưu neo trước
     const id = addAnnotation("yellow");
     if (id) openHighlightPopover(id, at.x, at.y, true);
   };

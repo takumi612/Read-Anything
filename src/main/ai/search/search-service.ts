@@ -4,8 +4,8 @@ import type { SearchBackend, SearchHit } from "@main/ai/search/types";
 const log = createLogger("search");
 
 /**
- * 搜索服务：按顺序依次调用 backends，第一个成功即返回结果；
- * 全部失败时抛出聚合错误，由调用方（web_search tool）转换为软失败 result。
+ * Thử backend tìm kiếm theo thứ tự, trả kết quả đầu tiên thành công.
+ * Nếu tất cả lỗi, ném lỗi tổng hợp để công cụ web_search chuyển thành kết quả lỗi nhẹ.
  */
 export class SearchService {
   constructor(private readonly backends: SearchBackend[]) {}

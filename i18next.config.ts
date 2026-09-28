@@ -1,7 +1,7 @@
 import { defineConfig } from "i18next-cli";
 
 export default defineConfig({
-  locales: ["zh-CN", "en"],
+  locales: ["en", "vi"],
   extract: {
     input: ["src/**/*.{ts,tsx}"],
     output: "src/shared/i18n/locales/{{language}}.ts",
@@ -10,7 +10,7 @@ export default defineConfig({
     // 直接产出 flat `{ common, errors }`（与 resources.ts 在外层包 `{ translation: ... }` 的约定吻合）。
     // 切勿改回 mergeNamespaces:true——那会把键塞进 `translation` 顶层键、并因形状不匹配把 en 译文清空。
     defaultNS: false,
-    primaryLanguage: "zh-CN",
+    primaryLanguage: "en",
     // 扁平点分键：键不嵌套，输出 `"errors.providerNotFound": "..."`。便于全文搜索——
     // 搜 `errors.providerNotFound` 同时命中源码 t() 调用处与 locale 定义处。运行时 init
     // 与 i18next.d.ts 的 CustomTypeOptions 必须同样 keySeparator/nsSeparator:false 才能对上。

@@ -1,12 +1,12 @@
-// src/renderer/ai/chat-context.ts —— AI 助手的上下文脊柱（spec 2026-06-16 §2/§5）。
+// Nơi xác định context của trợ lý AI theo spec 2026-06-16 §2/§5.
 export type ChatContext = { kind: "book"; bookId: string } | { kind: "library" };
 
-/** 稳定 key：用于 chat-store 槽、TanStack Query key。 */
+/** Khóa ổn định cho ô nhớ chat-store và khóa truy vấn TanStack Query. */
 export function contextKey(ctx: ChatContext): string {
   return ctx.kind === "book" ? `book:${ctx.bookId}` : "library";
 }
 
-/** 由导航派生上下文：书籍路由且有书 ⇒ book；否则 ⇒ library。 */
+/** Suy ra context từ điều hướng: có sách trên tuyến đọc thì dùng book, còn lại dùng library. */
 export function deriveChatContext(
   view: "library" | "stats" | "book",
   currentBookId: string | null,
@@ -17,19 +17,19 @@ export function deriveChatContext(
 }
 
 /**
- * 一次性「载入某会话历史」命令信号（非状态）：nonce 递增触发面板载入。
- * 带 `context` 标签——消费侧据此判断该命令是否属于自己（见 resolveOpenCommandTarget）。
+ * Lệnh tải lịch sử hội thoại dùng một lần, không phải state; nonce tăng để bảng tải lại.
+ * Nhãn context giúp bên nhận biết lệnh có thuộc về mình hay không.
  */
 export type OpenCommand = { conversationId: string; context: ChatContext; nonce: number };
 
 /**
- * 消费侧守卫（纯函数）：openCommand 是否该被「contextKey === panelKey 的面板」消费。
- * 命中 ⇒ 返回要载入的会话 id；否则（无命令 / 跨 context）⇒ null。
- * 防止读书时设下的 book 会话命令泄漏进 library 浮窗助手（反之亦然）。
+ * Hàm thuần kiểm tra bảng có panelKey trùng contextKey có nên nhận openCommand hay không.
+ * Nếu trùng thì trả id hội thoại cần tải; nếu thiếu lệnh hoặc khác context thì trả null.
+ * Nhờ đó lệnh của sách không lọt sang trợ lý nổi trong thư viện và ngược lại.
  *
- * 取面板的 contextKey **字符串**（而非 context 对象）是有意为之：调用方据此可让 effect 依赖
- * 稳定的字符串，不受 ReaderView 每 render 新建 `{ kind, bookId }` 对象的引用抖动影响——
- * effect 正确性不能押在 React Compiler 的记忆化上（它是性能优化、允许 bail）。
+ * Nhận chuỗi contextKey thay cho object context để effect phụ thuộc giá trị ổn định.
+ * ReaderView tạo object { kind, bookId } mới mỗi lần render; tính đúng đắn của effect
+ * không nên phụ thuộc khả năng ghi nhớ của React Compiler.
  */
 export function resolveOpenCommandTarget(
   openCommand: OpenCommand | null,

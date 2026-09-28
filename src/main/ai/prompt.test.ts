@@ -64,8 +64,8 @@ describe("assemblePrompt", () => {
     const last = out[out.length - 1];
     expect(last.role).toBe("user");
     expect(last.content).toBe(
-      "## 周围上下文\nthe cat sat on the mat\n\n" +
-        "## 选中文本\nthe cat\n\n" +
+      "## Ngữ cảnh xung quanh\nthe cat sat on the mat\n\n" +
+        "## Đoạn đã chọn\nthe cat\n\n" +
         "what does this mean?",
     );
   });
@@ -76,7 +76,7 @@ describe("assemblePrompt", () => {
       history: [],
       current: { chips: userChips("only selection"), userText: "hi" },
     });
-    expect(out[out.length - 1].content).toBe("## 选中文本\nonly selection\n\nhi");
+    expect(out[out.length - 1].content).toBe("## Đoạn đã chọn\nonly selection\n\nhi");
   });
 
   it("renders chapter-summary chip in current turn", async () => {
@@ -95,7 +95,7 @@ describe("assemblePrompt", () => {
       history: [],
       current: { chips, userText: "explain" },
     });
-    expect(out[out.length - 1].content).toContain("## 本章概要\n本章讲了 X");
+    expect(out[out.length - 1].content).toContain("## Tóm tắt chương\n本章讲了 X");
   });
 
   it("renders book-summary chip in current turn", async () => {
@@ -114,7 +114,7 @@ describe("assemblePrompt", () => {
       history: [],
       current: { chips, userText: "explain" },
     });
-    expect(out[out.length - 1].content).toContain("## 全书概要\n这本书讲了 Y");
+    expect(out[out.length - 1].content).toContain("## Tóm tắt toàn bộ sách\n这本书讲了 Y");
   });
 
   it("renders all four sections in fixed order: book-summary → chapter-summary → paragraph → selection → userText", async () => {
@@ -154,7 +154,7 @@ describe("assemblePrompt", () => {
       current: { chips, userText: "Q" },
     });
     expect(out[out.length - 1].content).toBe(
-      `## 全书概要\nB\n\n## 本章概要\nC\n\n## 周围上下文\nP\n\n## 选中文本\nS\n\nQ`,
+      `## Tóm tắt toàn bộ sách\nB\n\n## Tóm tắt chương\nC\n\n## Ngữ cảnh xung quanh\nP\n\n## Đoạn đã chọn\nS\n\nQ`,
     );
   });
 
@@ -278,14 +278,14 @@ describe("assemblePrompt", () => {
     expect(out[1]).toEqual({
       role: "user",
       content:
-        "## 本章概要\n历史章节摘要\n\n## 周围上下文\nold para\n\n## 选中文本\nold sel\n\nearlier question",
+        "## Tóm tắt chương\n历史章节摘要\n\n## Ngữ cảnh xung quanh\nold para\n\n## Đoạn đã chọn\nold sel\n\nearlier question",
     });
     expect(out[2]).toEqual({
       role: "assistant",
       content: [{ type: "text", text: "earlier answer" }],
     });
     // 当前轮
-    expect(out[3].content).toBe("## 选中文本\nnew sel\n\nfollow up");
+    expect(out[3].content).toBe("## Đoạn đã chọn\nnew sel\n\nfollow up");
   });
 
   it("elides a readPage image tool-result to a placeholder (no base64 replayed)", async () => {
@@ -441,7 +441,7 @@ describe("assemblePrompt", () => {
     });
     const c = out[out.length - 1].content as string;
     expect(c.indexOf("Current date and time")).toBeLessThan(c.indexOf("Current reading position"));
-    expect(c.indexOf("Current reading position")).toBeLessThan(c.indexOf("选中文本"));
+    expect(c.indexOf("Current reading position")).toBeLessThan(c.indexOf("Đoạn đã chọn"));
   });
 });
 
@@ -485,7 +485,7 @@ describe("renderHistoryMessage", () => {
       parts: [{ type: "text", text: "why?" }],
       metadata: { contextChips: [{ id: "selection", content: "the cat", tokenCount: 1 }] },
     });
-    expect(out).toContain("## 选中文本\nthe cat");
+    expect(out).toContain("## Đoạn đã chọn\nthe cat");
     expect(out).toContain("why?");
   });
 });

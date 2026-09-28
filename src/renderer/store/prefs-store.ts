@@ -2,56 +2,81 @@ import { create } from "zustand";
 import type { AnnotationStyle } from "@shared/annotations";
 import {
   DEFAULT_BACKGROUND_CONCURRENCY,
+  DEFAULT_ANNOTATION_COLORS,
+  DEFAULT_ANNOTATION_PALETTE,
   DEFAULT_SOUL,
   DEFAULT_STEP_LIMIT,
   DEFAULT_TTS_PREFS,
   type ChatModel,
+  type AppBackgroundMode,
+  type AnnotationPalette,
+  type AnnotationColors,
+  type PdfSurroundingBackground,
+  type ReaderColorMode,
   type Soul,
   type SummaryModel,
   type TtsPrefs,
 } from "@shared/preferences";
-import { DEFAULT_WEB_SEARCH, type WebSearchConfig } from "@shared/web-search";
+import { DEFAULT_WEB_SEARCH, redactWebSearchKeys, type WebSearchConfig } from "@shared/web-search";
 import type { ReaderLayout, ReaderPrefs } from "@renderer/types";
 import { persistPreference } from "@renderer/store/persist-preference";
 
 interface PrefsState {
-  /** 开章时自动生成本章摘要（默认关——控成本；landing/onboarding 时引导用户开启）。 */
+  /** Tự tạo tóm tắt khi mở chương; mặc định tắt để kiểm soát chi phí, có hướng dẫn bật khi bắt đầu. */
   autoSummarize: boolean;
-  /** 对话模型（接替 assistants 表配置）；null = 未配置（发送报错，无回退）。 */
+  /** Mô hình chat thay cấu hình bảng assistants; null nghĩa là chưa chọn, gửi tin sẽ báo lỗi. */
   chatModel: ChatModel | null;
-  /** 摘要模型（章节/全书摘要 + 会话自动命名）；null = 未配置（生成报错/命名跳过，无回退）。 */
+  aiDataConsent: boolean;
+  /** Mô hình tóm tắt chương, cả sách và đặt tên hội thoại; null thì tạo báo lỗi, đặt tên được bỏ qua. */
   summaryModel: SummaryModel | null;
-  /** 阅读排版偏好（字号/行高/版心宽）。 */
+  /** Tùy chọn dàn trang khi đọc: cỡ chữ, giãn dòng và chiều rộng nội dung. */
   prefs: ReaderPrefs;
-  /** 上次选用的高亮样式；选「高亮标记」时直接套用（Apple Books 式记忆）。 */
+  /** Kiểu tô sáng dùng lần trước; áp dụng ngay khi chọn công cụ tô sáng như Apple Books. */
   lastHighlightStyle: AnnotationStyle;
-  /** 阅读器三向布局开关（左栏 / AI 面板 / 顶栏）；落盘记忆，重启恢复。 */
+  /** Trạng thái bố cục trình đọc: thanh trái, bảng AI và thanh đầu; lưu để khôi phục khi mở lại. */
   layout: ReaderLayout;
-  /** PDF 缩放倍率（相对适宽）；落盘记忆，重启恢复。存倍率非档位索引（见 @shared/preferences）。 */
+  /** Hệ số phóng đại PDF so với chế độ vừa chiều rộng; lưu hệ số, không lưu chỉ số mức. */
   pdfZoom: number;
-  /** AI 对话 agent 循环的多步上限；0 = 不限制。落盘记忆，重启恢复。 */
+  /** PDF page-canvas brightness, independent of page tone, EPUB, and the application theme. */
+  pdfBrightness: number;
+  pdfSurroundingBrightness: number;
+  /** Saved PDF-only surround tones and the selected custom tone, if any. */
+  pdfSurroundingBackground: PdfSurroundingBackground;
+  /** Up to six quick highlight colors shown in the reader toolbar. */
+  annotationPalette: AnnotationPalette;
+  /** All user-saved highlight colors; separate from the toolbar selection. */
+  annotationColors: AnnotationColors;
+  /** Chế độ màu trang PDF tách khỏi giao diện ứng dụng; light giữ màu gốc của PDF. */
+  pdfColorMode: ReaderColorMode;
+  /** Chế độ màu trang EPUB tách khỏi chủ đề ứng dụng và màu trang PDF. */
+  epubColorMode: ReaderColorMode;
+  appBackgroundMode: AppBackgroundMode;
+  appBackgroundColor: string;
+  appBackgroundBlobId: string | null;
+  restorePdfTabs: boolean;
+  /** Giới hạn số bước của vòng lặp agent trong chat; 0 là không giới hạn, được lưu để khôi phục. */
   stepLimit: number;
-  /** 后台模型调用全局并发上限（章节/全书摘要 + 命名 + 压缩）；前台对话不受限。落盘记忆。 */
+  /** Giới hạn đồng thời cho các lệnh gọi mô hình nền: tóm tắt, đặt tên, nén; chat trực tiếp không bị giới hạn. */
   backgroundConcurrency: number;
-  /** 首启 onboarding 卡片已跳过/已完成（持久化，不再唠叨）。 */
+  /** Đã bỏ qua hoặc hoàn tất thẻ hướng dẫn lần đầu; lưu lại để không hiện tiếp. */
   onboardingDismissed: boolean;
-  /** AI 记忆功能总开关（默认开）。 */
+  /** Công tắc chính của bộ nhớ AI, mặc định bật. */
   memoryEnabled: boolean;
-  /** 后台每 N 轮自动整理记忆（默认关——控成本；受 memoryEnabled 总闸约束）。 */
+  /** Tự sắp xếp bộ nhớ sau mỗi N lượt ở nền; mặc định tắt để kiểm soát chi phí. */
   memoryAutoConsolidate: boolean;
-  /** agent 自我设定（SOUL）：name + persona。 */
+  /** Thiết lập nhân dạng agent (SOUL): tên và tính cách. */
   soul: Soul;
-  /** 用户自定义全局指令（叠加在 SOUL persona 之上）。 */
+  /** Chỉ dẫn chung của người dùng, bổ sung vào tính cách SOUL. */
   instructions: string;
-  /** 朗读（TTS）偏好：语速 + 语种→voice 名映射。 */
+  /** Tùy chọn đọc thành tiếng: tốc độ và ánh xạ ngôn ngữ sang tên giọng. */
   ttsPrefs: TtsPrefs;
-  /** 对话中显示头像总开关（默认开）。 */
+  /** Công tắc hiển thị ảnh đại diện trong chat, mặc định bật. */
   showAgentAvatar: boolean;
-  /** 当前头像 blob 引用；null = 用默认头像。由主进程 agent IPC 落盘，渲染层只镜像。 */
+  /** Blob ảnh đại diện hiện tại; null dùng ảnh mặc định. Main process lưu qua agent IPC, renderer chỉ phản chiếu. */
   avatarBlobId: string | null;
-  /** 联网搜索配置（enabled + backends）；null = 未 hydrate 前的占位（hydrate 后至少为出厂默认）。 */
+  /** Cấu hình tìm kiếm web gồm enabled và backends; null là giá trị tạm trước khi nạp tùy chọn. */
   webSearch: WebSearchConfig | null;
-  /** 联网搜索 composer 开关（per-message toggle；持久化，重启恢复）。 */
+  /** Công tắc tìm kiếm web của ô soạn tin cho từng tin; lưu để khôi phục khi mở lại. */
   webSearchEnabled: boolean;
 }
 interface PrefsActions {
@@ -62,6 +87,17 @@ interface PrefsActions {
   setLastHighlightStyle: (style: AnnotationStyle) => void;
   updateLayout: (patch: Partial<ReaderLayout>) => void;
   setPdfZoom: (v: number) => void;
+  setPdfBrightness: (v: number) => void;
+  setPdfSurroundingBrightness: (v: number) => void;
+  setPdfSurroundingBackground: (v: PdfSurroundingBackground) => void;
+  setAnnotationPalette: (v: AnnotationPalette) => void;
+  setAnnotationColors: (v: AnnotationColors) => void;
+  setPdfColorMode: (v: ReaderColorMode) => void;
+  setEpubColorMode: (v: ReaderColorMode) => void;
+  setAppBackgroundMode: (v: AppBackgroundMode) => void;
+  setAppBackgroundColor: (v: string) => void;
+  setAppBackgroundBlobId: (v: string | null) => void;
+  setRestorePdfTabs: (v: boolean) => void;
   setStepLimit: (v: number) => void;
   setBackgroundConcurrency: (v: number) => void;
   setOnboardingDismissed: (v: boolean) => void;
@@ -79,11 +115,23 @@ interface PrefsActions {
 export const PREFS_INITIAL: PrefsState = {
   autoSummarize: false,
   chatModel: null,
+  aiDataConsent: false,
   summaryModel: null,
   prefs: { fontScale: 1, lineHeight: 1.9, maxWidth: 640, fontFamily: "default" },
   lastHighlightStyle: "yellow",
-  layout: { sidebarOpen: true, panelOpen: false, headerOpen: true },
+  layout: { sidebarOpen: true, panelOpen: false },
   pdfZoom: 1,
+  pdfBrightness: 100,
+  pdfSurroundingBrightness: 100,
+  pdfSurroundingBackground: { colors: [], selectedId: null },
+  annotationPalette: DEFAULT_ANNOTATION_PALETTE,
+  annotationColors: DEFAULT_ANNOTATION_COLORS,
+  pdfColorMode: "light",
+  epubColorMode: "system",
+  appBackgroundMode: "default",
+  appBackgroundColor: "#e2e8e4",
+  appBackgroundBlobId: null,
+  restorePdfTabs: false,
   stepLimit: DEFAULT_STEP_LIMIT,
   backgroundConcurrency: DEFAULT_BACKGROUND_CONCURRENCY,
   onboardingDismissed: false,
@@ -99,8 +147,8 @@ export const PREFS_INITIAL: PrefsState = {
 };
 
 /**
- * 应用落盘偏好的单一家。默认值为未 hydrate 前的初值；启动时由 hydratePreferences 从主进程 DB
- * 灌入，变更经 persistPreference 落盘（收口到 preferences 表单一源）。
+ * Store duy nhất cho tùy chọn ứng dụng. Giá trị mặc định chỉ dùng trước khi hydratePreferences
+ * nạp từ DB của main process; thay đổi được lưu qua persistPreference vào bảng preferences.
  */
 export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   ...PREFS_INITIAL,
@@ -135,6 +183,47 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setPdfZoom: (pdfZoom) => {
     persistPreference({ key: "pdfZoom", value: pdfZoom });
     set({ pdfZoom });
+  },
+  setPdfBrightness: (pdfBrightness) => {
+    persistPreference({ key: "pdfBrightness", value: pdfBrightness });
+    set({ pdfBrightness });
+  },
+  setPdfSurroundingBrightness: (pdfSurroundingBrightness) => {
+    persistPreference({ key: "pdfSurroundingBrightness", value: pdfSurroundingBrightness });
+    set({ pdfSurroundingBrightness });
+  },
+  setPdfSurroundingBackground: (pdfSurroundingBackground) => {
+    persistPreference({ key: "pdfSurroundingBackground", value: pdfSurroundingBackground });
+    set({ pdfSurroundingBackground });
+  },
+  setAnnotationPalette: (annotationPalette) => {
+    persistPreference({ key: "annotationPalette", value: annotationPalette });
+    set({ annotationPalette });
+  },
+  setAnnotationColors: (annotationColors) => {
+    persistPreference({ key: "annotationColors", value: annotationColors });
+    set({ annotationColors });
+  },
+  setPdfColorMode: (pdfColorMode) => {
+    persistPreference({ key: "pdfColorMode", value: pdfColorMode });
+    set({ pdfColorMode });
+  },
+  setEpubColorMode: (epubColorMode) => {
+    persistPreference({ key: "epubColorMode", value: epubColorMode });
+    set({ epubColorMode });
+  },
+  setAppBackgroundMode: (appBackgroundMode) => {
+    persistPreference({ key: "appBackgroundMode", value: appBackgroundMode });
+    set({ appBackgroundMode });
+  },
+  setAppBackgroundColor: (appBackgroundColor) => {
+    persistPreference({ key: "appBackgroundColor", value: appBackgroundColor });
+    set({ appBackgroundColor });
+  },
+  setAppBackgroundBlobId: (appBackgroundBlobId) => set({ appBackgroundBlobId }),
+  setRestorePdfTabs: (restorePdfTabs) => {
+    persistPreference({ key: "restorePdfTabs", value: restorePdfTabs });
+    set({ restorePdfTabs });
   },
   setStepLimit: (stepLimit) => {
     persistPreference({ key: "stepLimit", value: stepLimit });
@@ -177,7 +266,7 @@ export const usePrefsStore = create<PrefsState & PrefsActions>()((set) => ({
   setAvatarBlobId: (avatarBlobId) => set({ avatarBlobId }),
   setWebSearch: (webSearch) => {
     persistPreference({ key: "webSearch", value: webSearch });
-    set({ webSearch });
+    set({ webSearch: redactWebSearchKeys(webSearch) });
   },
   setWebSearchEnabled: (webSearchEnabled) => {
     persistPreference({ key: "webSearchEnabled", value: webSearchEnabled });

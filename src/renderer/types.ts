@@ -1,14 +1,14 @@
-/** 选区信息（由 EpubReader 经 epub-selection 写入；字段对齐 @shared/chat 的 buildChipsInput）。 */
+/** Thông tin vùng chọn do EpubReader ghi qua epub-selection, khớp các trường của buildChipsInput. */
 export interface SelectionInfo {
   selectionText: string;
   paragraphBefore: string | null;
   paragraphCurrent: string;
   paragraphAfter: string | null;
-  /** 选区锚点矩形（浮动工具栏定位用；S3 填充）。 */
+  /** Hình chữ nhật neo vùng chọn để đặt thanh công cụ nổi. */
   rect: { x: number; y: number; width: number; height: number } | null;
-  /** 选区的 locator range（RA1-full 落点，供未来 RA3 标注；AI chips 不需要）。 */
+  /** Locator range của vùng chọn để neo chú thích; chip AI không cần trường này. */
   locatorRange: string | null;
 }
 
-// ReaderPrefs / ReaderLayout 收口到 @shared/preferences 的 Zod schema（单一源，供 preferences 表持久化）。
+// ReaderPrefs và ReaderLayout dùng chung Zod schema trong @shared/preferences để lưu vào bảng preferences.
 export type { ReaderFontFamily, ReaderLayout, ReaderPrefs } from "@shared/preferences";

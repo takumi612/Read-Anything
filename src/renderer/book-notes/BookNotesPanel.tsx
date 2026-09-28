@@ -18,8 +18,9 @@ import { qk } from "@renderer/query/keys";
 import { bookNotesQuery } from "@renderer/query/book-note-queries";
 import { relativeTime } from "@renderer/lib/relative-time";
 import { BookNoteEditor, type BookNoteEditorState } from "./BookNoteEditor";
+import { ClearBookCategoryButton } from "@renderer/reader/ClearBookCategoryButton";
 
-/** 书籍级独立笔记面板：侧栏「笔记」tab 与书库「查看笔记」Dialog 渲染同一实例形态。 */
+/** Bảng ghi chú riêng cho từng sách, dùng chung ở tab thanh bên và hộp xem ghi chú trong thư viện. */
 export function BookNotesPanel({ bookId }: { bookId: string }) {
   const { t, i18n } = useTranslation();
   const qc = useQueryClient();
@@ -32,9 +33,9 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
     mutationFn: window.api.bookNotes.create,
     onSuccess: invalidate,
     onError: (e) => {
-      // 透传主进程真实错误（honest-error），不自动消失。
+      // Hiện lỗi thật từ main process và giữ toast cho tới khi người dùng đóng.
       toast.error(
-        t("bookNotes.createError", "笔记保存失败：{{error}}", {
+        t("bookNotes.createError", "Không thể lưu ghi chú: {{error}}", {
           error: (e as Error).message,
         }),
         { closeButton: true, duration: Infinity },
@@ -45,9 +46,9 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
     mutationFn: window.api.bookNotes.update,
     onSuccess: invalidate,
     onError: (e) => {
-      // 透传主进程真实错误（honest-error），不自动消失。
+      // Hiện lỗi thật từ main process và giữ toast cho tới khi người dùng đóng.
       toast.error(
-        t("bookNotes.updateError", "笔记更新失败：{{error}}", {
+        t("bookNotes.updateError", "Không thể cập nhật ghi chú: {{error}}", {
           error: (e as Error).message,
         }),
         { closeButton: true, duration: Infinity },
@@ -58,9 +59,9 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
     mutationFn: window.api.bookNotes.delete,
     onSuccess: invalidate,
     onError: (e) => {
-      // 透传主进程真实错误（honest-error），不自动消失。
+      // Hiện lỗi thật từ main process và giữ toast cho tới khi người dùng đóng.
       toast.error(
-        t("bookNotes.deleteError", "笔记删除失败：{{error}}", {
+        t("bookNotes.deleteError", "Không thể xóa ghi chú: {{error}}", {
           error: (e as Error).message,
         }),
         { closeButton: true, duration: Infinity },
@@ -75,7 +76,7 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
 
   const now = Date.now();
 
-  // 编辑态整区切换为全高编辑器（非 Dialog）：与 AI 面板同级并存，写笔记时可同时查看/复制对话内容。
+  // Khi sửa, toàn bộ vùng thành editor cao hết khung, cạnh bảng AI để vẫn xem và sao chép hội thoại.
   if (editor) {
     return <BookNoteEditor state={editor} onSave={save} onClose={() => setEditor(null)} />;
   }
@@ -83,24 +84,32 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
   return (
     <div className="flex h-full flex-col">
       <div className="shrink-0 p-2 pb-0">
-        <Button
-          variant="outline"
-          size="sm"
-          className="w-full"
-          onClick={() => setEditor({ mode: "create" })}
-        >
-          <Plus />
-          {t("bookNotes.add", "新建笔记")}
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="outline"
+            size="sm"
+            className="min-w-0 flex-1"
+            onClick={() => setEditor({ mode: "create" })}
+          >
+            <Plus />
+            {t("bookNotes.add", "Ghi chú mới")}
+          </Button>
+          <ClearBookCategoryButton
+            bookId={bookId}
+            category="notes"
+            count={notes.data?.length ?? 0}
+            iconOnly
+          />
+        </div>
       </div>
       <div className="min-h-0 flex-1">
         {notes.isPending ? (
-          <p className="p-3 text-sm text-muted-foreground">{t("bookNotes.loading", "加载笔记…")}</p>
+          <p className="p-3 text-sm text-muted-foreground">{t("bookNotes.loading", "Đang tải ghi chú…")}</p>
         ) : notes.isError ? (
-          <p className="p-3 text-sm text-destructive">{t("bookNotes.loadError", "笔记加载失败")}</p>
+          <p className="p-3 text-sm text-destructive">{t("bookNotes.loadError", "Không thể tải ghi chú")}</p>
         ) : (notes.data?.length ?? 0) === 0 ? (
           <p className="p-4 text-center text-xs text-muted-foreground">
-            {t("bookNotes.empty", "还没有笔记。写下对这本书的第一条想法吧～")}
+            {t("bookNotes.empty", "Chưa có ghi chú. Hãy viết ý nghĩ đầu tiên về cuốn sách này.")}
           </p>
         ) : (
           <ScrollArea className="h-full">
@@ -129,14 +138,14 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
       >
         <AlertDialogContent>
           <AlertDialogTitle>
-            {t("bookNotes.deleteConfirm.title", "删除这条笔记？")}
+            {t("bookNotes.deleteConfirm.title", "Xóa ghi chú này?")}
           </AlertDialogTitle>
           <AlertDialogDescription>
-            {t("bookNotes.deleteConfirm.body", "此操作不可撤销。")}
+            {t("bookNotes.deleteConfirm.body", "Bạn không thể hoàn tác thao tác này.")}
           </AlertDialogDescription>
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => setConfirmDeleteId(null)}>
-              {t("common.cancel", "取消")}
+              {t("common.cancel", "Hủy")}
             </Button>
             <Button
               variant="destructive"
@@ -145,7 +154,7 @@ export function BookNotesPanel({ bookId }: { bookId: string }) {
                 setConfirmDeleteId(null);
               }}
             >
-              {t("bookNotes.deleteConfirm.confirm", "删除")}
+              {t("bookNotes.deleteConfirm.confirm", "Xóa")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -177,7 +186,7 @@ function NoteItem({
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={t("bookNotes.edit", "编辑")}
+            aria-label={t("bookNotes.edit", "Sửa")}
             onClick={onEdit}
             className="text-muted-foreground"
           >
@@ -186,7 +195,7 @@ function NoteItem({
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={t("bookNotes.delete", "删除")}
+            aria-label={t("bookNotes.delete", "Xóa")}
             onClick={onDelete}
             className="text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
           >

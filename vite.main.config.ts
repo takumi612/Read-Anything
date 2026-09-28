@@ -10,12 +10,12 @@ export default defineConfig({
   },
   build: {
     rollupOptions: {
-      // 原生 addon 不能打包：bindings 按 __dirname 相对定位 .node 文件，
-      // 一旦被 Vite 内联进 .vite/build/main.js 就会丢失 node_modules/better-sqlite3
-      // 的定位上下文（报 "Could not locate the bindings file"）。外置后改为运行时
-      // require("better-sqlite3")，从 node_modules 解析，.node 与 bindings 上下文都正确。
-      // pdfjs-dist（legacy 主进程用）与 @napi-rs/canvas（NAPI 原生件）同理外置：
-      // pdfjs 内部对 @napi-rs/canvas 的条件 require 在 bundle 后会失效。
+      // Không gộp native addon vào bundle: bindings tìm tệp .node theo __dirname.
+      // Nếu Vite gộp better-sqlite3 vào .vite/build/main.js, đường dẫn gốc bị mất
+      // và xuất hiện lỗi "Could not locate the bindings file".
+      // Để ngoài bundle giúp require("better-sqlite3") tìm đúng trong node_modules.
+      // pdfjs-dist dùng ở main process và @napi-rs/canvas cũng cần để ngoài bundle;
+      // lệnh require có điều kiện của pdfjs sẽ không hoạt động đúng sau khi bị gộp.
       external: ["better-sqlite3", /^pdfjs-dist/, "@napi-rs/canvas"],
     },
   },

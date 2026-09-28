@@ -1,10 +1,10 @@
 import { QueryClient } from "@tanstack/react-query";
 
 /**
- * 适配本地 IPC（非网络）：不 focus 重验、本地确定性数据高 staleTime、失败不重试。
- * networkMode "always"：query/mutation 走 IPC 读写本地 db，不依赖网络；
- * 默认 "online" 会在断网时整体 pause，导致本地数据取不到、写入卡住。
- * 真正的网络请求都在主进程发起，失败时由主进程透传真实错误。
+ * Cấu hình cho IPC cục bộ: không làm mới khi focus, staleTime dài cho dữ liệu ổn định và không thử lại khi lỗi.
+ * networkMode "always" giữ query/mutation với DB cục bộ hoạt động khi mất mạng;
+ * chế độ "online" mặc định sẽ tạm dừng cả đọc và ghi. Yêu cầu mạng thật nằm ở main process
+ * và lỗi được chuyển về từ đó.
  */
 export const queryClient = new QueryClient({
   defaultOptions: {

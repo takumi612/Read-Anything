@@ -30,7 +30,7 @@ export function ModelEditor({
   const [err, setErr] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // 切 type / baseUrl（换了端点）即清掉上次拉取结果，避免把旧端点的模型并进新配置。
+  // Khi đổi type hoặc baseUrl, xóa kết quả tải cũ để không gộp model từ endpoint trước.
   useEffect(() => {
     setFetched(null);
     setChecked(new Set());
@@ -50,7 +50,7 @@ export function ModelEditor({
     setLoading(false);
     if (res.ok) {
       setFetched(res.models);
-      // 默认不勾选——用户通常只挑少数几个目标模型，全选会逼他去逐个取消。
+      // Mặc định không chọn vì người dùng thường chỉ muốn vài model.
       setChecked(new Set());
     } else {
       setErr(res.message);
@@ -64,13 +64,13 @@ export function ModelEditor({
     }
   }
 
-  // openai-chat-completions 无默认端点：没填 baseUrl 拉不了（buildModelsRequest 会抛），直接禁用更干净。
+  // openai-chat-completions không có endpoint mặc định; thiếu baseUrl thì không thể tải model.
   const cannotPull = type === "openai-chat-completions" && !baseUrl.trim();
 
   return (
     <div className="space-y-2">
       <div className="flex items-center justify-between">
-        <span className="text-xs text-muted-foreground">{t("settings.model", "模型")}</span>
+        <span className="text-xs text-muted-foreground">{t("settings.model", "Model")}</span>
         <Button
           type="button"
           variant="outline"
@@ -79,14 +79,14 @@ export function ModelEditor({
           disabled={loading || cannotPull}
           title={
             cannotPull
-              ? t("settings.modelEditor.pullDisabled", "请先填写 baseURL")
-              : t("settings.modelEditor.pullTitle", "从$t(terms.provider)拉取模型列表")
+              ? t("settings.modelEditor.pullDisabled", "Nhập baseURL trước")
+              : t("settings.modelEditor.pullTitle", "Tải danh sách model từ $t(terms.provider)")
           }
         >
           <Download className="size-4" />{" "}
           {loading
-            ? t("settings.modelEditor.pulling", "拉取中…")
-            : t("settings.modelEditor.pull", "拉取模型")}
+            ? t("settings.modelEditor.pulling", "Đang tải…")
+            : t("settings.modelEditor.pull", "Tải danh sách model")}
         </Button>
       </div>
       {err && <p className="text-xs text-destructive">{err}</p>}
@@ -94,7 +94,7 @@ export function ModelEditor({
         <div className="rounded-md border border-border p-2">
           {fetched.length === 0 && (
             <p className="text-xs text-muted-foreground">
-              {t("settings.modelEditor.noModels", "（无模型）")}
+              {t("settings.modelEditor.noModels", "(không có model)")}
             </p>
           )}
           {fetched.map((m) => (
@@ -127,8 +127,8 @@ export function ModelEditor({
             }}
           >
             {checked.size > 0
-              ? t("settings.modelEditor.addSelected", "添加所选（{{n}}）", { n: checked.size })
-              : t("settings.modelEditor.addSelectedEmpty", "添加所选")}
+              ? t("settings.modelEditor.addSelected", "Thêm mục đã chọn ({{n}})", { n: checked.size })
+              : t("settings.modelEditor.addSelectedEmpty", "Thêm mục đã chọn")}
           </Button>
         </div>
       )}
@@ -141,7 +141,7 @@ export function ModelEditor({
             {m}
             <button
               type="button"
-              aria-label={t("common.remove", "移除")}
+              aria-label={t("common.remove", "Gỡ")}
               onClick={() => onChange(models.filter((x) => x !== m))}
             >
               <X className="size-3.5" />
@@ -159,7 +159,7 @@ export function ModelEditor({
               addManual();
             }
           }}
-          placeholder={t("settings.modelEditor.manualPlaceholder", "手动添加模型名…")}
+          placeholder={t("settings.modelEditor.manualPlaceholder", "Nhập tên model…")}
         />
         <Button type="button" variant="outline" size="sm" onClick={addManual}>
           <Plus className="size-4" />

@@ -2,19 +2,18 @@ import { openPdf, pageText } from "./parse";
 import type { ChapterTextSlice } from "./types";
 
 export interface PdfReadOptions {
-  startPage: number; // 1-based 闭区间
+  startPage: number; // Trang bắt đầu, đánh số từ 1.
   endPage: number;
   offset?: number;
   maxChars?: number;
 }
 
-const DEFAULT_MAX_CHARS = 20_000; // 与 epub-parser 对齐
+const DEFAULT_MAX_CHARS = 20_000; // Cùng giới hạn mặc định với epub-parser.
 
 /**
- * 提取页范围纯文本：页间插入页边界标记 `[p.N]`（spec §5.1——模型可在章节
- * 文本中引用页码并跳转 readPage 精读），再按字符偏移切片。
- * 注意：此处的 offset 是「章内偏移」（含标记），与标注 locator 的「页内偏移」
- * 是两个独立坐标空间，互不转换（spec §5.1 偏移空间注记）。
+ * Lấy văn bản trong khoảng trang, thêm mốc `[p.N]` giữa các trang để model
+ * có thể dẫn trang và gọi readPage. Sau đó cắt theo offset ký tự.
+ * Offset ở đây tính trong chương (gồm mốc trang), khác offset trong một trang của annotation.
  */
 export async function extractPdfText(
   bytes: Uint8Array,
@@ -31,8 +30,8 @@ export async function extractPdfText(
       if (text) parts.push(text);
     }
     const full = parts.join("\n\n");
-    // clamp 越界 offset：nextOffset 永远 ≤ full.length，调用方持久化续传安全
-    //（不 clamp 时越界 offset 会被原样回传，形成永远空切片的静默循环）。
+    // Giới hạn offset trong nội dung để nextOffset không vượt full.length,
+    // tránh vòng lặp trả mãi đoạn rỗng khi bên gọi lưu vị trí tiếp tục.
     const start = Math.min(offset, full.length);
     const text = full.slice(start, start + maxChars);
     const nextOffset = start + text.length;

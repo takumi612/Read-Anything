@@ -19,7 +19,7 @@ describe("parsePdf", () => {
       { label: "Chapter One", href: "pdf-ch:0" },
       { label: "Chapter Two", href: "pdf-ch:1" },
     ]);
-    // Chapter One: p1–p2（下一章起点-1）；Chapter Two: p3–末页
+    // Chapter One: trang 1–2 (trước trang bắt đầu chương tiếp theo); Chapter Two: trang 3 đến cuối.
     expect(parsed.chapterRanges).toEqual([
       { startPage: 1, endPage: 2 },
       { startPage: 3, endPage: 3 },
@@ -60,7 +60,7 @@ describe("parsePdf", () => {
   it("skips outline entries whose dest is broken", async () => {
     const bytes = await makeTextPdf({ outline: true, brokenDest: true });
     const parsed = await parsePdf(bytes);
-    // 坏 dest 条目被跳过，只剩好的那条
+    // Bỏ đích dest lỗi, chỉ giữ mục hợp lệ.
     expect(parsed.toc).toEqual([{ label: "Chapter One", href: "pdf-ch:0" }]);
     expect(parsed.chapterRanges).toEqual([{ startPage: 1, endPage: 3 }]);
   });

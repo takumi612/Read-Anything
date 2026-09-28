@@ -3,7 +3,7 @@ import type { DB } from "@main/db/client";
 import { books } from "@main/db/schema";
 import { BACKUP_FORMAT_VERSION, type BackupKind, type BackupManifest } from "@shared/backup";
 
-/** 组装备份 manifest。读 bookCount；其余由胶水层注入（schemaHead/dbSha256/appVersion）。 */
+/** Lập manifest sao lưu; đọc bookCount, các trường còn lại do lớp điều phối truyền vào. */
 export function buildManifest(
   db: DB,
   opts: {

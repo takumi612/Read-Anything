@@ -9,8 +9,8 @@ import {
 import { makeFixtureEpub } from "./fixture";
 
 /**
- * 三段 spine 的 epub：中间文件 s2 不在任何目录项里（孤儿），逻辑上属于 s1 那一章。
- * 用来复现「TOC 章节正文横跨多个 spine 文件、孤儿文件被漏读」的 bug。
+ * EPUB có ba tệp spine: s2 ở giữa không có mục TOC riêng nhưng thuộc chương của s1.
+ * Tái hiện lỗi bỏ sót tệp mồ côi khi nội dung mục TOC trải qua nhiều tệp spine.
  */
 function multiSpineEpub(): Uint8Array {
   const opf = `<?xml version="1.0" encoding="utf-8"?>
@@ -168,12 +168,12 @@ describe("extractChapterAcrossSpine", () => {
       { href: "OEBPS/s3.xhtml", anchor: "aB" },
       {},
     );
-    expect(r.text).toContain("第二章 概论"); // 起始 anchor 所在块
-    expect(r.text).toContain("引子段落。"); // s1 锚点之后
-    expect(r.text).toContain("正文主体第一段。"); // ← 关键：孤儿 s2 不再丢
+    expect(r.text).toContain("第二章 概论"); // Khối chứa anchor bắt đầu.
+    expect(r.text).toContain("引子段落。"); // Sau anchor trong s1.
+    expect(r.text).toContain("正文主体第一段。"); // Nội dung s2 mồ côi không bị bỏ sót.
     expect(r.text).toContain("正文主体第二段。");
-    expect(r.text).not.toContain("封面无关文字"); // 起始 anchor 之前不含
-    expect(r.text).not.toContain("付诸行动"); // 下一章（end 边界）不含
+    expect(r.text).not.toContain("封面无关文字"); // Không lấy nội dung trước anchor bắt đầu.
+    expect(r.text).not.toContain("付诸行动"); // Không lấy chương sau, tại ranh giới end.
     expect(r.text).not.toContain("下一章正文。");
     expect(r.hasMore).toBe(false);
   });
@@ -190,7 +190,7 @@ describe("extractChapterAcrossSpine", () => {
   });
 
   it("same-file boundary slices [start.anchor, end.anchor) without crossing files", () => {
-    // start 与 end 在同一文件 s1（aA → 文件内更后的锚点 z），不应吞入 s2/s3。
+    // start và end cùng nằm trong s1 (aA đến anchor z phía sau), không lấy thêm s2/s3.
     const sameFile = zipSync({
       mimetype: [strToU8("application/epub+zip"), { level: 0 }],
       "META-INF/container.xml": strToU8(`<?xml version="1.0"?>

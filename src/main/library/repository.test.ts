@@ -9,6 +9,7 @@ import {
   books,
   chapters,
   conversations,
+  confirmedReadingProgress,
   messages,
   progress,
   readingSessions,
@@ -232,7 +233,7 @@ describe("library repository", () => {
   it("listRecentlyRead includes only books with active sessions", async () => {
     const db = freshDb();
     const book = await importBook(db, { bytes: makeFixtureEpub() });
-    saveProgress(db, book.id, "loc-1", 0.5);
+    saveProgress(db, book.id, "loc-1");
     expect(listRecentlyRead(db)).toHaveLength(0);
     const { readingSessions } = await import("@main/db/schema");
     db.insert(readingSessions).values({ bookId: book.id, startedAt: 1 }).run();
@@ -323,6 +324,20 @@ describe("importBook (pdf)", () => {
     const book = await importBook(db, { bytes, fileName: "whatever.pdf" });
     expect(book.title).toBe("Real Title");
   });
+
+  it("uses the PDF file name when metadata carries a different document extension", async () => {
+    const db = freshDb();
+    const bytes = await makeTextPdf({ outline: false, title: "The Scaling Playbook.docx" });
+    const book = await importBook(db, { bytes, fileName: "the-scaling-playbook.pdf" });
+    expect(book.title).toBe("the-scaling-playbook");
+  });
+
+  it("uses the selected PDF file name when metadata only repeats a generic PDF filename", async () => {
+    const db = freshDb();
+    const bytes = await makeTextPdf({ outline: false, title: "Binder1.pdf" });
+    const book = await importBook(db, { bytes, fileName: "coders-at-work.pdf" });
+    expect(book.title).toBe("coders-at-work");
+  });
 });
 
 describe("updateBook", () => {
@@ -392,7 +407,12 @@ describe("listRecentlyRead (#48)", () => {
     return db;
   };
   const touch = (db: ReturnType<typeof createDb>, id: string, at: number, percent?: number) => {
-    saveProgress(db, id, "epubcfi(/6/2!/4/1:0)", percent);
+    saveProgress(db, id, "epubcfi(/6/2!/4/1:0)");
+    if (percent != null) {
+      db.insert(confirmedReadingProgress)
+        .values({ bookId: id, totalPages: 10, percent, updatedAt: at })
+        .run();
+    }
     db.update(progress).set({ updatedAt: at }).where(eq(progress.bookId, id)).run();
     db.insert(readingSessions).values({ bookId: id, startedAt: at }).run();
   };
@@ -414,6 +434,17 @@ describe("listRecentlyRead (#48)", () => {
     expect(r.map((x) => x.id)).toEqual(["d", "c", "b"]);
     expect(r[0]).toMatchObject({ percent: 0.9, lastReadAt: 4000 });
     expect(r[2]!.percent).toBeNull();
+  });
+
+  it("keeps a legacy shelf percentage when confirmed pages are still below it", () => {
+    const db = setupRead();
+    touch(db, "a", 1000);
+    db.update(progress).set({ percent: 0.4 }).where(eq(progress.bookId, "a")).run();
+    db.insert(confirmedReadingProgress)
+      .values({ bookId: "a", totalPages: 100, percent: 0.01, updatedAt: 2000 })
+      .run();
+
+    expect(listRecentlyRead(db)[0]?.percent).toBe(0.4);
   });
 });
 

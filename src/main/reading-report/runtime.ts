@@ -13,11 +13,11 @@ export interface GenerationClaim {
 
 const hasReport = (report: string | null): report is string => Boolean(report?.trim());
 
-/** 40 步的工具上限 + 余量；防异常循环把内存撑爆。 */
+/** Giới hạn 40 bước công cụ cộng phần dự phòng để vòng lặp lỗi không làm đầy bộ nhớ. */
 const PROGRESS_LIMIT = 50;
 
 export interface ProgressSink {
-  /** 工具开始执行；返回的 id 用于配对 finish。 */
+  /** Ghi lúc công cụ bắt đầu, trả ID để ghép với sự kiện kết thúc. */
   start(tool: string): string;
   finish(id: string, outcome: ReadingReportProgressOutcome, count: number | null): void;
 }
@@ -96,8 +96,8 @@ export class ReadingReportRuntime {
   }
 
   /**
-   * 绑定到某一次生成的进度出口。generation 不再是当前世代时全部调用变成空操作，
-   * 免得被顶掉的旧生成把事件写进新生成的时间线。
+   * Gắn kênh tiến độ với một lần tạo báo cáo. Sự kiện từ lần tạo cũ
+   * bị bỏ qua để không lẫn vào timeline mới.
    */
   sink(sessionId: string, generation: number): ProgressSink {
     return {

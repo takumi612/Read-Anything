@@ -4,7 +4,7 @@ import path from "node:path";
 import { eq, sql } from "drizzle-orm";
 import { describe, expect, it } from "vitest";
 import { createDb, runMigrations } from "@main/db/client";
-import { books, chapters, conversations, providers } from "@main/db/schema";
+import { annotations, books, chapters, conversations, providers } from "@main/db/schema";
 
 const MIGRATIONS = path.resolve(__dirname, "migrations");
 
@@ -56,6 +56,32 @@ describe("db client", () => {
     expect(() =>
       // @ts-expect-error intentionally violating the type-level enum to test the SQL CHECK
       db.insert(books).values({ id: "b-fmt", format: "word" }).run(),
+    ).toThrow();
+  });
+
+  it("stores custom hex annotation styles and still rejects invalid styles", () => {
+    const db = createDb(":memory:");
+    runMigrations(db, MIGRATIONS);
+    db.insert(books).values({ id: "b-annotation-color" }).run();
+    expect(() =>
+      db.insert(annotations)
+        .values({
+          bookId: "b-annotation-color",
+          style: "#fb923c",
+          selectedText: "selected",
+          locatorRange: "pdf:1:0-8",
+        })
+        .run(),
+    ).not.toThrow();
+    expect(() =>
+      db.insert(annotations)
+        .values({
+          bookId: "b-annotation-color",
+          style: "#badhex!",
+          selectedText: "selected",
+          locatorRange: "pdf:1:0-8",
+        })
+        .run(),
     ).toThrow();
   });
 

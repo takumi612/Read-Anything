@@ -34,7 +34,7 @@ export function CompleteReadingDialog({ bookId }: { bookId: string }) {
       setOpen(false);
     } catch (error) {
       log.warn("complete reading failed", error);
-      toast.error(t("reader.completeReading.failed", "无法完成这次阅读，请重试。"), {
+      toast.error(t("reader.completeReading.failed", "Không thể hoàn tất lượt đọc. Hãy thử lại."), {
         closeButton: true,
         duration: Infinity,
       });
@@ -45,19 +45,19 @@ export function CompleteReadingDialog({ bookId }: { bookId: string }) {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
-        {t("reader.completeReading.action", "完成阅读")}
+        {t("reader.completeReading.action", "Hoàn tất lượt đọc")}
       </Button>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{t("reader.completeReading.confirmTitle", "完成这次阅读？")}</DialogTitle>
+          <DialogTitle>{t("reader.completeReading.confirmTitle", "Hoàn tất lượt đọc này?")}</DialogTitle>
         </DialogHeader>
         <DialogFooter>
           <Button variant="outline" onClick={() => setOpen(false)} disabled={pending}>
-            {t("common.cancel", "取消")}
+            {t("common.cancel", "Hủy")}
           </Button>
           <Button onClick={() => void complete()} disabled={pending}>
             {pending ? <LoaderCircle className="animate-spin" data-icon="inline-start" /> : null}
-            {t("reader.completeReading.action", "完成阅读")}
+            {t("reader.completeReading.action", "Hoàn tất lượt đọc")}
           </Button>
         </DialogFooter>
       </DialogContent>

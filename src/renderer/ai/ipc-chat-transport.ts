@@ -7,13 +7,13 @@ import { usePrefsStore } from "@renderer/store/prefs-store";
 import type { ChatUIMessage } from "@renderer/ai/types";
 import { type ChatContext } from "@renderer/ai/chat-context";
 
-/** onChunk 订阅器签名（与 window.api.ai.onChunk 一致；测试可注入假实现）。 */
+/** Chữ ký của hàm đăng ký onChunk, khớp window.api.ai.onChunk và có thể thay bằng bản giả trong kiểm thử. */
 type OnChunk = (streamId: string, cb: (ev: AiStreamEvent) => void) => () => void;
 
 /**
- * 纯函数：把 ai:chunk 事件流重组为 ReadableStream<UIMessageChunk>。
- * chunk → enqueue；finish → close；error → error。任一收尾都退订。
- * 抽出以便 headless 单测（不碰 window.api / DOM）。
+ * Hàm thuần chuyển luồng sự kiện ai:chunk thành ReadableStream<UIMessageChunk>.
+ * chunk được enqueue, finish đóng luồng, error báo lỗi; mọi trường hợp kết thúc đều hủy đăng ký.
+ * Tách riêng để kiểm thử không cần window.api hoặc DOM.
  */
 export function createEventStream(
   streamId: string,
@@ -39,7 +39,7 @@ export function createEventStream(
   });
 }
 
-/** 末条用户消息的纯文本（拼接其全部 text parts）。 */
+/** Văn bản thuần của tin người dùng cuối, ghép mọi text part. */
 function lastUserText(messages: ChatUIMessage[]): string {
   const last = messages.at(-1);
   if (!last) return "";
@@ -47,13 +47,12 @@ function lastUserText(messages: ChatUIMessage[]): string {
 }
 
 /**
- * 自定义 ChatTransport：经 IPC（ai:send / ai:abort / ai:chunk）对接主进程 runSend。
- * - 历史不上送（spec §4.1：主进程是会话历史唯一真源，从 DB 装配 prompt）。
- * - userText + chips 取自「刚发出的那条用户消息」（chips 在 metadata.contextChips），
- *   而非读 store.draftChips——避免与 Composer 发送后同步清空 draftChips 的竞态
- *   （仍满足 §4.1「userText + chips 同行」）。
- * - bookId 由 context 决定（book→bookId；library→null）；conversationId 发送前懒建保证存在（spec §7）。
- * - 先订阅 ai:chunk 再 invoke ai:send（spec §4.4：订阅必早于推送，无竞态）。
+ * ChatTransport riêng kết nối runSend của main process qua ai:send, ai:abort và ai:chunk.
+ * - Không gửi lịch sử; main process đọc nguồn lịch sử duy nhất từ DB để tạo prompt.
+ * - Lấy userText và chips từ tin người dùng vừa gửi, với chips trong metadata.contextChips.
+ *   Không đọc store.draftChips vì Composer xóa nó ngay sau khi gửi.
+ * - bookId lấy từ context; tạo conversationId khi cần trước lúc gửi.
+ * - Đăng ký ai:chunk trước khi gọi ai:send để không bỏ lỡ sự kiện.
  */
 export function createIpcChatTransport(context: ChatContext): ChatTransport<ChatUIMessage> {
   const bookId = context.kind === "book" ? context.bookId : null;
@@ -68,12 +67,12 @@ export function createIpcChatTransport(context: ChatContext): ChatTransport<Chat
       abortSignal?.addEventListener("abort", () => void window.api.ai.abort({ streamId }));
 
       if (trigger === "regenerate-message") {
-        // 重发/编辑/再生成：目标 user 轮 = messages.at(-1)（regenerate 已移除其后 assistant）
+        // Khi gửi lại, sửa hoặc tạo lại, lượt người dùng đích là messages.at(-1); regenerate đã bỏ câu trả lời sau đó.
         const conversationId = getActiveConversationId(context);
         if (!conversationId || !last) {
           void stream.cancel();
           const { default: i18n } = await import("@renderer/i18n");
-          throw new Error(i18n.t("ai.cannotResend", "无法重发：找不到会话或目标消息"));
+          throw new Error(i18n.t("ai.cannotResend", "Không thể gửi lại: không tìm thấy cuộc trò chuyện hoặc tin nhắn"));
         }
         const webSearch = usePrefsStore.getState().webSearchEnabled;
         const ack = await window.api.ai.resend({
@@ -90,7 +89,7 @@ export function createIpcChatTransport(context: ChatContext): ChatTransport<Chat
         return stream;
       }
 
-      // 新发：保证会话存在（无 active → 懒建）
+      // Khi gửi mới, tạo hội thoại nếu chưa có active.
       let conversationId = getActiveConversationId(context);
       if (!conversationId) {
         const convo = await window.api.chat.conversations.create({ bookId });
@@ -109,12 +108,12 @@ export function createIpcChatTransport(context: ChatContext): ChatTransport<Chat
         webSearch,
       });
       if (!ack.ok) {
-        void stream.cancel(); // 触发 cancel() → 退订，避免监听器泄漏
-        throw new Error(ack.reason); // useChat 进 error 态
+        void stream.cancel(); // Hủy đăng ký để không rò rỉ listener.
+        throw new Error(ack.reason); // Đưa useChat vào trạng thái lỗi.
       }
       return stream;
     },
-    // 单窗口竖切不做断线重连。
+    // Chuyển ngữ cảnh trong một cửa sổ không cần kết nối lại.
     reconnectToStream: async () => null,
   };
 }

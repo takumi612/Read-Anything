@@ -23,6 +23,7 @@ describe("app.onNotify", () => {
         handlers.set(channel, cb);
         return () => handlers.delete(channel);
       },
+      onOpenFile: vi.fn(() => () => {}),
       getPathForFile: () => "",
       prefsSnapshot: {},
       appLocale: "en",
@@ -40,6 +41,7 @@ describe("preload api coverage", () => {
   const api = createApi({
     invoke: vi.fn(() => Promise.resolve()),
     on: vi.fn(() => () => {}),
+    onOpenFile: vi.fn(() => () => {}),
     getPathForFile: () => "",
     prefsSnapshot: {},
     appLocale: "en",
@@ -73,6 +75,7 @@ describe("readingSessions", () => {
     const api = createApi({
       invoke,
       on: vi.fn(() => () => {}),
+      onOpenFile: vi.fn(() => () => {}),
       getPathForFile: () => "",
       prefsSnapshot: {},
       appLocale: "en",

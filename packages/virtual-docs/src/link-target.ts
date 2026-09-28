@@ -5,7 +5,7 @@ export type LinkTarget =
 
 const EXTERNAL = /^(https?:|mailto:)/i;
 
-/** 把 iframe 内 <a href> 分类：绝对 http/https/mailto = 外链；其余（相对路径 / #fragment）= 站内；空/裸"#" = 忽略。 */
+/** Phân loại <a href> trong iframe: URL tuyệt đối http/https/mailto là liên kết ngoài; đường dẫn tương đối/#fragment là nội bộ; href trống hoặc chỉ "#" thì bỏ qua. */
 export function classifyLink(href: string): LinkTarget {
   const h = href.trim();
   if (!h || h === "#") return null;

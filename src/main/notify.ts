@@ -1,9 +1,9 @@
-// src/main/notify.ts —— main→renderer 通知的唯一 Electron 触点（spec 2026-06-16 §4.3）。
+// Điểm Electron duy nhất để gửi thông báo từ main sang renderer.
 import { BrowserWindow } from "electron";
 import { C } from "@shared/ipc";
 import type { AppNotification } from "@shared/chat";
 
-/** 向所有窗口广播一条通知（单窗口 app 即发给那一个）；窗口已销毁则跳过。 */
+/** Gửi thông báo tới các cửa sổ còn sống; bỏ qua cửa sổ đã bị hủy. */
 export function notifyRenderer(n: AppNotification): void {
   for (const win of BrowserWindow.getAllWindows()) {
     if (!win.webContents.isDestroyed()) win.webContents.send(C.appNotify.channel, n);

@@ -21,7 +21,7 @@ export const backupBindings: Binding[] = [
     const now = Temporal.Now.zonedDateTimeISO();
     const opts = {
       defaultPath: backupFileName(input.kind, now),
-      filters: [{ name: "Marginalia Backup", extensions: ["zip"] }],
+      filters: [{ name: "Read-Anything Backup", extensions: ["zip"] }],
     };
     const r = win ? await dialog.showSaveDialog(win, opts) : await dialog.showSaveDialog(opts);
     if (r.canceled || !r.filePath) return null;
@@ -45,7 +45,7 @@ export const backupBindings: Binding[] = [
     const win = BrowserWindow.getFocusedWindow();
     const opts = {
       properties: ["openFile" as const],
-      filters: [{ name: "Marginalia Backup", extensions: ["zip"] }],
+      filters: [{ name: "Read-Anything Backup", extensions: ["zip"] }],
     };
     const r = win ? await dialog.showOpenDialog(win, opts) : await dialog.showOpenDialog(opts);
     if (r.canceled || r.filePaths.length === 0) return null;

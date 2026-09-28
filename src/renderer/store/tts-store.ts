@@ -2,9 +2,9 @@ import { create } from "zustand";
 import type { TtsState } from "@renderer/reader/tts/tts-engine";
 
 interface TtsUiState {
-  /** TTS 会话状态（控制条显隐 + 播放/暂停按钮态）。由 tts-controller 单向写入。 */
+  /** Trạng thái phiên TTS quyết định thanh điều khiển và nút phát/tạm dừng; tts-controller ghi một chiều. */
   status: TtsState;
 }
 
-/** TTS 运行态发布（非持久化；偏好在 prefs-store.ttsPrefs）。 */
+/** State TTS khi chạy, không lưu bền; tùy chọn nằm ở prefs-store.ttsPrefs. */
 export const useTtsStore = create<TtsUiState>()(() => ({ status: "idle" }));

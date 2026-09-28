@@ -2,7 +2,7 @@ import { splitForUtterance } from "./split-for-utterance";
 
 export type TtsState = "idle" | "playing" | "paused";
 
-/** SpeechSynthesisUtterance 的可 mock 收窄面。 */
+/** Giao diện tối thiểu của SpeechSynthesisUtterance để có thể mock. */
 export interface UtteranceLike {
   text: string;
   voice: SpeechSynthesisVoice | null;
@@ -11,7 +11,7 @@ export interface UtteranceLike {
   onerror: ((err?: unknown) => void) | null;
 }
 
-/** speechSynthesis 的可 mock 收窄面（真实现见 voices.ts 的 browserSpeechPort）。 */
+/** Giao diện tối thiểu của speechSynthesis để mock; bản thật ở browserSpeechPort trong voices.ts. */
 export interface SpeechPort {
   createUtterance: (text: string) => UtteranceLike;
   speak: (u: UtteranceLike) => void;
@@ -21,25 +21,25 @@ export interface SpeechPort {
 }
 
 export interface TtsEngineEvents {
-  /** 段开始朗读（驱动高亮与滚动）。 */
+  /** Bắt đầu đọc một đoạn, dùng để tô sáng và cuộn. */
   onParagraphChange: (index: number) => void;
   onStateChange: (state: TtsState) => void;
-  /** 队列读尽（spec 的 onChapterEnd——引擎不懂章节，集成层接「下一章」）。 */
+  /** Đọc hết hàng đợi; lớp tích hợp quyết định chuyển chương vì engine không biết cấu trúc chương. */
   onQueueEnd: () => void;
-  /** 单 utterance 失败（已跳过继续）；日志归集成层。 */
+  /** Một utterance lỗi đã được bỏ qua; lớp tích hợp ghi log. */
   onUtteranceError: (text: string, err: unknown) => void;
 }
 
 export interface PlayOptions {
   rate: number;
-  /** 每个 utterance 文本 → voice（detect+pick 组合由集成层注入，引擎保持纯排队逻辑）。 */
+  /** Chọn giọng cho từng utterance; lớp tích hợp cung cấp cách nhận diện và chọn, engine chỉ quản lý hàng đợi. */
   pickVoiceFor: (text: string) => SpeechSynthesisVoice | null;
 }
 
 /**
- * 段队列状态机（spec §4.3）：idle → playing ⇄ paused → idle。
- * generation 计数器使 cancel 后迟到的 onend/onerror 失效（部分平台 cancel
- * 会对挂起 utterance 触发 onend，不防会幽灵推进）。
+ * State machine hàng đợi đoạn: idle → playing ⇄ paused → idle.
+ * Bộ đếm generation bỏ qua onend/onerror tới muộn sau cancel; một số nền tảng vẫn gọi onend
+ * cho utterance đang chờ, nếu không chặn sẽ tự tiến sai.
  */
 export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
   let state: TtsState = "idle";
@@ -55,7 +55,7 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
     events.onStateChange(s);
   };
 
-  /** spec §8 防御：pause 后直接 cancel 在部分平台不干净，统一先 resume。 */
+  /** Trên một số nền tảng cancel ngay sau pause không sạch; luôn resume trước. */
   const hardCancel = () => {
     port.resume();
     port.cancel();
@@ -88,15 +88,15 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
   const playParagraph = (i: number, myGen: number) => {
     if (myGen !== gen) return;
     if (i >= texts.length) {
-      // 先发 onQueueEnd 再收口 idle：集成层在回调里同步置 crossing/重启播放，
-      // 颠倒顺序会让瞬时 idle 泄漏到 UI（跨章控制条闪退）。
+      // Gọi onQueueEnd trước khi chuyển sang idle để lớp tích hợp kịp chuyển chương và phát tiếp.
+      // Nếu đảo thứ tự, UI sẽ thấy idle thoáng qua và thanh điều khiển nhấp nháy.
       events.onQueueEnd();
-      if (myGen === gen) setState("idle"); // 回调内未启动新播放（gen 未变）才收口
+      if (myGen === gen) setState("idle"); // Chỉ về idle nếu callback chưa bắt đầu lượt đọc mới.
       return;
     }
     current = i;
     events.onParagraphChange(i);
-    // 同段共享 voice，避免同段多 chunk 因语言检测结果不同而切换声音
+    // Mọi chunk của cùng một đoạn dùng chung giọng để tránh đổi giọng do nhận diện ngôn ngữ khác nhau.
     const voice = opts.pickVoiceFor(texts[i]!);
     speakChunks(splitForUtterance(texts[i]!), 0, myGen, voice);
   };
@@ -119,7 +119,7 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
     resume() {
       if (state !== "paused") return;
       if (rateDirty) {
-        // 暂停中调速不得擅自开播；新速率在继续时从当前段头生效
+        // Đổi tốc độ khi tạm dừng không tự phát; tốc độ mới áp dụng từ đầu đoạn khi tiếp tục.
         rateDirty = false;
         gen++;
         hardCancel();
@@ -141,11 +141,11 @@ export function createTtsEngine(port: SpeechPort, events: TtsEngineEvents) {
       opts = { ...opts, rate };
       if (state === "idle") return;
       if (state === "paused") {
-        // 暂停中调速不得擅自开播；新速率在继续时从当前段头生效
+        // Đổi tốc độ khi tạm dừng không tự phát; tốc độ mới áp dụng từ đầu đoạn khi tiếp tục.
         rateDirty = true;
         return;
       }
-      // playing：从当前段头以新 rate 重读（spec §4.3）
+      // Khi đang phát, đọc lại từ đầu đoạn hiện tại với tốc độ mới.
       gen++;
       hardCancel();
       setState("playing");

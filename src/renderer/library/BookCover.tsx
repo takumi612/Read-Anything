@@ -1,6 +1,6 @@
 import { useId, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { NotebookPen, Pencil, Trash2 } from "lucide-react";
+import { Eraser, NotebookPen, Pencil, Trash2 } from "lucide-react";
 import type { BookSummaryDto } from "@shared/library";
 import { Button } from "@renderer/components/ui/button";
 import {
@@ -32,22 +32,25 @@ export function BookCover({
   book,
   onOpen,
   onDelete,
+  onClearData,
   onUpdate,
 }: {
   book: BookSummaryDto;
   onOpen: () => void;
   onDelete: () => void;
+  onClearData: () => void;
   onUpdate: (patch: { title: string; author: string | null }) => void;
 }) {
   const { t } = useTranslation();
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [clearDataOpen, setClearDataOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [editTitle, setEditTitle] = useState("");
   const [editAuthor, setEditAuthor] = useState("");
   const [notesOpen, setNotesOpen] = useState(false);
   const fieldId = useId();
 
-  // 打开时从 book 快照初始化（不预填 id 哈希——哈希是 title=null 的显示回退，不是数据）。
+  // Khi mở, lấy dữ liệu từ snapshot sách; không điền hash id vì nó chỉ là nhãn dự phòng khi thiếu title.
   const openEdit = () => {
     setEditTitle(book.title ?? "");
     setEditAuthor(book.author ?? "");
@@ -57,12 +60,12 @@ export function BookCover({
   const saveEdit = () => {
     const title = editTitle.trim();
     if (!title) return;
-    onUpdate({ title, author: editAuthor.trim() || null }); // 空作者收敛为 null →「未知作者」
+    onUpdate({ title, author: editAuthor.trim() || null }); // Tác giả rỗng thành null để hiện nhãn chưa rõ tác giả.
     setEditOpen(false);
   };
 
   const title = book.title ?? book.id;
-  const author = book.author ?? t("library.unknownAuthor", "未知作者");
+  const author = book.author ?? t("library.unknownAuthor", "Không rõ tác giả");
   const label = `${title} · ${author}`;
   return (
     <>
@@ -82,15 +85,21 @@ export function BookCover({
         <ContextMenuContent>
           <ContextMenuItem onClick={openEdit}>
             <Pencil />
-            {t("library.menu.edit", "编辑信息")}
+            {t("library.menu.edit", "Sửa thông tin")}
           </ContextMenuItem>
           <ContextMenuItem onClick={() => setNotesOpen(true)}>
             <NotebookPen />
-            {t("library.menu.notes", "查看笔记")}
+            {t("library.menu.notes", "Xem ghi chú")}
           </ContextMenuItem>
+          {book.format === "pdf" && (
+            <ContextMenuItem onClick={() => setClearDataOpen(true)}>
+              <Eraser />
+              {t("library.menu.clearPdfData")}
+            </ContextMenuItem>
+          )}
           <ContextMenuItem variant="destructive" onClick={() => setConfirmOpen(true)}>
             <Trash2 />
-            {t("library.menu.delete", "删除")}
+            {t("library.menu.delete", "Xóa")}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -98,17 +107,17 @@ export function BookCover({
       <AlertDialog open={confirmOpen} onOpenChange={setConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogTitle>
-            {t("library.deleteConfirm.title", "删除《{{title}}》？", { title })}
+            {t("library.deleteConfirm.title", "Xóa “{{title}}”?", { title })}
           </AlertDialogTitle>
           <AlertDialogDescription>
             {t(
               "library.deleteConfirm.body",
-              "将永久移除这本书及其所有标注、笔记、对话，以及导入的书籍文件。此操作不可撤销。",
+              "Sách này, toàn bộ ghi chú, đánh dấu, cuộc trò chuyện và tệp đã nhập sẽ bị xóa vĩnh viễn. Bạn không thể hoàn tác thao tác này.",
             )}
           </AlertDialogDescription>
           <AlertDialogFooter>
             <Button variant="outline" onClick={() => setConfirmOpen(false)}>
-              {t("library.deleteConfirm.cancel", "取消")}
+              {t("library.deleteConfirm.cancel", "Hủy")}
             </Button>
             <Button
               variant="destructive"
@@ -117,7 +126,28 @@ export function BookCover({
                 onDelete();
               }}
             >
-              {t("library.deleteConfirm.confirm", "删除")}
+              {t("library.deleteConfirm.confirm", "Xóa")}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={clearDataOpen} onOpenChange={setClearDataOpen}>
+        <AlertDialogContent>
+          <AlertDialogTitle>{t("library.clearPdfData.title", { title })}</AlertDialogTitle>
+          <AlertDialogDescription>{t("library.clearPdfData.body")}</AlertDialogDescription>
+          <AlertDialogFooter>
+            <Button variant="outline" onClick={() => setClearDataOpen(false)}>
+              {t("common.cancel")}
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={() => {
+                setClearDataOpen(false);
+                onClearData();
+              }}
+            >
+              {t("library.menu.clearPdfData")}
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -127,7 +157,7 @@ export function BookCover({
         <DialogContent className="font-sans sm:max-w-lg">
           <DialogHeader>
             <DialogTitle>
-              {t("library.notesDialog.title", "笔记 · {{title}}", { title })}
+              {t("library.notesDialog.title", "Ghi chú · {{title}}", { title })}
             </DialogTitle>
           </DialogHeader>
           <div className="h-[60vh]">
@@ -139,7 +169,7 @@ export function BookCover({
       <Dialog open={editOpen} onOpenChange={setEditOpen}>
         <DialogContent className="font-sans sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{t("library.editDialog.title", "编辑书籍信息")}</DialogTitle>
+            <DialogTitle>{t("library.editDialog.title", "Sửa thông tin sách")}</DialogTitle>
           </DialogHeader>
           <form
             className="flex flex-col gap-4"
@@ -150,7 +180,7 @@ export function BookCover({
           >
             <div className="flex flex-col gap-2">
               <Label htmlFor={`${fieldId}-title`}>
-                {t("library.editDialog.bookTitle", "书名")}
+                {t("library.editDialog.bookTitle", "Tên sách")}
               </Label>
               <Input
                 id={`${fieldId}-title`}
@@ -160,20 +190,20 @@ export function BookCover({
               />
             </div>
             <div className="flex flex-col gap-2">
-              <Label htmlFor={`${fieldId}-author`}>{t("library.editDialog.author", "作者")}</Label>
+              <Label htmlFor={`${fieldId}-author`}>{t("library.editDialog.author", "Tác giả")}</Label>
               <Input
                 id={`${fieldId}-author`}
                 value={editAuthor}
                 onChange={(e) => setEditAuthor(e.target.value)}
-                placeholder={t("library.editDialog.authorPlaceholder", "留空则显示「未知作者」")}
+                placeholder={t("library.editDialog.authorPlaceholder", "Để trống nếu không biết tác giả")}
               />
             </div>
             <DialogFooter>
               <Button type="button" variant="ghost" onClick={() => setEditOpen(false)}>
-                {t("common.cancel", "取消")}
+                {t("common.cancel", "Hủy")}
               </Button>
               <Button type="submit" disabled={editTitle.trim() === ""}>
-                {t("common.save", "保存")}
+                {t("common.save", "Lưu")}
               </Button>
             </DialogFooter>
           </form>

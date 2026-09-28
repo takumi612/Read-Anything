@@ -2,13 +2,13 @@ import { type Zippable, strToU8, zipSync } from "fflate";
 import type { UILanguage } from "@shared/i18n/language";
 
 /**
- * 一种语言的整本样书内容（书名 + dc:language + 3 章）。
- * 注意：以下字段直接插入 XML（OPF/nav/xhtml）不做转义——值必须为纯静态、不含 XML 特殊字符（< > & "）。
+ * Nội dung sách mẫu theo một ngôn ngữ: tên, dc:language và ba chương.
+ * Các trường được chèn thẳng vào XML nên chỉ dùng chuỗi cố định không có ký tự đặc biệt XML.
  */
 interface SampleContent {
   identifier: string;
   bookTitle: string;
-  /** OPF dc:language 值。 */
+  /** Giá trị dc:language trong OPF. */
   lang: string;
   navTitle: string;
   chapters: { id: string; title: string; bodyHtml: string }[];
@@ -53,49 +53,49 @@ const EN: SampleContent = {
   ],
 };
 
-const ZH: SampleContent = {
-  identifier: "urn:uuid:marginalia-sample-zh",
-  bookTitle: "页边 · 示例读本",
-  lang: "zh-CN",
-  navTitle: "目录",
+const VI: SampleContent = {
+  identifier: "urn:uuid:marginalia-sample-vi",
+  bookTitle: "Bên lề · Sách đọc thử",
+  lang: "vi",
+  navTitle: "Mục lục",
   chapters: [
     {
       id: "ch1",
-      title: "一、在书页的边缘阅读",
+      title: "I. Đọc bên lề trang sách",
       bodyHtml:
-        "<h1>一、在书页的边缘阅读</h1>" +
-        "<p>读书最孤独也最自由的时刻，往往不在正文之内，而在页边那一道窄窄的空白里。那里没有作者的声音，只有你自己的疑问、反驳与忽然亮起的联想。把它们写下来，一本书才真正属于你。</p>" +
-        "<p>边缘不是次要的地方。许多伟大的思想，最初都只是某个读者在页脚潦草写下的一句「真的是这样吗？」。怀疑不是对作者的不敬，而是阅读最诚实的姿态。</p>" +
-        "<p>现在不妨试试：在这一段里挑一句你最不确定的话，问问它依赖了什么前提，又回避了什么。一个足够小的问题，常常能撬动一整页的意义。</p>" +
-        "<p>真正好的批注从不只是复述。它是一种发现——你忽然看见两个相隔很远的念头其实在暗暗押韵，或是一个笃定的断言底下，藏着一处无人追问的轻轻一跃。把铅笔握紧，下一个发现往往就在一句话之外。</p>",
+        "<h1>I. Đọc bên lề trang sách</h1>" +
+        "<p>Khoảnh khắc cô độc mà cũng tự do nhất khi đọc thường không nằm trong phần nội dung chính, mà ở khoảng trắng hẹp bên lề. Ở đó không có tiếng nói của tác giả, chỉ có thắc mắc, phản biện và những liên tưởng bất chợt của bạn. Hãy ghi chúng lại để cuốn sách thực sự trở thành của bạn.</p>" +
+        "<p>Lề sách không phải chỗ thứ yếu. Nhiều ý tưởng lớn ban đầu chỉ là câu hỏi một độc giả viết vội ở cuối trang: “Điều này có thật không?” Nghi ngờ không phải bất kính với tác giả, mà là cách đọc trung thực nhất.</p>" +
+        "<p>Bạn có thể thử ngay: chọn một câu khiến bạn chưa chắc chắn, rồi hỏi nó dựa trên giả định nào và bỏ qua điều gì. Một câu hỏi nhỏ đôi khi mở ra ý nghĩa của cả trang sách.</p>" +
+        "<p>Một lời ghi chú hay không chỉ nhắc lại nội dung. Nó giống như một phát hiện: bạn chợt nhận ra hai ý tưởng xa nhau lại có điểm chung, hoặc một khẳng định chắc nịch đang dựa vào bước nhảy chưa ai chất vấn. Hãy cầm sẵn cây bút. Phát hiện tiếp theo có thể chỉ cách một câu.</p>",
     },
     {
       id: "ch2",
-      title: "二、值得留住的疑问",
+      title: "II. Câu hỏi đáng giữ lại",
       bodyHtml:
-        "<h1>二、值得留住的疑问</h1>" +
-        "<p>不是每个问题都该当场得到答案。有些值得留住——从这一页带到那一页，在夜里反复掂量，任它慢慢成熟。好的读者收集疑问，就像别人收集警句。</p>" +
-        "<p>当一句话让你卡住，那份卡顿本身就是信息。别急着把它抹平。把它念出声，写在页边，让它随你走进下一章——书也许会在无意之间替你回答。</p>" +
-        "<p>留住的疑问最奇妙之处，在于它改变你所看见的东西。一旦你真心想知道作者是否正确，每个例子都成了证据，每句旁白都成了线索。书不再从你身上漫过，而是开始与你争辩。</p>" +
-        "<p>所以当这里有什么让你困惑，别急着翻过去。选中它，举到光下细看。你今天留住的疑问，正是你明天挣得的理解。</p>",
+        "<h1>II. Câu hỏi đáng giữ lại</h1>" +
+        "<p>Không phải câu hỏi nào cũng cần được trả lời ngay. Có câu đáng giữ lại, mang theo từ trang này sang trang khác, nghĩ đi nghĩ lại trong đêm để nó dần sáng tỏ. Người đọc tốt sưu tầm câu hỏi như người khác sưu tầm danh ngôn.</p>" +
+        "<p>Khi một câu văn khiến bạn khựng lại, chính sự ngập ngừng ấy đã cho bạn một manh mối. Đừng vội gạt nó đi. Hãy đọc thành tiếng, ghi bên lề và mang theo sang chương tiếp theo. Có thể cuốn sách sẽ vô tình trả lời bạn.</p>" +
+        "<p>Điều lạ nhất ở một câu hỏi được giữ lại là nó làm thay đổi những gì bạn chú ý. Khi thật sự muốn biết tác giả có đúng không, mỗi ví dụ đều thành bằng chứng và mỗi đoạn chen vào đều thành manh mối. Cuốn sách không còn lướt qua bạn, mà bắt đầu tranh luận với bạn.</p>" +
+        "<p>Vì vậy, nếu có điều gì khiến bạn băn khoăn, đừng vội lật qua. Hãy chọn đoạn đó và nhìn kỹ dưới ánh sáng. Câu hỏi bạn giữ lại hôm nay có thể trở thành hiểu biết bạn có được ngày mai.</p>",
     },
     {
       id: "ch3",
-      title: "三、点灯人的问题",
+      title: "III. Câu hỏi của người thắp đèn",
       bodyHtml:
-        "<h1>三、点灯人的问题</h1>" +
-        "<p>在一座忘记了星辰的小镇上，住着一个点灯人。每到黄昏，他都爬上同一座山岗，点亮一盏灯。没有人请他这么做。那盏灯照亮的，不过是空荡荡路上的一个弯。</p>" +
-        "<p>一天傍晚，一个孩子跟着他上了山，问他何必如此——从没有旅人经过。点灯人想了很久，说：「我点上它，是为了万一有人来时，黑暗不至于说了最后一句话。」</p>" +
-        "<p>第二天孩子又来了，之后每天都来，直到点灯成了他俩一起做的事。渐渐地，别的人也爬上山岗——不是因为路变了，而是因为一簇小小的、固执的光，给了他们抬头的理由。</p>" +
-        "<p>许多年后，小镇记住那盏灯的时间，远比记住黑暗的时间长。这正是微小而忠实之举古怪的算术：它们发生时容易被轻视，做成了却再难被忘记。</p>",
+        "<h1>III. Câu hỏi của người thắp đèn</h1>" +
+        "<p>Ở một thị trấn đã quên mất những vì sao, có một người thắp đèn. Mỗi buổi chạng vạng, ông đều leo lên cùng một ngọn đồi để thắp một ngọn đèn. Không ai nhờ ông làm vậy. Ngọn đèn chỉ soi sáng khúc quanh trên con đường vắng.</p>" +
+        "<p>Một chiều nọ, một đứa trẻ theo ông lên đồi và hỏi tại sao ông phải làm thế khi chẳng có lữ khách nào đi qua. Người thắp đèn suy nghĩ hồi lâu rồi đáp: “Tôi thắp đèn để nếu có ai đến, bóng tối không phải là lời cuối cùng.”</p>" +
+        "<p>Đứa trẻ quay lại vào tối hôm sau, rồi mỗi tối tiếp theo, cho đến khi hai người cùng thắp đèn. Dần dần, những người khác cũng lên đồi. Con đường chẳng đổi khác, nhưng ánh sáng nhỏ bé và bền bỉ ấy đã cho họ lý do để ngẩng đầu nhìn lên.</p>" +
+        "<p>Nhiều năm sau, thị trấn nhớ ngọn đèn lâu hơn nhớ bóng tối. Đó là phép tính kỳ lạ của những việc nhỏ được làm đến nơi đến chốn: khi đang diễn ra, chúng dễ bị xem nhẹ; khi đã hoàn thành, người ta khó lòng quên được.</p>",
     },
   ],
 };
 
 function contentFor(language: UILanguage): SampleContent {
   switch (language) {
-    case "zh-CN":
-      return ZH;
+    case "vi":
+      return VI;
     case "en":
       return EN;
     default:
@@ -103,7 +103,7 @@ function contentFor(language: UILanguage): SampleContent {
   }
 }
 
-/** 按语言代码内构建一本合法 EPUB3 样书字节（无打包资源）。纯函数。 */
+/** Tạo bytes EPUB3 mẫu hợp lệ theo mã ngôn ngữ, không cần tài nguyên ngoài. */
 export function buildSampleEpub(language: UILanguage): Uint8Array {
   const c = contentFor(language);
 
@@ -124,7 +124,7 @@ export function buildSampleEpub(language: UILanguage): Uint8Array {
     '  <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">\n' +
     `    <dc:identifier id="bookid">${c.identifier}</dc:identifier>\n` +
     `    <dc:title>${c.bookTitle}</dc:title>\n` +
-    "    <dc:creator>Marginalia</dc:creator>\n" +
+    "    <dc:creator>Read-Anything</dc:creator>\n" +
     `    <dc:language>${c.lang}</dc:language>\n` +
     "  </metadata>\n" +
     "  <manifest>\n" +

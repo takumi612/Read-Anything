@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Volume2 } from "lucide-react";
 import { Button } from "@renderer/components/ui/button";
-import { Checkbox } from "@renderer/components/ui/checkbox";
 import {
   Select,
   SelectContent,
@@ -11,19 +10,19 @@ import {
   SelectValue,
 } from "@renderer/components/ui/select";
 import { usePrefsStore } from "@renderer/store/prefs-store";
-import type { TtsLang } from "@renderer/reader/tts/detect-lang";
 import { NOVELTY_BLOCKLIST, pickVoice } from "@renderer/reader/tts/pick-voice";
 import { currentPlatform, getVoicesReady } from "@renderer/reader/tts/voices";
 import { ttsController } from "@renderer/reader/tts/tts-controller";
 
 const RATE_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 const AUTO_VALUE = "__auto__";
-const PREVIEW_TEXT: Record<string, string> = {
-  zh: "你好，这是朗读功能的试听。",
+type SettingsVoiceLang = "en" | "vi";
+const PREVIEW_TEXT: Record<SettingsVoiceLang, string> = {
   en: "Hello, this is a read-aloud preview.",
+  vi: "Xin chào, đây là phần nghe thử chức năng đọc thành tiếng.",
 };
 
-function VoiceRow({ lang, label }: { lang: TtsLang; label: string }) {
+function VoiceRow({ lang, label }: { lang: SettingsVoiceLang; label: string }) {
   const { t } = useTranslation();
   const ttsPrefs = usePrefsStore((s) => s.ttsPrefs);
   const updateTtsPrefs = usePrefsStore((s) => s.updateTtsPrefs);
@@ -42,11 +41,11 @@ function VoiceRow({ lang, label }: { lang: TtsLang; label: string }) {
   );
   const selected = ttsPrefs.voiceByLang[lang] ?? AUTO_VALUE;
   const preview = () => {
-    // 试听前停掉朗读会话——直接 cancel 会让引擎误推进
+    // Dừng phiên đọc hiện tại trước khi nghe thử; hủy trực tiếp có thể khiến engine tiến nhầm.
     ttsController.stop();
     const u = new SpeechSynthesisUtterance(PREVIEW_TEXT[lang]);
-    // 与正文朗读同一条选声链（用户偏好→推荐表→兜底）——「自动」档若不显式设 voice，
-    // utterance 会继承 <html lang>（UI 语言）、用中文 voice 读英文（spike 点名的坑）。
+    // Nghe thử dùng cùng cách chọn giọng với nội dung: tùy chọn người dùng, giọng đề xuất rồi dự phòng.
+    // Ở mức tự động vẫn cần đặt voice; nếu không utterance kế thừa ngôn ngữ UI từ html và có thể chọn sai.
     const v = pickVoice(lang, voices, ttsPrefs, currentPlatform());
     if (v) u.voice = v;
     u.rate = ttsPrefs.rate;
@@ -68,16 +67,16 @@ function VoiceRow({ lang, label }: { lang: TtsLang; label: string }) {
           }}
         >
           <SelectTrigger className="w-44" aria-label={label}>
-            {/* value 是 voice.name 或 __auto__ 哨兵；用函数 child 把哨兵映射回显示名。 */}
+            {/* Value là tên giọng hoặc __auto__; hàm child đổi sentinel thành nhãn hiển thị. */}
             <SelectValue>
               {(v) =>
-                v === AUTO_VALUE ? t("settings.tts.autoVoice", "自动（推荐）") : (v as string)
+                v === AUTO_VALUE ? t("settings.tts.autoVoice", "Tự động (khuyên dùng)") : (v as string)
               }
             </SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value={AUTO_VALUE}>
-              {t("settings.tts.autoVoice", "自动（推荐）")}
+              {t("settings.tts.autoVoice", "Tự động (khuyên dùng)")}
             </SelectItem>
             {options.map((v) => (
               <SelectItem key={v.name} value={v.name}>
@@ -89,7 +88,7 @@ function VoiceRow({ lang, label }: { lang: TtsLang; label: string }) {
         <Button
           variant="ghost"
           size="icon"
-          aria-label={t("settings.tts.preview", "试听")}
+          aria-label={t("settings.tts.preview", "Nghe thử")}
           onClick={preview}
         >
           <Volume2 />
@@ -101,36 +100,15 @@ function VoiceRow({ lang, label }: { lang: TtsLang; label: string }) {
 
 export function ReadingSettings() {
   const { t } = useTranslation();
-  const autoSummarize = usePrefsStore((s) => s.autoSummarize);
-  const setAutoSummarize = usePrefsStore((s) => s.setAutoSummarize);
   const ttsPrefs = usePrefsStore((s) => s.ttsPrefs);
   const updateTtsPrefs = usePrefsStore((s) => s.updateTtsPrefs);
   return (
     <section className="space-y-4">
-      <h2 className="font-serif text-lg">{t("settings.reading", "阅读")}</h2>
-      <div className="flex items-start justify-between gap-3">
-        <label htmlFor="auto-summarize" className="min-w-0 cursor-pointer">
-          <span className="block text-sm font-medium">
-            {t("settings.reading.autoSummarize", "开章自动生成本章摘要")}
-          </span>
-          <span className="mt-0.5 block text-[11px] leading-relaxed text-muted-foreground">
-            {t(
-              "settings.reading.autoSummarizeDesc",
-              "打开 / 切换章节时后台生成本章摘要，就绪后随提问一并提供给 AI（会产生模型调用）。关闭时可在 AI 面板的摘要 pill 里手动生成。",
-            )}
-          </span>
-        </label>
-        <Checkbox
-          id="auto-summarize"
-          checked={autoSummarize}
-          onCheckedChange={setAutoSummarize}
-          className="mt-0.5"
-        />
-      </div>
+      <h2 className="font-serif text-lg">{t("settings.reading", "Đọc")}</h2>
       <div className="space-y-3">
-        <h3 className="text-sm font-medium">{t("settings.tts.title", "朗读")}</h3>
+        <h3 className="text-sm font-medium">{t("settings.tts.title", "Đọc thành tiếng")}</h3>
         <div className="flex items-center justify-between gap-3">
-          <span className="text-sm">{t("settings.tts.rate", "语速")}</span>
+          <span className="text-sm">{t("settings.tts.rate", "Tốc độ")}</span>
           <Select
             value={String(ttsPrefs.rate)}
             onValueChange={(val) => {
@@ -138,8 +116,8 @@ export function ReadingSettings() {
               updateTtsPrefs({ rate: Number(val) });
             }}
           >
-            <SelectTrigger className="w-44" aria-label={t("settings.tts.rate", "语速")}>
-              {/* value 是倍率裸值（"1.25"）；显示带 × 后缀与选项一致。 */}
+            <SelectTrigger className="w-44" aria-label={t("settings.tts.rate", "Tốc độ")}>
+              {/* Value là hệ số gốc như "1.25"; nhãn thêm dấu × như các tùy chọn. */}
               <SelectValue>{(v) => `${v as string}×`}</SelectValue>
             </SelectTrigger>
             <SelectContent>
@@ -151,8 +129,8 @@ export function ReadingSettings() {
             </SelectContent>
           </Select>
         </div>
-        <VoiceRow lang="zh" label={t("settings.tts.voiceZh", "中文 voice")} />
-        <VoiceRow lang="en" label={t("settings.tts.voiceEn", "英文 voice")} />
+        <VoiceRow lang="en" label={t("settings.tts.voiceEn", "Giọng tiếng Anh")} />
+        <VoiceRow lang="vi" label={t("settings.tts.voiceVi", "Giọng tiếng Việt")} />
       </div>
     </section>
   );

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from "vitest";
 import { buildPdfSelectionInfo, flatOffsetOf } from "./pdf-selection";
+import * as pdfSelectionModule from "./pdf-selection";
 
 function layer(spans: string[]): HTMLElement {
   const div = document.createElement("div");
@@ -27,6 +28,33 @@ describe("flatOffsetOf", () => {
   it("returns null for an element (non-text) container", () => {
     const root = layer(["abc"]);
     expect(flatOffsetOf(root, root.children[0]!, 0)).toBeNull();
+  });
+});
+
+describe("PDF selection scroll dismissal", () => {
+  it("keeps selection open when the dictionary result itself scrolls", () => {
+    const panel = document.createElement("div");
+    panel.setAttribute("data-selection-lookup-panel", "");
+    const scrollArea = document.createElement("div");
+    panel.append(scrollArea);
+    const policy = (
+      pdfSelectionModule as typeof pdfSelectionModule & {
+        shouldDismissPdfSelectionOnScroll?: (target: EventTarget | null) => boolean;
+      }
+    ).shouldDismissPdfSelectionOnScroll;
+
+    expect(policy?.(scrollArea) ?? true).toBe(false);
+  });
+
+  it("still dismisses selection when the PDF reader scrolls", () => {
+    const page = document.createElement("div");
+    const policy = (
+      pdfSelectionModule as typeof pdfSelectionModule & {
+        shouldDismissPdfSelectionOnScroll?: (target: EventTarget | null) => boolean;
+      }
+    ).shouldDismissPdfSelectionOnScroll;
+
+    expect(policy?.(page) ?? true).toBe(true);
   });
 });
 
@@ -63,6 +91,41 @@ describe("buildPdfSelectionInfo", () => {
       rect,
     });
     expect(info.paragraphCurrent).toBe("short page text");
+  });
+
+  it("uses layout line breaks for context without shifting raw PDF locator offsets", () => {
+    const pageStr = "EngineeringThe Practice";
+    const contextPageStr = "Engineering\nThe Practice";
+    const start = pageStr.indexOf("Practice");
+    const end = start + "Practice".length;
+    const info = buildPdfSelectionInfo({
+      page: 2,
+      pageStr,
+      contextPageStr,
+      start,
+      end,
+      selectionText: "Practice",
+      rect,
+    });
+
+    expect(info.paragraphCurrent).toContain("Engineering\nThe Practice");
+    expect(info.locatorRange).toBe(`pdf:{"page":2,"start":${start},"end":${end}}`);
+  });
+
+  it("falls back to raw text when the layout text has non-whitespace differences", () => {
+    const pageStr = "short page text";
+    const info = buildPdfSelectionInfo({
+      page: 1,
+      pageStr,
+      contextPageStr: "short replacement text",
+      start: 6,
+      end: 10,
+      selectionText: "page",
+      rect,
+    });
+
+    expect(info.paragraphCurrent).toBe(pageStr);
+    expect(info.locatorRange).toBe('pdf:{"page":1,"start":6,"end":10}');
   });
 
   it("yields null locatorRange when offsets are unknown (cross-page / element container)", () => {

@@ -17,24 +17,24 @@ export function BookRoute() {
     enabled: bookId != null,
   });
   if (!bookId) {
-    return <RouteMessage>{t("reading.routeSelectBook", "请选择一本书。")}</RouteMessage>;
+    return <RouteMessage>{t("reading.routeSelectBook", "Hãy chọn một cuốn sách để đọc.")}</RouteMessage>;
   }
   if (book.isPending) {
-    return <RouteMessage>{t("reading.routeLoading", "载入书籍中…")}</RouteMessage>;
+    return <RouteMessage>{t("reading.routeLoading", "Đang tải sách…")}</RouteMessage>;
   }
   if (book.isError) {
-    return <RouteMessage>{t("reading.routeLoadError", "无法读取这本书。")}</RouteMessage>;
+    return <RouteMessage>{t("reading.routeLoadError", "Không thể tải sách này.")}</RouteMessage>;
   }
   if (!book.data) {
-    return <RouteMessage>{t("reading.routeNotFound", "这本书不存在。")}</RouteMessage>;
+    return <RouteMessage>{t("reading.routeNotFound", "Không tìm thấy sách này.")}</RouteMessage>;
   }
   switch (resolveBookDestination(book.data.readingState, mode)) {
     case "start":
       return <ReadingStartView book={book.data} />;
     case "reader-active":
-      return <ReaderView mode="active" />;
+      return <ReaderView key={bookId} mode="active" />;
     case "reader-reference":
-      return <ReaderView mode="reference" />;
+      return <ReaderView key={bookId} mode="reference" />;
     case "report":
       return <ReadingReportView book={book.data} />;
   }

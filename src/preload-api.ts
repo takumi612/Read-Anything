@@ -3,7 +3,7 @@ import { C, type Contract } from "@shared/ipc";
 import type { AiStreamEvent, AppNotification } from "@shared/chat";
 import type { PreferencesSnapshot } from "@shared/preferences";
 
-/** 由注入的 invoke 生成类型化调用函数；类型从 contract 流出，零手写标注。__channel 供漂移测试走树收集。 */
+/** Tạo hàm gọi có kiểu từ invoke được tiêm vào; kiểu dữ liệu lấy từ contract. __channel được thu thập để kiểm tra độ lệch. */
 export function invoker<S extends z.ZodType, O>(
   invoke: (channel: string, input: unknown) => Promise<unknown>,
   contract: Contract<S, O>,
@@ -12,30 +12,36 @@ export function invoker<S extends z.ZodType, O>(
   return Object.assign(fn, { __channel: contract.channel });
 }
 
-/** createApi 的注入依赖：把所有 Electron 触点收敛到此，使 createApi 成为可 headless 测试的纯函数。 */
+/** Các dependency được tiêm vào createApi: tập trung mọi điểm chạm Electron để createApi có thể được kiểm thử độc lập giao diện. */
 export interface PreloadDeps {
   invoke: (channel: string, input: unknown) => Promise<unknown>;
-  /** 订阅某 channel；cb 收到 payload（已剥离 IpcRendererEvent）；返回退订函数。 */
+  sendSync?: (channel: string, input: unknown) => unknown;
+  /** Theo dõi một channel; cb nhận payload đã bỏ IpcRendererEvent và trả về hàm hủy đăng ký. */
   on: (channel: string, cb: (payload: unknown) => void) => () => void;
+  onOpenFile: (cb: (filePath: string) => void) => () => void;
   getPathForFile: (file: File) => string;
   prefsSnapshot: PreferencesSnapshot;
   appLocale: string;
 }
 
-/** 构建 window.api（形状与重构前完全一致）。纯函数，依赖经 deps 注入。 */
+/** Tạo window.api với cấu trúc tương thích bản trước. Đây là hàm thuần, dependency được tiêm qua deps. */
 export function createApi(d: PreloadDeps) {
   const inv = <S extends z.ZodType, O>(c: Contract<S, O>) => invoker(d.invoke, c);
   return {
     app: {
       getInfo: inv(C.appGetInfo),
-      /** 系统 locale（启动同步快照，供 i18n 决定默认语言）。 */
+      pdfAssociationStatus: inv(C.appPdfAssociationStatus),
+      resetBackground: inv(C.appResetBackground),
+      setBackgroundImage: inv(C.appSetBackground),
+      /** Ngôn ngữ hệ thống, được chụp đồng bộ lúc khởi động để i18n chọn ngôn ngữ mặc định. */
       locale: d.appLocale,
       openLogsDir: inv(C.appOpenLogsDir),
       openExternal: inv(C.appOpenExternal),
       checkUpdate: inv(C.appCheckUpdate),
-      /** 订阅 main→renderer 通知；返回退订函数。 */
+      /** Theo dõi thông báo từ main đến renderer; trả về hàm hủy đăng ký. */
       onNotify: (cb: (n: AppNotification) => void): (() => void) =>
         d.on(C.appNotify.channel, (payload) => cb(payload as AppNotification)),
+      onOpenFile: d.onOpenFile,
     },
     log: {
       write: inv(C.logWrite),
@@ -48,18 +54,29 @@ export function createApi(d: PreloadDeps) {
       list: inv(C.libraryList),
       get: inv(C.libraryGet),
       readBookBytes: inv(C.libraryReadBookBytes),
+      exportAnnotatedPdf: inv(C.libraryExportAnnotatedPdf),
       relink: inv(C.libraryRelink),
       delete: inv(C.libraryDelete),
+      clearPdfData: inv(C.libraryClearPdfData),
+      clearBookCategory: inv(C.readerClearBookCategory),
       update: inv(C.libraryUpdate),
       recentlyRead: inv(C.libraryRecentlyRead),
       reorder: inv(C.libraryReorder),
-      /** 由拖入的 File 取磁盘路径（Electron 41 已移除 File.path，须经 webUtils）。同步、纯渲染端、非 IPC。 */
+      bookmarks: {
+        list: inv(C.pdfBookmarksList),
+        create: inv(C.pdfBookmarksCreate),
+        rename: inv(C.pdfBookmarksRename),
+        delete: inv(C.pdfBookmarksDelete),
+      },
+      /** Lấy đường dẫn đĩa từ File được kéo vào. Electron 41 đã bỏ File.path nên cần dùng webUtils. Đồng bộ, chỉ chạy ở renderer, không qua IPC. */
       pathForFile: (file: File) => d.getPathForFile(file),
     },
 
     progress: {
       get: inv(C.progressGet),
       save: inv(C.progressSave),
+      saveSync: (input: z.infer<typeof C.progressSaveSync.input>): boolean =>
+        d.sendSync?.(C.progressSaveSync.channel, input) === true,
     },
 
     readingSessions: {
@@ -89,6 +106,17 @@ export function createApi(d: PreloadDeps) {
       delete: inv(C.annotationsDelete),
     },
 
+    vocabulary: {
+      list: inv(C.vocabularyList),
+      countOccurrences: inv(C.vocabularyCountOccurrences),
+      lookup: inv(C.vocabularyLookup),
+      savePhrase: inv(C.vocabularySavePhrase),
+      update: inv(C.vocabularyUpdate),
+      delete: inv(C.vocabularyDelete),
+      refresh: inv(C.vocabularyRefresh),
+      setOccurrence: inv(C.vocabularySetOccurrence),
+    },
+
     bookNotes: {
       listByBook: inv(C.bookNotesListByBook),
       create: inv(C.bookNotesCreate),
@@ -97,9 +125,9 @@ export function createApi(d: PreloadDeps) {
     },
 
     preferences: {
-      // 读同步（boot 时已取一次缓存于 prefsSnapshot）；写仍异步 fire-and-forget——非对称是有意的。
-      // 注意：返回的是**启动快照**，不反映运行时 set() 的写入（仅启动 hydrate / theme-store 初始化各调一次；
-      // 运行时态由各 store 在内存中持有）。勿在运行时重复调用 getAll() 当「当前值」读。
+      // Đọc đồng bộ từ prefsSnapshot đã lấy một lần lúc khởi động; ghi vẫn bất đồng bộ fire-and-forget. Sự khác nhau này là có chủ đích.
+      // Giá trị trả về là **ảnh chụp lúc khởi động**, không phản ánh các lần set() khi ứng dụng đang chạy. Chỉ hydrate và theme-store gọi lúc khởi tạo;
+      // trạng thái hiện tại được các store giữ trong bộ nhớ. Không gọi getAll() lặp lại để đọc giá trị mới nhất khi đang chạy.
       getAll: () => d.prefsSnapshot,
       set: inv(C.preferencesSet),
     },
@@ -128,10 +156,11 @@ export function createApi(d: PreloadDeps) {
 
     ai: {
       buildChips: inv(C.aiBuildChips),
+      translateSelection: inv(C.aiTranslateSelection),
       send: inv(C.aiSend),
       resend: inv(C.aiResend),
       abort: inv(C.aiAbort),
-      /** 订阅本 streamId 的增量；返回退订函数。 */
+      /** Theo dõi dữ liệu tăng dần của streamId này; trả về hàm hủy đăng ký. */
       onChunk: (streamId: string, cb: (ev: AiStreamEvent) => void): (() => void) =>
         d.on(C.aiChunk.channel, (payload) => {
           const ev = payload as AiStreamEvent;
@@ -142,14 +171,16 @@ export function createApi(d: PreloadDeps) {
     stats: {
       readingState: inv(C.statsReadingState),
       get: inv(C.statsGet),
+      getPageStreak: inv(C.statsPageStreakGet),
+      recordPageRead: inv(C.statsRecordPageRead),
     },
 
     backup: {
-      /** 导出备份需要显式 kind（主进程开 saveDialog）；用户取消返回 null。 */
+      /** Xuất bản sao lưu cần chỉ rõ kind; tiến trình chính mở saveDialog và trả về null nếu người dùng hủy. */
       export: inv(C.backupExport),
-      /** 选包并检视（主进程开 openDialog）；取消返回 null，含兼容性结论供确认弹窗。 */
+      /** Chọn và kiểm tra gói sao lưu; tiến trình chính mở openDialog, trả về null nếu hủy và kèm kết luận tương thích cho hộp thoại xác nhận. */
       inspect: inv(C.backupInspect),
-      /** 以 inspect 返回的 archiveSha256 绑定整体替换还原；成功后主进程立即 relaunch。 */
+      /** Khôi phục bằng cách thay thế toàn bộ dữ liệu, được ràng buộc với archiveSha256 từ bước kiểm tra; tiến trình chính khởi động lại sau khi thành công. */
       restore: inv(C.backupRestore),
     },
 

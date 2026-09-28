@@ -12,5 +12,5 @@ export function getAppInfo(db: DB, version: string): AppGetInfoResult {
     .select({ c: sql<number>`count(*)` })
     .from(books)
     .get();
-  return { version, bookCount: row?.c ?? 0 };
+  return { version, bookCount: row?.c ?? 0, platform: process.platform };
 }

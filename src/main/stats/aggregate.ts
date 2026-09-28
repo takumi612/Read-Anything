@@ -2,11 +2,12 @@ import type { DB } from "@main/db/client";
 import { dailyTotals, perBookTotals } from "@main/stats/reading-daily";
 import { localDayKey } from "@main/stats/day-key";
 import type { DailyPoint, ReadingStatsDto } from "@shared/stats";
+import { getMonthToDatePageStreak } from "@main/stats/page-streak";
 
-/** 当天合计达此秒数才算「读过书的一天」（streak / readingDays 计入门槛）。 */
+/** Số giây đọc tối thiểu để một ngày được tính vào streak và readingDays. */
 export const STREAK_MIN_SECONDS = 60;
 
-/** 'YYYY-MM-DD' 加减天（按本地分量构造 Date 做日历运算，时区稳定）。 */
+/** Cộng/trừ ngày từ YYYY-MM-DD bằng các thành phần ngày địa phương để tránh lệch múi giờ. */
 function addDays(day: string, delta: number): string {
   const [y, m, d] = day.split("-").map(Number);
   const dt = new Date(y, m - 1, d);
@@ -17,12 +18,12 @@ function addDays(day: string, delta: number): string {
   return `${yy}-${mm}-${dd}`;
 }
 
-/** 全历史日合计 → 统计 DTO（除 perBook）。 */
+/** Tổng hợp theo ngày của toàn bộ lịch sử thành DTO thống kê, chưa gồm perBook. */
 export function aggregateStats(
   rows: DailyPoint[],
   dailyDays: number,
   today: string,
-): Omit<ReadingStatsDto, "perBook"> {
+): Omit<ReadingStatsDto, "perBook" | "pageStreak"> {
   const map = new Map<string, number>();
   for (const r of rows) map.set(r.day, (map.get(r.day) ?? 0) + r.seconds);
   const secondsOf = (day: string) => map.get(day) ?? 0;
@@ -42,15 +43,15 @@ export function aggregateStats(
     daily.push({ day, seconds: secondsOf(day) });
   }
 
-  // current streak：锚点 = 今天(达标) 否则昨天(达标) 否则无；自锚点向前数连续达标。
+  // Streak hiện tại bắt đầu ở hôm nay hoặc hôm qua nếu ngày đó đạt mục tiêu.
   let anchor: string | null = null;
   if (qualifies(today)) anchor = today;
   else if (qualifies(addDays(today, -1))) anchor = addDays(today, -1);
   let currentStreak = 0;
   for (let cur = anchor; cur != null && qualifies(cur); cur = addDays(cur, -1)) currentStreak++;
 
-  // longest streak：全历史达标日的最长连续段。
-  // 'YYYY-MM-DD' 字典序即时间序（ISO 8601），故 .sort() 无需比较器。
+  // Streak dài nhất là chuỗi ngày đạt mục tiêu liên tiếp dài nhất trong lịch sử.
+  // YYYY-MM-DD sắp theo thứ tự chữ cũng là thứ tự thời gian.
   const qualifyingDays = [...map.keys()].filter(qualifies).sort();
   let longestStreak = 0;
   let run = 0;
@@ -72,14 +73,19 @@ export function aggregateStats(
   };
 }
 
-/** Stats 视图默认窗口（与 statsGet handler 的 `?? 30` 对齐）。 */
+/** Số ngày mặc định trong trang thống kê, đồng bộ với statsGet handler. */
 export const DEFAULT_DAILY_DAYS = 30;
 
 /**
- * 纯函数（注入 DB）组装完整 ReadingStatsDto。
- * 供书库 AI 工具（library-tools）与 stats handler 共用，避免重复拼装逻辑。
+ * Dựng ReadingStatsDto từ DB đã truyền vào; dùng chung cho công cụ AI thư viện
+ * và stats handler để không lặp cách tính.
  */
 export function aggregateReadingStats(db: DB): ReadingStatsDto {
-  const core = aggregateStats(dailyTotals(db), DEFAULT_DAILY_DAYS, localDayKey(Date.now()));
-  return { ...core, perBook: perBookTotals(db) };
+  const today = localDayKey(Date.now());
+  const core = aggregateStats(dailyTotals(db), DEFAULT_DAILY_DAYS, today);
+  return {
+    ...core,
+    perBook: perBookTotals(db),
+    pageStreak: getMonthToDatePageStreak(db, today),
+  };
 }

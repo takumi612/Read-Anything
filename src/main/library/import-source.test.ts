@@ -1,4 +1,5 @@
-import { mkdtemp, mkdir, rm, symlink, writeFile } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { mkdtemp, mkdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { unzipSync } from "fflate";
@@ -62,10 +63,15 @@ describe("packEpubDir", () => {
   it("throws (no partial zip) when a directory entry cannot be read", async () => {
     const src = path.join(dir, "evicted.epub");
     await explodeEpubToDir(makeFixtureEpub(), src); // 合法目录，过 container 校验
-    // 加一个指向不存在目标的断链 symlink —— readFileSync 会 ENOENT
-    await symlink(path.join(dir, "nonexistent-target"), path.join(src, "OEBPS", "ghost.xhtml"));
+    const unreadable = path.join(src, "OEBPS", "ghost.xhtml");
+    await writeFile(unreadable, "unavailable");
 
-    expect(() => packEpubDir(src)).toThrow(/Cannot read EPUB directory contents/);
+    expect(() =>
+      packEpubDir(src, (filePath) => {
+        if (filePath === unreadable) throw new Error("entry could not be read");
+        return readFileSync(filePath);
+      }),
+    ).toThrow(/Cannot read EPUB directory contents/);
   });
 });
 

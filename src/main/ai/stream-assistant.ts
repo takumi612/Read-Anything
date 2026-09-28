@@ -27,11 +27,11 @@ const log = createLogger("send");
 
 type ResolvedOk = Extract<ResolvedModel, { ok: true }>;
 
-/** runSend / runResend 共用的成功返回形状。 */
+/** Kiểu kết quả thành công chung cho runSend và runResend. */
 export interface OkSendResult {
   ok: true;
   conversationId: string;
-  /** UI message stream（chunk 为 UIMessageChunk）供 UI 轨 IPC 订阅推送。 */
+  /** Luồng UIMessageChunk để đẩy qua IPC tới UI. */
   stream: AsyncIterable<UIMessageChunk>;
   finished: Promise<void>;
 }
@@ -40,14 +40,14 @@ export interface StreamCtx {
   conversationId: string;
   bookId: string | null;
   resolved: ResolvedOk;
-  /** 本轮 user 文本（首轮自动命名用）。 */
+  /** Văn bản lượt người dùng hiện tại, dùng khi tự đặt tên hội thoại. */
   userText: string;
   webSearchTurn: boolean;
 }
 
 /**
- * 共享流式尾段：streamText + tools 跑 agent 循环，一轮终止时落终态 assistant
- * （complete|error|aborted），首轮自动命名 + 轮后压缩。从 runSend 抽出供 runResend 复用。
+ * Phần xử lý stream dùng chung: streamText cùng công cụ chạy vòng AI,
+ * lưu trạng thái cuối complete/error/aborted, đặt tên lượt đầu và nén sau lượt.
  */
 export function streamAssistantReply(
   deps: SendDeps,
@@ -85,7 +85,7 @@ export function streamAssistantReply(
 
   let capturedUsage: LanguageModelUsage | undefined;
   const limit = stepLimit ?? DEFAULT_STEP_LIMIT;
-  // 按 provider 应用 prompt caching 策略（显式断点型如 Anthropic 标 cache_control；隐式型原样透传）。
+  // Áp dụng cache tường minh hoặc giữ nguyên prompt nếu provider tự cache.
   const cached = withPromptCaching({
     providerType: resolved.providerType,
     system: systemPrompt,
@@ -93,7 +93,7 @@ export function streamAssistantReply(
   });
   const result = streamText({
     model: resolved.model,
-    // 顶层 reasoning（v7）：SDK 按 provider 翻译成各自原生推理配置；undefined = provider 默认。
+    // reasoning cấp cao nhất của SDK v7; undefined dùng mặc định provider.
     reasoning: resolved.reasoningEffort,
     instructions: cached.system,
     messages: cached.messages,
@@ -101,7 +101,7 @@ export function streamAssistantReply(
     providerOptions: providerCallOptions(resolved.providerType),
     stopWhen: limit === 0 ? () => false : isStepCount(limit),
     abortSignal: opts?.abortSignal,
-    // v7: onFinish→onEnd；事件的 usage 现为全步累计（= v6 的 totalUsage），语义不变。
+    // SDK v7 dùng onEnd; usage là tổng của mọi bước trong lượt.
     onEnd: ({ usage }) => {
       capturedUsage = usage;
     },
