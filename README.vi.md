@@ -54,8 +54,6 @@ Có thể dùng trực tiếp `corepack pnpm package` và `corepack pnpm make:wi
 3. Nếu dùng AI, mở **Settings**, chọn nhà cung cấp và nhập API key của bạn. Bản sao lưu không chứa API key.
 4. Muốn mở PDF bằng Read-Anything trên Windows, bật đăng ký ứng dụng trong phần cài đặt nâng cao. Sau đó chọn Read-Anything cho `.pdf` trong **Ứng dụng mặc định** của Windows.
 
-Ứng dụng dùng lại dữ liệu Marginalia cũ trên cùng máy nếu Read-Anything chưa có thư mục dữ liệu. Tên tệp database và các khóa lưu trữ cũ được giữ để không mất sách, ghi chú và tiến độ. Hãy sao lưu thư viện trước khi gỡ bản cũ.
-
 ## Tài liệu trong repository
 
 - [Cài và chạy từ mã nguồn](docs/run-from-source.html)

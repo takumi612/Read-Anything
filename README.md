@@ -54,8 +54,6 @@ The same actions are available as `corepack pnpm package` and `corepack pnpm mak
 3. Open **Settings** to choose a provider and enter your own API key if you want AI responses. Keys are not part of backups.
 4. To offer Read-Anything as a PDF app in Windows, open the app's advanced settings. Windows Default Apps controls the final `.pdf` choice.
 
-Existing Marginalia data is reused on the same machine when Read-Anything has no data directory yet. The database and saved keys keep their legacy internal names for compatibility. Back up your library before uninstalling an older version.
-
 ## Documentation
 
 - [Set up from source](docs/run-from-source.html)
