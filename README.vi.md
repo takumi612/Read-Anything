@@ -14,9 +14,30 @@ Read-Anything là ứng dụng đọc PDF và EPUB trên máy tính. Bạn có t
 - Hỏi AI về đoạn đã chọn qua OpenAI, Anthropic, Google hoặc endpoint tương thích OpenAI. Nếu nhà cung cấp thu phí API, chi phí thuộc tài khoản của bạn.
 - Dùng giao diện tiếng Việt hoặc tiếng Anh. Đọc và tra từ offline không cần tài khoản hay API key.
 
-## Cài và chạy từ mã nguồn trên Windows
+## Cài và chạy Read-Anything trên Windows
 
-Cần **Windows 10 trở lên (64 bit)**, **Node.js 24 có Corepack** và **Git** để tải mã nguồn. Lần cài đầu tải thư viện npm, Electron và phiên bản pnpm đã khóa; các lần chạy sau dùng lại thư viện trên máy. Bộ từ điển ngoại tuyến đã có trong repository.
+### Yêu cầu
+
+- Windows 10 trở lên, 64 bit.
+- [Node.js 24.x cho Windows x64](https://nodejs.org/en/download/archive/v24/). Bộ cài có npm và Corepack. Dự án khóa pnpm ở phiên bản 11.5.0.
+- [Git for Windows](https://git-scm.com/download/win) để tải mã nguồn.
+- Có kết nối Internet để tải mã nguồn và dependencies trong lần cài đầu.
+
+Sau khi cài, ứng dụng và từ điển đi kèm dùng được ngoại tuyến. Muốn hỏi AI, bạn cần Internet và API key của nhà cung cấp. Đọc sách và tra từ không cần API key.
+
+Mở PowerShell và kiểm tra các công cụ:
+
+```powershell
+node --version
+git --version
+corepack --version
+```
+
+`node --version` cần trả về dạng `v24.x.x`. Nếu lệnh `corepack --version` báo không tìm thấy lệnh, chạy `npm install --global corepack`, đóng PowerShell rồi mở lại. Xem [hướng dẫn Corepack](https://github.com/nodejs/corepack#readme) để biết thêm.
+
+### Cài và mở ứng dụng
+
+Chạy các lệnh sau trong PowerShell:
 
 ```powershell
 git clone https://github.com/takumi612/Read-Anything.git
@@ -25,34 +46,35 @@ cd Read-Anything
 .\scripts\windows.ps1 dev
 ```
 
-Nếu PowerShell không cho chạy script, dùng lệnh tương đương:
+Lệnh đầu tải mã nguồn cùng bộ từ điển. `setup` tải phiên bản pnpm và thư viện đã khóa, build bộ đọc EPUB và chuẩn bị SQLite cho Electron. Giữ cửa sổ PowerShell mở khi ứng dụng đang chạy. Nhấn **Ctrl+C** trong cửa sổ đó để dừng chế độ phát triển.
+
+Nếu PowerShell chặn script cài đặt, chạy trực tiếp các lệnh của dự án:
 
 ```powershell
 corepack pnpm install --frozen-lockfile
 corepack pnpm dev
 ```
 
-`install` tự build các package nội bộ và biên dịch `better-sqlite3` cho Electron qua `postinstall`. Giữ cửa sổ terminal mở khi chạy chế độ phát triển. Nếu máy thiếu trình biên dịch native, cài Microsoft C++ Build Tools rồi chạy lại lệnh `install`.
+Nếu cài đặt dừng với lỗi biên dịch `node-gyp` hoặc `better-sqlite3`, cài Python 3 và [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/), chọn workload **Desktop development with C++**. Sau đó chạy lại `corepack pnpm install --frozen-lockfile`. Một số máy dùng được binary dựng sẵn nên không cần các công cụ biên dịch này.
 
-## Tạo và chạy EXE trên Windows
+### Mở sách đầu tiên
 
-Đóng EXE đang chạy trước khi build lại. Lệnh `package` tạo một thư mục ứng dụng; khi sao chép phải giữ nguyên cả thư mục:
+1. Trong thư viện, chọn **Import books**, rồi chọn tệp PDF hoặc EPUB.
+2. Mở sách, bôi chọn một từ tiếng Anh và chọn **Look up** để xem từ điển offline.
+3. Muốn hỏi AI về một đoạn sách, mở **Settings**, thêm nhà cung cấp và API key, rồi chọn đoạn văn và nhấn **Ask AI**. Nhà cung cấp có thể tính phí API.
+
+### Tạo file EXE Windows
+
+Để tạo và chạy bản ứng dụng portable, dùng:
 
 ```powershell
 .\scripts\windows.ps1 package
 .\out\Read-Anything-win32-x64\Read-Anything.exe
 ```
 
-Để tạo bộ cài Windows, chạy `.\scripts\windows.ps1 installer`. Electron Forge ghi bộ cài Squirrel trong `out\make\squirrel.windows\x64\`. Bản tự build chưa ký mã. Lệnh này không đăng bản phát hành lên GitHub.
+Để tạo bộ cài Windows, chạy `.\scripts\windows.ps1 installer`. Bộ cài nằm trong `out\make\squirrel.windows\x64\`.
 
-Có thể dùng trực tiếp `corepack pnpm package` và `corepack pnpm make:win`. Trên macOS hoặc Linux, cài cùng phiên bản Node.js, rồi chạy `corepack pnpm install --frozen-lockfile`, `corepack pnpm dev`, `corepack pnpm package`. Muốn đóng gói cho hệ điều hành nào thì chạy lệnh trên hệ điều hành đó; repository này chưa có luồng phát hành đã ký và công chứng.
-
-## Bắt đầu đọc
-
-1. Nhập một tệp PDF hoặc EPUB trong thư viện.
-2. Chọn từ tiếng Anh và nhấn **Look up** để tra offline. Chọn đoạn văn và nhấn **Ask AI** khi đã cấu hình nhà cung cấp.
-3. Nếu dùng AI, mở **Settings**, chọn nhà cung cấp và nhập API key của bạn. Bản sao lưu không chứa API key.
-4. Muốn mở PDF bằng Read-Anything trên Windows, bật đăng ký ứng dụng trong phần cài đặt nâng cao. Sau đó chọn Read-Anything cho `.pdf` trong **Ứng dụng mặc định** của Windows.
+Xem [hướng dẫn cài từ mã nguồn](docs/run-from-source.html) để biết thêm về chế độ phát triển, hoặc [hướng dẫn đóng gói Windows](docs/build-windows-exe.html) để tìm hiểu file EXE và bộ cài.
 
 ## Tài liệu trong repository
 

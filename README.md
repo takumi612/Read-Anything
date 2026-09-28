@@ -14,9 +14,30 @@ Read-Anything is an offline-first desktop reader for PDF and EPUB books. Look up
 - Ask AI about selected text with OpenAI, Anthropic, Google, or an OpenAI-compatible endpoint you configure. Provider charges, if any, are determined by that provider.
 - Use the interface in English or Vietnamese. No account is required for offline reading.
 
-## Run on Windows from source
+## Run Read-Anything on Windows
 
-You need **Windows 10 or later (64-bit)**, **Node.js 24 with Corepack**, and **Git** for cloning. The first install downloads the app's npm dependencies, Electron, and the pinned pnpm version. Later runs reuse the local installation. The offline dictionary is included in the repository; no API key is needed for lookup.
+### Requirements
+
+- Windows 10 or later, 64-bit.
+- [Node.js 24.x for Windows x64](https://nodejs.org/en/download/archive/v24/). It includes npm and Corepack. This repository pins pnpm 11.5.0.
+- [Git for Windows](https://git-scm.com/download/win) to clone the repository.
+- An internet connection for cloning the repository and downloading dependencies on the first setup.
+
+The app and bundled dictionary work offline after setup. AI questions need an internet connection and an API key from the provider you choose. You do not need an API key to read books or look up words.
+
+Check that the tools are available in PowerShell:
+
+```powershell
+node --version
+git --version
+corepack --version
+```
+
+`node --version` must show `v24.x.x`. If `corepack --version` reports that the command was not found, run `npm install --global corepack`, close PowerShell, then open it again. See the [Corepack guide](https://github.com/nodejs/corepack#readme) for details.
+
+### Install and start the app
+
+Run these commands in PowerShell:
 
 ```powershell
 git clone https://github.com/takumi612/Read-Anything.git
@@ -25,34 +46,35 @@ cd Read-Anything
 .\scripts\windows.ps1 dev
 ```
 
-If PowerShell restricts local scripts, run the equivalent commands directly:
+The first command downloads the source and bundled dictionary. `setup` downloads the locked pnpm version and app dependencies, builds the EPUB parser, and prepares SQLite for Electron. Keep the PowerShell window open while the app runs. Press **Ctrl+C** in that window to stop development mode.
+
+If PowerShell blocks the setup script, run the project commands directly:
 
 ```powershell
 corepack pnpm install --frozen-lockfile
 corepack pnpm dev
 ```
 
-`install` builds the workspace packages and rebuilds `better-sqlite3` for Electron through `postinstall`. Keep the terminal open while developing. If the native module cannot compile on your Windows machine, install the Microsoft C++ build tools, then repeat `corepack pnpm install`.
+If setup stops with a `node-gyp` or `better-sqlite3` compiler error, install Python 3 and [Visual Studio Build Tools](https://visualstudio.microsoft.com/visual-cpp-build-tools/) with the **Desktop development with C++** workload. Then run `corepack pnpm install --frozen-lockfile` again. The native module may use a prebuilt binary and not need these build tools.
 
-## Build and run the Windows EXE
+### Open your first book
 
-Close any running Read-Anything EXE before rebuilding. The `package` action creates an app folder that must stay together:
+1. In the library, choose **Import books** and select a PDF or EPUB.
+2. Open the book. Select an English word and choose **Look up** to see its offline dictionary entry.
+3. To ask AI about a passage, open **Settings**, add your provider and API key, then select the passage and choose **Ask AI**. The provider may charge for API use.
+
+### Build a Windows EXE
+
+To create and run a portable build, use:
 
 ```powershell
 .\scripts\windows.ps1 package
 .\out\Read-Anything-win32-x64\Read-Anything.exe
 ```
 
-To create a Windows installer instead, run `.\scripts\windows.ps1 installer`. Electron Forge writes the Squirrel installer under `out\make\squirrel.windows\x64\`. A build from source is not code signed. Building the installer does not publish a GitHub release.
+To create a Windows installer, run `.\scripts\windows.ps1 installer`. Find it in `out\make\squirrel.windows\x64\`.
 
-The same actions are available as `corepack pnpm package` and `corepack pnpm make:win`. On macOS or Linux, install the same Node.js version and use `corepack pnpm install --frozen-lockfile`, `corepack pnpm dev`, and `corepack pnpm package`. Packaging for a platform must run on that platform; this repository does not include a signed or notarized release workflow.
-
-## First use
-
-1. Import a PDF or EPUB from the library.
-2. Select an English word and choose **Look up** for the offline dictionary. Select a passage and choose **Ask AI** only if you have configured a provider.
-3. Open **Settings** to choose a provider and enter your own API key if you want AI responses. Keys are not part of backups.
-4. To offer Read-Anything as a PDF app in Windows, open the app's advanced settings. Windows Default Apps controls the final `.pdf` choice.
+See [the detailed source setup guide](docs/run-from-source.html) for development notes, or [the Windows packaging guide](docs/build-windows-exe.html) to learn about the EXE and installer.
 
 ## Documentation
 
