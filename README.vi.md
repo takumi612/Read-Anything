@@ -74,15 +74,15 @@ Nếu cài đặt dừng với lỗi biên dịch `node-gyp` hoặc `better-sqli
 
 Để tạo bộ cài Windows, chạy `.\scripts\windows.ps1 installer`. Bộ cài nằm trong `out\make\squirrel.windows\x64\`.
 
-Xem [hướng dẫn cài từ mã nguồn](docs/run-from-source.html) để biết thêm về chế độ phát triển, hoặc [hướng dẫn đóng gói Windows](docs/build-windows-exe.html) để tìm hiểu file EXE và bộ cài.
+Xem [hướng dẫn chạy từ mã nguồn](docs/run-from-source.md) để biết thêm về chế độ phát triển, hoặc [hướng dẫn đóng gói Windows](docs/build-windows-exe.md) để làm theo các bước tạo EXE và bộ cài.
 
 ## Tài liệu trong repository
 
-- [Cài và chạy từ mã nguồn](docs/run-from-source.html)
-- [Tạo EXE Windows](docs/build-windows-exe.html)
-- [Kiến trúc dự án](docs/architecture.html)
-- [Bản đồ mã nguồn](docs/code-map.html)
-- [Luồng hoạt động](docs/runtime-flows.html)
+- [Cài và chạy từ mã nguồn](docs/run-from-source.md)
+- [Tạo EXE Windows](docs/build-windows-exe.md)
+- [Kiến trúc dự án](docs/architecture.md)
+- [Bản đồ mã nguồn](docs/code-map.md)
+- [Luồng hoạt động](docs/runtime-flows.md)
 
 ## Giấy phép và dữ liệu
 

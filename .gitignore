@@ -103,6 +103,8 @@ out/
 
 # Implementation plans stay local (never committed)
 docs/plans/
+# Local design notes are not part of the public docs.
+docs/specs/
 
 # Agent worktrees
 .worktrees/

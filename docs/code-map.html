@@ -4,7 +4,302 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <title>Bản đồ mã nguồn Read-Anything</title>
-    <link rel="stylesheet" href="source-guide.css" />
+      <style>
+      :root {
+        color-scheme: light;
+        --ink: #20302f;
+        --muted: #526460;
+        --line: #dbe4dc;
+        --paper: #fbfaf5;
+        --card: #fff;
+        --accent: #17695b;
+        --soft: #e9f3ee;
+        --code: #edf1ec;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        scroll-behavior: smooth;
+      }
+      body {
+        margin: 0;
+        background: var(--paper);
+        color: var(--ink);
+        font:
+          16px/1.65 system-ui,
+          -apple-system,
+          "Segoe UI",
+          sans-serif;
+      }
+      a {
+        color: var(--accent);
+        text-underline-offset: 3px;
+      }
+      a:hover {
+        text-decoration-thickness: 2px;
+      }
+      .site-header {
+        background: #133e37;
+        color: #f8fbf7;
+        padding: 1.35rem max(1rem, calc((100vw - 1180px) / 2));
+        display: flex;
+        gap: 1rem;
+        align-items: center;
+        justify-content: space-between;
+        flex-wrap: wrap;
+      }
+      .site-header a {
+        color: #f8fbf7;
+      }
+      .brand {
+        font-weight: 750;
+        font-size: 1.16rem;
+        text-decoration: none;
+      }
+      .site-nav {
+        display: flex;
+        gap: 0.3rem;
+        flex-wrap: wrap;
+      }
+      .site-nav a {
+        padding: 0.28rem 0.58rem;
+        border-radius: 7px;
+        text-decoration: none;
+      }
+      .site-nav a:hover,
+      .site-nav a[aria-current="page"] {
+        background: #326b60;
+      }
+      .layout {
+        max-width: 1180px;
+        margin: auto;
+        padding: 1.8rem 1rem 5rem;
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) 220px;
+        gap: 3rem;
+      }
+      .content {
+        min-width: 0;
+      }
+      h1 {
+        font-size: clamp(2rem, 4vw, 3.1rem);
+        line-height: 1.17;
+        margin: 0.15rem 0 1rem;
+        letter-spacing: -0.035em;
+      }
+      h2 {
+        font-size: 1.5rem;
+        margin: 2.5rem 0 0.7rem;
+        padding-top: 0.3rem;
+        border-top: 1px solid var(--line);
+      }
+      h3 {
+        font-size: 1.14rem;
+        margin: 1.5rem 0 0.4rem;
+      }
+      p {
+        margin: 0.55rem 0 1rem;
+      }
+      .lead {
+        font-size: 1.13rem;
+        color: #324b45;
+        max-width: 72ch;
+      }
+      .eyebrow {
+        font-size: 0.8rem;
+        text-transform: uppercase;
+        letter-spacing: 0.11em;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .toc {
+        align-self: start;
+        position: sticky;
+        top: 1rem;
+        padding: 1rem;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--card);
+        max-height: calc(100vh - 2rem);
+        overflow: auto;
+      }
+      .toc strong {
+        display: block;
+        margin-bottom: 0.55rem;
+      }
+      .toc a {
+        display: block;
+        padding: 0.2rem 0;
+        font-size: 0.89rem;
+        text-decoration: none;
+      }
+      .toc a:hover {
+        text-decoration: underline;
+      }
+      .callout,
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        padding: 1rem 1.2rem;
+        margin: 1rem 0;
+      }
+      .callout {
+        border-left: 4px solid var(--accent);
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+        gap: 0.8rem;
+      }
+      .grid .card {
+        margin: 0;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      code,
+      pre {
+        font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+      }
+      code {
+        background: var(--code);
+        padding: 0.1rem 0.3rem;
+        border-radius: 4px;
+        font-size: 0.9em;
+        overflow-wrap: anywhere;
+      }
+      pre {
+        background: #19312d;
+        color: #eef6f0;
+        padding: 1rem;
+        border-radius: 10px;
+        overflow: auto;
+        line-height: 1.48;
+      }
+      pre code {
+        background: none;
+        color: inherit;
+        padding: 0;
+        overflow-wrap: normal;
+      }
+      table {
+        border-collapse: collapse;
+        width: 100%;
+        background: #fff;
+        font-size: 0.94rem;
+      }
+      th,
+      td {
+        border: 1px solid var(--line);
+        padding: 0.65rem 0.7rem;
+        text-align: left;
+        vertical-align: top;
+      }
+      th {
+        background: var(--soft);
+      }
+      .table-wrap {
+        overflow: auto;
+      }
+      .diagram {
+        display: flex;
+        gap: 0.3rem;
+        flex-wrap: wrap;
+        align-items: center;
+        margin: 1rem 0;
+      }
+      .diagram span {
+        background: var(--soft);
+        border: 1px solid var(--line);
+        border-radius: 7px;
+        padding: 0.4rem 0.65rem;
+      }
+      .diagram b {
+        color: var(--accent);
+      }
+      .file-list {
+        list-style: none;
+        padding: 0;
+      }
+      .file-list li {
+        border-bottom: 1px solid var(--line);
+        padding: 0.32rem 0;
+      }
+      .file-list code {
+        font-size: 0.82rem;
+      }
+      .badge {
+        display: inline-block;
+        font-size: 0.72rem;
+        color: #526460;
+        margin-left: 0.45rem;
+      }
+      .footer {
+        max-width: 1180px;
+        margin: 0 auto;
+        padding: 1rem;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        font-size: 0.86rem;
+      }
+      details {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: #fff;
+        padding: 0.55rem 0.8rem;
+        margin: 0.5rem 0;
+      }
+      summary {
+        cursor: pointer;
+        font-weight: 650;
+      }
+      @media (max-width: 850px) {
+        .layout {
+          display: block;
+        }
+        .toc {
+          position: static;
+          max-height: none;
+          margin-top: 2rem;
+        }
+        .site-header {
+          padding: 1rem;
+        }
+        .site-nav {
+          gap: 0.1rem;
+        }
+        .site-nav a {
+          font-size: 0.85rem;
+        }
+      }
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --ink: #e5eee9;
+          --muted: #aabeb6;
+          --line: #334b43;
+          --paper: #14221f;
+          --card: #1c302b;
+          --accent: #90dcc4;
+          --soft: #243d35;
+          --code: #2d433a;
+        }
+        table {
+          background: var(--card);
+        }
+        .lead {
+          color: #d2e1d9;
+        }
+        pre {
+          background: #0c1815;
+        }
+        .site-header {
+          background: #0b3028;
+        }
+      }
+      </style>
   </head>
   <body>
     <header class="site-header">
@@ -259,19 +554,13 @@
           migration; asset nhị phân không phải mã TypeScript.
         </p>
         <details id="dir-c-u-h-nh---g-c">
-          <summary>Cấu hình ở gốc <span class="muted">(22 tệp)</span></summary>
+          <summary>Cấu hình ở gốc <span class="muted">(20 tệp)</span></summary>
           <ul class="file-list">
             <li>
               <a href="../.oxfmtrc.json"><code>.oxfmtrc.json</code></a>
             </li>
             <li>
               <a href="../.oxlintrc.json"><code>.oxlintrc.json</code></a>
-            </li>
-            <li>
-              <a href="../AGENTS.md"><code>AGENTS.md</code></a>
-            </li>
-            <li>
-              <a href="../CLAUDE.md"><code>CLAUDE.md</code></a>
             </li>
             <li>
               <a href="../LICENSE"><code>LICENSE</code></a>
@@ -349,26 +638,10 @@
           </ul>
         </details>
         <details id="dir-assets">
-          <summary>assets <span class="muted">(5 tệp)</span></summary>
+          <summary>assets <span class="muted">(1 tệp)</span></summary>
           <ul class="file-list">
             <li>
               <a href="../assets/icon.svg"><code>assets/icon.svg</code></a
-              ><span class="badge">asset/patch</span>
-            </li>
-            <li>
-              <a href="../assets/library-zh-CN.jpg"><code>assets/library-zh-CN.jpg</code></a
-              ><span class="badge">asset/patch</span>
-            </li>
-            <li>
-              <a href="../assets/library.jpg"><code>assets/library.jpg</code></a
-              ><span class="badge">asset/patch</span>
-            </li>
-            <li>
-              <a href="../assets/reader-zh-CN.png"><code>assets/reader-zh-CN.png</code></a
-              ><span class="badge">asset/patch</span>
-            </li>
-            <li>
-              <a href="../assets/reader.png"><code>assets/reader.png</code></a
               ><span class="badge">asset/patch</span>
             </li>
           </ul>

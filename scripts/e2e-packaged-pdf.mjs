@@ -26,10 +26,8 @@ const exePath = path.resolve(
         : path.join(root, "out", "Read-Anything-win32-x64", "Read-Anything.exe")),
   ),
 );
-const samplePath = path.resolve(
-  String(args.get("sample") || "D:\\Book will read\\coders-at-work.pdf"),
-);
-const sampleExtension = path.extname(samplePath).toLowerCase();
+const samplePath = args.has("sample") ? path.resolve(String(args.get("sample"))) : null;
+const sampleExtension = samplePath ? path.extname(samplePath).toLowerCase() : null;
 const captureSelection = args.has("capture");
 const keepProfile = args.has("keep-profile");
 const pinchOnly = args.has("pinch-only");
@@ -1945,6 +1943,11 @@ async function main() {
   }
   if (!existsSync(exePath)) throw new Error(`Electron executable not found: ${exePath}`);
   if (appRoot && !existsSync(appRoot)) throw new Error(`Built app root not found: ${appRoot}`);
+  if (!samplePath) {
+    throw new Error(
+      "No sample file specified. Pass --sample=<absolute-pdf-or-epub-path>.",
+    );
+  }
   if (!existsSync(samplePath)) {
     throw new Error(
       `Sample file not found: ${samplePath}. Pass --sample=<absolute-pdf-or-epub-path>.`,

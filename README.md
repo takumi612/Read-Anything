@@ -74,15 +74,15 @@ To create and run a portable build, use:
 
 To create a Windows installer, run `.\scripts\windows.ps1 installer`. Find it in `out\make\squirrel.windows\x64\`.
 
-See [the detailed source setup guide](docs/run-from-source.html) for development notes, or [the Windows packaging guide](docs/build-windows-exe.html) to learn about the EXE and installer.
+See [the source setup guide](docs/run-from-source.md) for development details, or [the Windows packaging guide](docs/build-windows-exe.md) for the EXE and installer steps.
 
 ## Documentation
 
-- [Set up from source](docs/run-from-source.html)
-- [Build a Windows EXE](docs/build-windows-exe.html)
-- [Project architecture](docs/architecture.html)
-- [Code map](docs/code-map.html)
-- [Runtime flows](docs/runtime-flows.html)
+- [Set up from source](docs/run-from-source.md)
+- [Build a Windows EXE](docs/build-windows-exe.md)
+- [Project architecture](docs/architecture.md)
+- [Code map](docs/code-map.md)
+- [Runtime flows](docs/runtime-flows.md)
 
 ## License and data
 
