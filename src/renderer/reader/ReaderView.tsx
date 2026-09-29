@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useQuery } from "@tanstack/react-query";
-import {
-  ArrowLeft,
-  MessagesSquare,
-  Volume2,
-} from "lucide-react";
+import { ArrowLeft, MessagesSquare, Volume2 } from "lucide-react";
 import { qk } from "@renderer/query/keys";
 import { Button } from "@renderer/components/ui/button";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@renderer/components/ui/tooltip";
@@ -74,6 +70,10 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
   const [headerVisible, setHeaderVisible] = useState(true);
   const previousScrollTop = useRef<number | null>(null);
   const lastScrollIntentAt = useRef(0);
+  const scrollIntentId = useRef(0);
+  const handledScrollIntentId = useRef(0);
+  const scrollIntentDirection = useRef<-1 | 0 | 1>(0);
+  const previousTouchY = useRef<number | null>(null);
   const [pdfNavigation, setPdfNavigation] = useState<PdfNavigationState | null>(null);
   const [pdfTocView, setPdfTocView] = useState<PdfTocView>("contents");
   const [readerPanelView, setReaderPanelView] = useState<ReaderPanelView>("assistant");
@@ -85,6 +85,8 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
     setPdfTocView("contents");
     setReaderPanelView("assistant");
     previousScrollTop.current = null;
+    lastScrollIntentAt.current = 0;
+    handledScrollIntentId.current = scrollIntentId.current;
     setHeaderVisible(true);
   }, [bookId]);
 
@@ -94,7 +96,20 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
     const noteScrollIntent = (event: Event) => {
       if (event instanceof WheelEvent && !isReadingScrollWheel(event)) return;
       if (!isReaderScrollTarget(event.target)) return;
+      let direction: -1 | 0 | 1 = 0;
+      if (event instanceof WheelEvent) {
+        direction = Math.sign(event.deltaY) as -1 | 0 | 1;
+      } else if (event instanceof TouchEvent) {
+        const y = event.touches[0]?.clientY;
+        if (y == null) return;
+        if (event.type === "touchmove" && previousTouchY.current != null)
+          direction = Math.sign(previousTouchY.current - y) as -1 | 0 | 1;
+        previousTouchY.current = y;
+      }
+      if (direction === 0) return;
       lastScrollIntentAt.current = performance.now();
+      scrollIntentDirection.current = direction;
+      scrollIntentId.current += 1;
       if (previousScrollTop.current == null && event.target instanceof Element) {
         const scrollRegion = event.target.closest<HTMLElement>(".reader-scroll-region");
         if (scrollRegion) previousScrollTop.current = scrollRegion.scrollTop;
@@ -109,6 +124,11 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
         ["ArrowDown", "ArrowUp", "PageDown", "PageUp", "Home", "End", " "].includes(event.key)
       ) {
         lastScrollIntentAt.current = performance.now();
+        scrollIntentDirection.current =
+          ["ArrowUp", "PageUp", "Home"].includes(event.key) || (event.key === " " && event.shiftKey)
+            ? -1
+            : 1;
+        scrollIntentId.current += 1;
       }
     };
     const onReaderScroll = (event: Event) => {
@@ -126,11 +146,24 @@ export function ReaderView({ mode }: { mode: "active" | "reference" }) {
         previousScrollTop.current = currentScrollTop;
         return;
       }
+      // Hiding the header resizes the reader and Virtuoso emits another scroll event.
+      // Consume each physical input once so that layout scroll cannot reveal it again.
+      if (handledScrollIntentId.current === scrollIntentId.current) {
+        previousScrollTop.current = currentScrollTop;
+        return;
+      }
+      handledScrollIntentId.current = scrollIntentId.current;
       const previousScrollTopValue = previousScrollTop.current;
+      const intentDirection = scrollIntentDirection.current;
       setHeaderVisible((visible) =>
         previousScrollTopValue == null
           ? visible
-          : nextHeaderVisibility(visible, previousScrollTopValue, currentScrollTop),
+          : nextHeaderVisibility(
+              visible,
+              previousScrollTopValue,
+              currentScrollTop,
+              intentDirection,
+            ),
       );
       previousScrollTop.current = currentScrollTop;
     };

@@ -15,6 +15,24 @@ export interface HighlightRect {
   rect: OverlayRect;
 }
 
+function sameHighlightRects(previous: HighlightRect[], next: HighlightRect[]): boolean {
+  return (
+    previous.length === next.length &&
+    previous.every((item, index) => {
+      const candidate = next[index];
+      return (
+        item.annoId === candidate.annoId &&
+        item.style === candidate.style &&
+        item.hasNote === candidate.hasNote &&
+        item.rect.left === candidate.rect.left &&
+        item.rect.top === candidate.rect.top &&
+        item.rect.width === candidate.rect.width &&
+        item.rect.height === candidate.rect.height
+      );
+    })
+  );
+}
+
 /** Tìm hình tô sáng chứa điểm (x,y) theo khung trang, dùng cho nhấn sửa và con trỏ khi rê. */
 export function hitHighlight(
   highlights: HighlightRect[],
@@ -43,7 +61,7 @@ export function usePdfHighlights(
   const [rects, setRects] = useState<HighlightRect[]>([]);
   useEffect(() => {
     if (!ready || !textLayer || annos.length === 0) {
-      setRects([]);
+      setRects((previous) => (previous.length === 0 ? previous : []));
       return;
     }
     const containerRect = textLayer.getBoundingClientRect();
@@ -55,7 +73,7 @@ export function usePdfHighlights(
         out.push({ annoId: a.id, style: a.style, hasNote: a.hasNote, rect });
       }
     }
-    setRects(out);
+    setRects((previous) => (sameHighlightRects(previous, out) ? previous : out));
   }, [annos, textLayer, ready]);
   return rects;
 }

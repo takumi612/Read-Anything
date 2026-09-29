@@ -7,9 +7,7 @@ export function hasRecentUserScrollIntent(lastIntentAt: number, now: number): bo
 }
 
 /** Pinch zoom is a modified wheel gesture, not a request to move the reader header. */
-export function isReadingScrollWheel(
-  event: Pick<WheelEvent, "ctrlKey" | "metaKey">,
-): boolean {
+export function isReadingScrollWheel(event: Pick<WheelEvent, "ctrlKey" | "metaKey">): boolean {
   return !event.ctrlKey && !event.metaKey;
 }
 
@@ -18,10 +16,13 @@ export function nextHeaderVisibility(
   currentlyVisible: boolean,
   previousScrollTop: number,
   currentScrollTop: number,
+  intentDirection: -1 | 0 | 1 = 0,
 ): boolean {
   if (currentScrollTop <= HEADER_REVEAL_SCROLL_TOP) return true;
 
   const delta = currentScrollTop - previousScrollTop;
+  if (intentDirection > 0 && delta < 0) return currentlyVisible;
+  if (intentDirection < 0 && delta > 0) return currentlyVisible;
   if (delta > SCROLL_DIRECTION_THRESHOLD) return false;
   if (delta < -SCROLL_DIRECTION_THRESHOLD) return true;
   return currentlyVisible;

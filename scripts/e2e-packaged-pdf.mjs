@@ -39,6 +39,9 @@ const disableGpu = args.has("disable-gpu");
 const noSandbox = args.has("no-sandbox");
 const capturePages = args.has("capture-pages");
 const layoutOnly = args.has("layout-only") || args.has("pre-render-steps");
+const scrollStress = args.has("scroll-stress");
+const topScrollStress = args.has("top-scroll-stress");
+const fitPageStress = args.has("fit-page-stress");
 const checks = [];
 let profilePath;
 let child;
@@ -1931,7 +1934,7 @@ async function removeProfileSafely() {
 async function main() {
   if (args.has("help")) {
     console.log(
-      "Usage: node scripts/e2e-packaged-pdf.mjs [--sample=<absolute-pdf-or-epub-path>] [--exe=<absolute-exe-path>] [--app-root=<built-app-root>] [--capture] [--capture-pages] [--keep-profile] [--background-only] [--pinch-only] [--thumbnails-only] [--layout-only] [--disable-gpu] [--no-sandbox]",
+      "Usage: node scripts/e2e-packaged-pdf.mjs [--sample=<absolute-pdf-or-epub-path>] [--exe=<absolute-exe-path>] [--app-root=<built-app-root>] [--capture] [--capture-pages] [--keep-profile] [--background-only] [--pinch-only] [--thumbnails-only] [--layout-only] [--scroll-stress] [--top-scroll-stress] [--fit-page-stress] [--disable-gpu] [--no-sandbox]",
     );
     console.log(
       "Starts the packaged EXE, or Electron with a built app root, using a fresh temporary profile.",
@@ -1944,9 +1947,7 @@ async function main() {
   if (!existsSync(exePath)) throw new Error(`Electron executable not found: ${exePath}`);
   if (appRoot && !existsSync(appRoot)) throw new Error(`Built app root not found: ${appRoot}`);
   if (!samplePath) {
-    throw new Error(
-      "No sample file specified. Pass --sample=<absolute-pdf-or-epub-path>.",
-    );
+    throw new Error("No sample file specified. Pass --sample=<absolute-pdf-or-epub-path>.");
   }
   if (!existsSync(samplePath)) {
     throw new Error(
@@ -2050,6 +2051,157 @@ async function main() {
     firstPagePaint.inkSamples > 0,
     `${firstPagePaint.width}×${firstPagePaint.height}, text ${firstPagePaint.textLength} chars, ${firstPagePaint.opaqueSamples}/${firstPagePaint.sampledPixels} opaque and ${firstPagePaint.inkSamples} ink samples`,
   );
+  if (fitPageStress) {
+    const opened = await client.evaluate(`(() => {
+      const options = [...document.querySelectorAll('button')].find(button =>
+        /^(Reading preferences|Reading options|Tùy chọn đọc)$/u.test(button.getAttribute('aria-label') || '')
+      );
+      options?.click();
+      return Boolean(options);
+    })()`);
+    check("Reading preferences can be opened", opened);
+    const selected = await waitFor("Fit page option", () =>
+      client.evaluate(`(() => {
+      const fit = [...document.querySelectorAll('button')].find(button =>
+        /^(Fit page|Vừa trang)$/u.test(button.innerText.trim())
+      );
+      fit?.click();
+      return Boolean(fit);
+    })()`),
+    );
+    check("Fit page can be selected from reading options", selected);
+    await sleep(500);
+    const trace = [];
+    for (let i = 0; i < 18; i++) {
+      await client.call("Input.dispatchKeyEvent", {
+        type: "keyDown",
+        key: "PageDown",
+        code: "PageDown",
+        windowsVirtualKeyCode: 34,
+      });
+      await client.call("Input.dispatchKeyEvent", {
+        type: "keyUp",
+        key: "PageDown",
+        code: "PageDown",
+        windowsVirtualKeyCode: 34,
+      });
+      await sleep(220);
+      const state = await client.evaluate(`(() => {
+        const scroller = document.querySelector('.reader-scroll-region');
+        if (!scroller) return null;
+        const top = scroller.getBoundingClientRect().top;
+        const layers = [...scroller.querySelectorAll('.textLayer[data-page]')];
+        const page = layers.map(layer => ({page: Number(layer.dataset.page), distance: Math.abs(layer.getBoundingClientRect().top - top)}))
+          .sort((a, b) => a.distance - b.distance)[0]?.page ?? null;
+        return { page, scrollTop: Math.round(scroller.scrollTop), errorScreen: document.body.innerText.includes('Something went wrong') };
+      })()`);
+      trace.push(state);
+      if (!state || state.errorScreen) break;
+    }
+    console.log("FIT_PAGE_TRACE", JSON.stringify(trace));
+    check(
+      "Fit page navigation keeps the PDF reader mounted",
+      trace.length === 18 && trace.every((step) => step && !step.errorScreen),
+    );
+    check("Fit page navigation advances through pages", trace.at(-1).page > trace[0].page);
+    check(
+      "each PageDown in Fit page advances one page",
+      trace.every((step, index) => index === 0 || step.page === trace[index - 1].page + 1),
+    );
+    check(
+      "Fit page navigation has no renderer exception",
+      !client.runtimeEvents.some(
+        (event) =>
+          event.type === "exception" || /React error #185|Maximum update depth/u.test(event.text),
+      ),
+    );
+    return;
+  }
+  if (scrollStress || topScrollStress) {
+    const trace = [];
+    await client.evaluate(`(() => {
+      const collapse = [...document.querySelectorAll('button[aria-label]')].find(button =>
+        /^(Collapse sidebar|Thu gọn thanh bên)$/u.test(button.getAttribute('aria-label') || '')
+      );
+      collapse?.click();
+    })()`);
+    await sleep(300);
+    const target = await client.evaluate(`(() => {
+      const scroller = document.querySelector('.reader-scroll-region');
+      if (!scroller) return null;
+      scroller.scrollTop = ${topScrollStress ? "0" : "scroller.scrollHeight * 0.035"};
+      const rect = scroller.getBoundingClientRect();
+      return { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+    })()`);
+    if (!target) throw new Error("PDF scroller missing");
+    await sleep(500);
+    if (topScrollStress) {
+      await client.call("Input.dispatchMouseEvent", {
+        type: "mouseWheel",
+        x: target.x,
+        y: target.y,
+        deltaX: 0,
+        deltaY: 120,
+      });
+      await sleep(100);
+      const layoutScroll = await client.evaluate(`(() => {
+        const scroller = document.querySelector('.reader-scroll-region');
+        if (!scroller) return null;
+        const before = scroller.scrollTop;
+        scroller.scrollTop = Math.max(12, before - 36);
+        scroller.dispatchEvent(new Event('scroll', { bubbles: true }));
+        return { before, after: scroller.scrollTop };
+      })()`);
+      await sleep(100);
+      const headerHidden = await client.evaluate(
+        `document.querySelector('header')?.parentElement?.getAttribute('aria-hidden') === 'true'`,
+      );
+      check(
+        "layout scroll after a downward wheel does not reveal the header",
+        layoutScroll?.before > layoutScroll?.after && headerHidden,
+        JSON.stringify(layoutScroll),
+      );
+    }
+    for (let i = 0; i < 70; i++) {
+      await client.call("Input.dispatchMouseEvent", {
+        type: "mouseWheel",
+        x: target.x,
+        y: target.y,
+        deltaX: 0,
+        deltaY: topScrollStress ? 120 : 260,
+      });
+      await sleep(60);
+      const step = await client.evaluate(`(() => {
+        const scroller = document.querySelector('.reader-scroll-region');
+        if (!scroller) return null;
+        const layers = [...scroller.querySelectorAll('.textLayer[data-page]')];
+        const top = scroller.getBoundingClientRect().top;
+        const page = layers.map(layer => ({ page: Number(layer.dataset.page), distance: Math.abs(layer.getBoundingClientRect().top - top) })).sort((a, b) => a.distance - b.distance)[0]?.page ?? null;
+        return { scrollTop: Math.round(scroller.scrollTop), page,
+          headerVisible: document.querySelector('header')?.parentElement?.getAttribute('aria-hidden') === 'false' };
+      })()`);
+      trace.push(step);
+    }
+    console.log(
+      "SCROLL_TRACE",
+      JSON.stringify({ first: trace[0], last: trace.at(-1), count: trace.length }),
+    );
+    check("repeated downward scrolling keeps the PDF reader mounted", trace.every(Boolean));
+    if (topScrollStress)
+      check("downward scrolling from the cover advances", trace.at(-1)?.scrollTop > 500);
+    check(
+      "repeated downward scrolling advances without backward jumps",
+      trace.every((step, i) => i === 0 || step.scrollTop >= trace[i - 1].scrollTop),
+    );
+    check(
+      "repeated downward scrolling has no renderer exception",
+      !client.runtimeEvents.some(
+        (event) =>
+          event.type === "exception" || /React error #185|Maximum update depth/u.test(event.text),
+      ),
+    );
+    return;
+  }
   if (layoutOnly) await verifyReaderLayout();
   if (backgroundOnly) {
     await runApplicationBackgroundChecks(firstPagePaint);

@@ -25,6 +25,7 @@ import { chapterIdAtPage } from "./pdf-chapter-at-page";
 import { clampPdfZoom, clampPdfZoomScale, nextZoom, PDF_ZOOM_STEP } from "./pdf-zoom";
 import {
   intraPageRatio,
+  PAGE_PADDING_Y,
   positionAtViewportTop,
   scrollTopFor,
   topPageAt,
@@ -114,6 +115,7 @@ const ZOOM_SETTLE_MS = ZOOM_GESTURE_GAP_MS + 50;
 /** Chờ hết khoảng này sau khi phóng đại rồi mới vẽ lại trang; CSS kéo giãn ảnh cũ trong lúc chờ. */
 const RENDER_DEBOUNCE_MS = 140;
 const EMPTY_VOCABULARY: VocabularyEntryDto[] = [];
+const EMPTY_PDF_ANNOS: PdfPageAnno[] = [];
 const CITATION_SEARCH_OPTIONS: PdfSearchOptions = { caseSensitive: false, wholeWord: false };
 
 function renderedPdfPosition(
@@ -243,17 +245,25 @@ export function PdfReader({ bookId, chapters, persistProgress, onNavigationChang
   const updateCurrentPageContext = (page: number) => {
     const chapterId = chapterIdAtPage(chapters, page);
     const chapter = chapterId ? chapters.find((item) => item.id === chapterId) : null;
-    setReadingContext({
-      format: "pdf",
-      page,
-      pageCount: book?.pageCount ?? 0,
-      chapterId,
-      chapterTitle: chapter?.title ?? null,
-    });
+    const pageCount = book?.pageCount ?? 0;
+    const chapterTitle = chapter?.title ?? null;
+    const previous = useNavigationStore.getState().readingContext;
+    // Virtuoso can report the same range again after measuring a page. Publishing a new
+    // context for an unchanged page rerenders ReaderView during that measurement cycle.
+    if (
+      previous?.format !== "pdf" ||
+      previous.page !== page ||
+      previous.pageCount !== pageCount ||
+      previous.chapterId !== chapterId ||
+      previous.chapterTitle !== chapterTitle
+    ) {
+      setReadingContext({ format: "pdf", page, pageCount, chapterId, chapterTitle });
+    }
     if (book) recordPageRead(page, book.pageCount);
     if (chapterId) {
       topChapterIdRef.current = chapterId;
-      if (chapterId !== currentChapterId) setCurrentChapter(chapterId);
+      if (chapterId !== useNavigationStore.getState().currentChapterId)
+        setCurrentChapter(chapterId);
     }
   };
 
@@ -267,7 +277,13 @@ export function PdfReader({ bookId, chapters, persistProgress, onNavigationChang
         useNavigationStore.getState().recordPdfJump(bookId, from, { page, scrollRatio });
       }
       const scroller = scrollerRef.current;
-      virtuosoRef.current?.scrollToIndex({ index: page - 1, align: "start" });
+      // Land on the page content, past its 8px top padding. At the item boundary,
+      // positionAtViewportTop still considers the gap part of the previous page.
+      virtuosoRef.current?.scrollToIndex({
+        index: page - 1,
+        align: "start",
+        offset: PAGE_PADDING_Y + scrollRatio * pageH,
+      });
       if (scroller) {
         const alignToPageRatio = (attempt: number) => {
           requestAnimationFrame(() => {
@@ -596,8 +612,7 @@ export function PdfReader({ bookId, chapters, persistProgress, onNavigationChang
     if (!book || appliedBookZoom.current !== bookId || !sawInitialRange.current) return;
     const timer = setTimeout(() => {
       const current = currentPdfPosition();
-      if (current)
-        saveAt(current.page, current.scrollRatio);
+      if (current) saveAt(current.page, current.scrollRatio);
     }, 350);
     return () => clearTimeout(timer);
   }, [book, bookId, zoom, viewMode, rotation, fitMode, currentPdfPosition, saveAt]);
@@ -1117,7 +1132,7 @@ export function PdfReader({ bookId, chapters, persistProgress, onNavigationChang
             rotation={rotation}
             invert={invertPdfPages}
             brightness={pdfBrightness}
-            annos={annosByPage.get(index + 1) ?? []}
+            annos={annosByPage.get(index + 1) ?? EMPTY_PDF_ANNOS}
             vocabulary={
               vocabularyVisible ? (vocabulary.data ?? EMPTY_VOCABULARY) : EMPTY_VOCABULARY
             }

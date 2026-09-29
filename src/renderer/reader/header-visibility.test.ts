@@ -40,4 +40,9 @@ describe("nextHeaderVisibility", () => {
     expect(nextHeaderVisibility(true, 120, 121)).toBe(true);
     expect(nextHeaderVisibility(false, 120, 121)).toBe(false);
   });
+
+  it("ignores layout scroll in the opposite direction of the user's gesture", () => {
+    expect(nextHeaderVisibility(false, 150, 110, 1)).toBe(false);
+    expect(nextHeaderVisibility(true, 110, 150, -1)).toBe(true);
+  });
 });
